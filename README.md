@@ -1,128 +1,86 @@
-# Poke-Controller Modified Extension
+# Poke-Controller Modified Extension Plus
 
-[moi_poke](https://github.com/Moi-poke)氏が開発した[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)をベースに機能を追加したゲーム機自動化支援ソフトウェアです。
+[Poke-Controller Modified Extension](https://github.com/futo030/Poke-Controller-Modified-Extension) 0.1.9をベースにした、Windows用のフォークです。元のTk画面とPythonスクリプト実行方式を維持し、Pythonのインストールが不要な配布とMCP対応を追加しています。
 
-[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)からUIを一新、並列起動や対応ゲーム機の種類を増やしています。(ver. 0.1.6時点ではSwitch/3DS/DS/GCに対応。)
+## この公開について
 
-また、Modified版に対する後方互換性保持をMUSTとして開発をしています。
-2025/3/31時点では、[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)で動作する自動化のスクリプト(後述)はすべて動作する(はず)です。
+ポケコンについて詳しいわけではありませんが、個人的に使っていて気になった部分を、Codexを使って修正しました。「とりあえず動けばよい」という方向けに、Pythonやライブラリを自分で導入しなくても起動できるアルファ版を置いています。
 
-![カイリューかわいい](https://github.com/futo030/Poke-Controller-Modified-Extension/blob/image/pokecon_modified_extension_image_20250402.png)
+動作・スクリプト互換性・不具合の修正を保証しません。利用による損害などについて責任は負いません。また、今後継続的に更新・サポートする予定はありません。これらを了承のうえ、各同梱物のライセンス条件の範囲で、自己責任で利用してください。
 
+必要な機能や不具合があれば、このリポジトリをフォークし、CodexやClaudeなどを使って、ご自身の環境に合わせて修正することをおすすめします。AIによる変更も、実際に使う前にご自身で確認してください。
 
-## 更新履歴
+## フォーク元から引き継いだ機能
 
-[Github - 更新履歴](https://github.com/futo030/Poke-Controller-Modified-Extension/blob/master/changelog.txt)
+元のアプリは[KawaSwitch氏のPoke-Controller](https://github.com/KawaSwitch/Poke-Controller)、[Moi-poke氏のModified](https://github.com/Moi-poke/Poke-Controller-Modified)を経て、[futo030氏のModified Extension](https://github.com/futo030/Poke-Controller-Modified-Extension)へ拡張されています。
 
+Extensionの2つのログ欄、プロファイル、スクリプトの絞り込み・ショートカット・一時停止、ソフトウェアコントローラー、画像認識の範囲表示、ゲームパッド入力、3DS向け通信形式、MQTT・Socket通信などを引き継いでいます。これらを今回新しく作ったものとして扱っていません。詳細と元の改善点は[元版README](README.upstream.md)に残しています。
 
-## Poke-Controller とは?
+## 起動
 
-Poke-Controllerの概要は[KawaSwitch](https://github.com/KawaSwitch)氏が開発した[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)および[moi_poke](https://github.com/Moi-poke)氏が開発した[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)を参照してください。
+1. [Releases](https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/releases)から`PokeController-portable-win64.zip`をダウンロードします。
+2. ZIP全体を書き込み可能なフォルダーへ解凍します。Python・追加ライブラリの手動導入は不要です。
+3. 解凍したフォルダー内の`PokeController.exe`を起動します。exeだけを移動しないでください。
+4. カメラとCOMポートを選んで接続します。初回はどちらも無効です。
 
+Windows 10/11 x64向けです。Python、.NET SDK、Gitのインストールは不要です。小さな起動用exeはWindows付属の.NET Framework 4を使用し、Python本体とライブラリは`runtime-python`に同梱しています。
 
-## Poke-Controller Modifiedとの差分について
+インストーラーや自己展開exeは使用しません。フォルダー一式で動作するportable版です。MCPには同じフォルダー内の`PokeControllerMCP.exe`を登録します。
 
-[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)に対し、以下の機能追加および仕様変更を実施しています。
-- 使用時における便利機能の追加
-  - 2つ目のログ画面を追加(常時表示しておきたい情報の表示を想定)
-  - 更新確認機能を追加
-  - シリアルデバイスをコンボボックスで設定する機能を追加
-  - スクリプトのFilter機能を追加
-  - スクリプトのショートカット割り当て機能を追加
-  - スクリプトの一時停止機能を追加
-  - ログ画面クリア機能を追加
-  - ログ画面の上書き用関数を追加
-  - メインウィンドウに埋め込まれたソフトウェアコントローラーを追加(表示ON/OFF可能)
-  - スクリプト一時停止機能を追加
-  - ToolTip表示機能を追加
-- スクリプト開発に役立つ機能の追加
-  - 画像認識時の類似度を自動化スクリプトの記載によらず出力できる機能を追加(ON/OFF可能)
-  - 画像認識時の探索範囲および認識結果をGUI上に表示する機能を追加(ON/OFF可能)
-  - 画面キャプチャ機能を拡張
-    - キャプチャしている画面部分を'Ctrl+Alt+左クリック'しながらドラッグした範囲をキャプチャすることが可能\
-      このとき、名前をつけて保存のダイアログボックスが出て、任意の名前をつけることが可能
-- スクリプト開発者への問い合わせ時に必要な情報の表示する機能の追加
-  - ライブラリのversion情報の表示機能の追加
-  - 問い合わせ用テンプレート文章作成アシスタント機能の追加
-- 並列起動への対応
-  - ProfileによるPokeCon側の設定複数保持機能を追加
-  - 同一名称のキャプチャデバイスが接続された場合に対応できるよう仕様を変更
-- 3DS自動化基板への対応([Qingpi](https://qiita.com/u1f992/items/09617ae326288a0df703)/3DS Controller)
-  - 送信するシリアルデータのフォーマットを3種(Poke-Controller向け/Qingpi向け/3DS Controller向け)から選択する機能を追加
-  - PokeConの画面上でタッチスクリーンを操作する機能を追加([Qingpi](https://qiita.com/u1f992/items/09617ae326288a0df703)のみ)
-- ゲームパッドによる操作への対応
-  - Pro-Controllerによる操作機能を追加(ver.0.1.5時点ではPro-Controllerのみ対応。)
-  - 操作時のログを取得する機能を追加(再生可能)
-- MQTTおよびSocket通信関連への対応
-  - 関連する関数を追加
-- 画像認識関連の関数の拡張
-  - 画像の2値化に対応
-  - 引数および関数を追加
-- ダイアログ関数の拡張
-  - ウィジェットの複数列表示(改行)機能を追加
-  - 前回の入力の保持や呼び出しが可能なダイアログ関数を追加
-- 通知機能の拡充
-  - WindowsのNotificationによる通知機能を追加
-  - ~~Discord Webhookを用いた通知機能を追加~~(同様の機能が[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)に実装済み)
-  - プログラムの開始および終了時に通知する機能を追加(ON/OFF可能)
-- UI刷新(設定画面のタブ化およびログ画面を2画面化)
-  - ログ画面の2画面化に伴う機能の追加(サイズや標準出力先など)
-  - レイアウトカスタマイズ機能の追加
+別の設定で同時起動する場合は`PokeController.exe --profile 名前`を使用します。同じプロファイルの二重起動は防止しています。元のメニューからプロファイル別の起動BATも作れます。
 
+設定は`SerialController/profiles`、追加スクリプトは`SerialController/Commands/PythonCommands`、画像認識用の画像は`SerialController/Template`、キャプチャは`SerialController/Captures`に保存します。更新時は新しいZIPを別フォルダーへ展開し、自分の設定・スクリプト・画像を移してください。
 
-## 推奨環境
+## MCP
 
-- OS
-  - Windows10/11
-  - (一応Mac/Linuxでも動作するはずですが未確認です。issueおよびPRには対応します。)
-- Python
-  - 3.12以上(従来の3.7はサポートが終了しているためサポート対象外とします。)
+MCPは初期状態でOFFです。「メニュー → 設定 → MCP」またはMCPメニューからONにし、MCPクライアントに`PokeControllerMCP.exe`を登録してください。[接続方法とツール一覧](MCP.md)。MCPも同梱Pythonで動作します。設定はプロファイルごとに保存されます。`--mcp` / `--no-mcp`はその起動だけの指定です。
 
+## 設定と更新
 
-## 開発環境
+Show Sizeは映像の表示サイズです。起動時にモニターへ収まる表示領域を確保し、解像度を変更してもウィンドウ・操作欄・ログ欄の位置とサイズを維持します。大きな映像は縦横比を保って領域内へ縮小し、小さな映像では余白が残ります。確認ダイアログは表示せず、その場で映像を更新します。保存される指定値とキャプチャ・画像認識の解像度は変更しません。
 
-Python 3.12.2
+「メニュー → 設定」でMCP、アプリの更新、同梱ライブラリを確認できます。「ヘルプ → アップデート確認」からも更新画面を開けます。
 
+- 更新確認は手動です。非公開リポジトリでは、そのリポジトリのContents読み取り権限を持つGitHubトークンを入力してください。トークンはファイルに保存しません。
+- 同梱ライブラリ画面は初期状態で全項目にチェックが入っています。「チェックした部品を更新」で一括更新でき、チェックを外すと個別更新になります。外した部品のバージョンは維持します。依存関係が両立しなければ適用せずエラーを表示します。FFmpegはOpenCV付属なので`opencv-python`と一緒に更新します。Python本体の更新機能はありません。
+- ライブラリは別の実行環境へコピーして更新・基本検証し、次回起動から使用します。全ウィンドウとMCPを終了して同じexeを起動し直してください。最新版での全スクリプトの動作は保証できません。「配布時のライブラリに戻す」で元に戻せます。起動できないときはexeに`--reset-libraries`を付けて実行し、その後通常起動してください。更新には通信と追加ディスク容量が必要です。失敗の詳細は`.runtime-updates`内の`update.log`に残ります。
+- 更新対象は新しいバージョンの非下書きリリースで、`PokeController-portable-win64.zip`が必要です。検証版も設定で対象にできます。「配布ページを開く」からブラウザーでダウンロードしてください。
+- 更新は手動です。全ウィンドウを終了して新しいZIPを別フォルダーへ展開し、`SerialController/profiles`、`Commands/PythonCommands`内の自分で追加・変更したスクリプト、`Template`内の独自画像をコピーしてください。必要なら`Captures`と`Controller_Log`もコピーします。いずれも`SerialController`以下です。標準スクリプト全体を旧版で上書きすると修正が戻るため、自分の変更分を移してください。
+- 同じフォルダーへの上書き更新も可能です。全ウィンドウを終了し、設定と独自ファイルのバックアップを取ってからZIPの内容を上書きしてください。旧版で不要になったファイルは残るため、別フォルダーへの展開を推奨します。exeだけの置換では更新できません。
+- アプリは更新版の自動展開・データ移行・切り替えを行いません。exeファイル名は既存MCP設定との互換性のため変更していません。移動した場合はMCPクライアントの登録パスも変更してください。
 
-## Installation
+通常の設定とMCPなどの追加設定は、一時ファイルへの書き込み完了後に置き換えます。変更前の内容を同じ場所の`.bak`へ保存し、同じ内容の再保存ではバックアップを更新しません。読み込み時に破損が見つかり正常なバックアップがあれば、破損ファイルを`.corrupt-*`へ残して復元します。復元できない場合はファイルを上書きせずエラーを表示します。キー設定と通常設定は保存前に最新内容を読み込み、互いの変更を保ちます。
 
-必要なライブラリは[Github - requirements](https://github.com/futo030/Poke-Controller-Modified-Extension/blob/master/requirements.txt)を参照してください。
+## この版の変更と制約
 
+- DirectShowLib、pythonnet、windows-capture-device-listを廃止し、Windows COMによるカメラ列挙へ置換。
+- 元版と同じpynput・pygameへ復帰しました。独自の代替ライブラリは削除し、既存スクリプトから元のライブラリのAPIを利用できます。
+- 橋渡し関数・サンプルスクリプトは上流0.1.9のファイルを無変更で復元しました。フウ氏の作成物を引用・同梱しています。[個人・非商用などの元の利用条件](SerialController/Commands/PythonCommands/bridge_functions/License.txt)が適用され、MITではありません。
+- 出典のライセンスを明確にできないログ装飾コードを標準loggingへ置換。Icons8の画像は文字ボタンへ置換。
+- 上流のサンプル画像を元のファイル名・配置で復元しています。画像内のゲーム著作物は本体のMITライセンスの対象ではありません。解像度・ゲームの表示設定が違う場合は自分で画像を用意してください。
+- OpenCV付属のFFmpegプラグインも復元し、対応する動画ファイルの読み書きを利用できます。
+- 通知設定の読み込み時に外部サービスへ接続しません。通知の実送信は従来の操作で行います。既存のLINE関連UIは残していますが、サービスの稼働を保証するものではありません。
+- 指定ポート名で接続する際のボーレート、右スティックの変化判定、カメラ無効時の処理、スクリプトの個別読み込み失敗を修正。
 
-## Wiki
+0.2.0-alpha.8は個人用の修正をまとめた公開アルファ版です。協調停止、切断時の入力停止、デバイス別ゲームパッド入力、非同期キャプチャ、画面ログの件数制限を維持しています。pynputのコールバックから送信処理を分離し、キーを押したまま停止した際の入力解除も行います。独自スクリプトの無限ループやタイムアウトのない外部処理は強制終了せず、終了待ちを表示します。実機への操作送信と全スクリプトの動作は未検証です。Mac/Linux向けのアプリ全体の対応は行っていません。
 
-現在作成を検討しております。
-3DSの自動化については[こちら](https://draco-meteor.hatenablog.com/entry/20240514)の記事を参照ください。
+## 開発・ビルド
 
+開発時のみPython 3.12 x64が必要です。
 
-## 謝辞
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+.venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe tests\integration.py
+.venv\Scripts\python.exe packaging\build.py
+.venv\Scripts\python.exe tests\integration.py --package C:\絶対パス\dist\PokeController
+```
 
-[Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)の開発者である[KawaSwitch](https://github.com/KawaSwitch)氏、[Poke-Controller Modified](https://github.com/Moi-poke/Poke-Controller-Modified)の開発者である[moi_poke](https://github.com/Moi-poke)氏にそれぞれ感謝申し上げます。
-
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tr>
-    <td align="center"><a href="https://github.com/KawaSwitch"><img src="https://avatars3.githubusercontent.com/u/41296626?v=4" width="100px;" alt=""/><br /><sub><b>KawaSwitch</b></sub></a><br /><a href="https://github.com/KawaSwitch/Poke-Controller/commits?author=KawaSwitch" title="Code">💻</a> <a href="#maintenance-KawaSwitch" title="Maintenance">🚧</a> <a href="https://github.com/KawaSwitch/Poke-Controller/commits?author=KawaSwitch" title="Documentation">📖</a> <a href="#question-KawaSwitch" title="Answering Questions">💬</a></td>
-    <td align="center"><a href="https://github.com/Moi-poke"><img src="https://avatars1.githubusercontent.com/u/59233665?v=4" width="100px;" alt=""/><br /><sub><b>Moi-poke</b></sub></a><br /><a href="https://github.com/KawaSwitch/Poke-Controller/commits?author=Moi-poke" title="Code">💻</a> <a href="#question-Moi-poke" title="Answering Questions">💬</a></td>
-  </tr>
-</table>
-
-<!-- markdownlint-enable -->
-<!-- prettier-ignore-end -->
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-
-## 貢献
-
-このプロジェクトは, [all-contributors](https://github.com/all-contributors/all-contributors)仕様に準拠しています. どんな貢献も歓迎します。
-
+ビルドはGitで管理されているファイルのみを収集します。変更をコミットしてから実行してください。出力先が既にある場合は`--output-name PokeController-alpha8`などで新しいフォルダー名を指定できます。起動中のアプリのフォルダーは移動しないでください。ZIPは`release`に出力します。
 
 ## ライセンス
 
-本プロジェクトはMITライセンスです。
-詳細は [Github - LISENCE](https://github.com/futo030/Poke-Controller-Modified-Extension/blob/master/LICENSE) を参照ください。
-※今後変更の可能性があります。
+本体と今回の追加コードは[MIT](LICENSE)ですが、橋渡し関数は独自ライセンス、pygame・pynput・FFmpeg等はそれぞれのライセンスです。ゲーム画像も本体のMITの対象ではありません。配布物全体がMITではありません。[第三者ライセンスと変更内容](THIRD_PARTY_NOTICES.md)を参照してください。依存元のライセンスと、一部ライブラリの対応するソースアーカイブを同梱します。
 
-また, 本プロジェクトではLGPLライセンスのDirectShowLib-2005.dllを同梱し使用しています。
-[About DirectShowLib](http://directshownet.sourceforge.net/)  
+フォークのGit履歴には元のファイルと元のライセンスが残ります。過去の制限付きファイルをMITへ変更したものではありません。元版の説明は[README.upstream.md](README.upstream.md)に保存しています。配布版の起動・更新方法はこのREADMEを優先してください。

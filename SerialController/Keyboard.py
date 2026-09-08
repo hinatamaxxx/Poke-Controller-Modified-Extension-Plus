@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import configparser
 import os
+import queue
+import threading
 
 from pynput.keyboard import Key, Listener
 from logging import getLogger, DEBUG, NullHandler
@@ -19,15 +21,64 @@ class Keyboard:
         self._logger.setLevel(DEBUG)
         self._logger.propagate = True
 
+        self._events = queue.Queue(maxsize=2048)
+        self._stopped = threading.Event()
         self.listener = Listener(
-            on_press=self.on_press,
-            on_release=self.on_release)
+            on_press=lambda key: self._enqueue(True, key),
+            on_release=lambda key: self._enqueue(False, key))
+        self.worker = threading.Thread(target=self._dispatch, daemon=True)
+
+    @property
+    def threads(self):
+        return [self.listener, self.worker]
+
+    def _enqueue(self, down, key):
+        if key is None or self._stopped.is_set():
+            return
+        try:
+            self._events.put_nowait((down, key))
+        except queue.Full:
+            self._logger.error('キーボード入力が過負荷になったため停止します')
+            self.stop()
+
+    def _dispatch(self):
+        held = {}
+        try:
+            while not self._stopped.is_set():
+                try:
+                    down, key = self._events.get(timeout=.05)
+                except queue.Empty:
+                    continue
+                # Keep the key decoded at keydown even if Shift is released first.
+                identity = getattr(key, 'vk', None)
+                if identity is None:
+                    identity = key
+                if down:
+                    if identity not in held:
+                        held[identity] = key
+                        self.on_press(key)
+                else:
+                    original = held.pop(identity, None)
+                    if original is not None:
+                        self.on_release(original)
+        except Exception:
+            self._logger.exception('キーボード操作でエラーが発生しました')
+        finally:
+            self._stopped.set()
+            self.listener.stop()
+            for key in held.values():
+                try:
+                    self.on_release(key)
+                except Exception:
+                    self._logger.exception('キーボード入力の解除に失敗しました')
 
     def listen(self):
+        self.worker.start()
         self.listener.start()
         self._logger.debug('Keyboard control start')
 
     def stop(self):
+        self._stopped.set()
         self.listener.stop()
         self._logger.debug('Keyboard control stop')
 

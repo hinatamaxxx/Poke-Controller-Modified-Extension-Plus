@@ -3,6 +3,9 @@
 from __future__ import annotations
 from typing import List, TYPE_CHECKING
 
+import os
+os.environ.setdefault('PYGAME_HIDE_SUPPORT_PROMPT', '1')
+os.environ.setdefault('SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS', '1')
 import pygame
 import numpy as np
 import datetime
@@ -130,8 +133,8 @@ class ProController:
             self.stick_status_new[3] = self.map_axis(joystick.get_axis(3))
         # 古い位置と比較して異なるならビットを立てる
         if (
-            self.stick_status_new[2] == self.stick_status_old[3]
-            and self.stick_status_new[2] == self.stick_status_old[3]
+            self.stick_status_new[2] == self.stick_status_old[2]
+            and self.stick_status_new[3] == self.stick_status_old[3]
         ):
             self.bits_16 = self.bits_16 & ~(1)
         else:
@@ -215,6 +218,7 @@ class ProController:
             self.controller_log = []
 
     def end_sequence(self, ser: Sender, flag_record: bool):
+        self.time0 = datetime.datetime.today()
         self.message = "0x0003 8 80 80 80 80"
         ser.writeRow_wo_perf_counter(self.message, is_show=False)
         if flag_record:
@@ -226,24 +230,32 @@ class ProController:
     def controller_loop(self, ser: Sender, flag_record: bool, ControllerLogDir: str):
         self._logger.info("Activate Pro Controller")
         print("*****Activate Pro Controller*****")
-        # pygame初期化
-        pygame.init()
-        joystick = pygame.joystick.Joystick(0)
-        joystick.init()
-
-        if flag_record:
-            start_time = datetime.datetime.today().strftime("%Y%m%d%H%M%S")
-            self.filename = ControllerLogDir + "/controller_log_" + start_time + ".txt"
-            self.f = open(self.filename, "w", encoding="UTF-8")
-            self._logger.info(f"{self.filename} is opened.")
-            print(f"{self.filename} is opened.")
-            self.controller_log = []
-
+        initialized = False
+        recording = False
+        own_display = not pygame.display.get_init()
+        own_joystick = not pygame.joystick.get_init()
+        joystick = None
         self.old_message = ""
         try:
+            pygame.display.init()
+            pygame.joystick.init()
+            initialized = True
+            joystick = pygame.joystick.Joystick(0)
+            joystick.init()
+            self.instance_id = joystick.get_instance_id()
+            self.current_hat = 0
+            clock = pygame.time.Clock()
+            if flag_record:
+                from pathlib import Path
+                Path(ControllerLogDir).mkdir(parents=True, exist_ok=True)
+                start_time = datetime.datetime.today().strftime('%Y%m%d%H%M%S%f')
+                self.filename = str(Path(ControllerLogDir) / f'controller_log_{start_time}.txt')
+                self.f = open(self.filename, 'w', encoding='utf-8')
+                self.controller_log = []
+                recording = True
             while self.flag_procon:
                 # イベント取得
-                events = pygame.event.get()
+                events = self.controller_events(pygame.event.get())
                 # print("1")
                 # L/R-Stickの変化を検知
                 self.joystick_move_detection(joystick)
@@ -253,12 +265,45 @@ class ProController:
                 # print("3")
                 # シリアルデータの送信
                 self.send_message(ser, flag_record)
+                clock.tick(250)
                 # print("4")
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f'ゲームパッド操作を停止しました: {exc}')
+            self._logger.exception('ゲームパッド処理に失敗しました')
         finally:
-            # 終了処理
-            self.end_sequence(ser, flag_record)
-        pygame.quit()
+            self.flag_procon = False
+            try:
+                if initialized:
+                    self.end_sequence(ser, recording)
+            finally:
+                if recording and not self.f.closed:
+                    self.f.close()
+                if joystick is not None:
+                    joystick.quit()
+                if own_joystick:
+                    pygame.joystick.quit()
+                if own_display:
+                    pygame.display.quit()
         self._logger.info("Inactivate Pro Controller")
         print("*****Inactivate Pro Controller*****")
+
+    def controller_events(self, events):
+        """Keep the real pygame API while isolating the selected controller."""
+        result = []
+        for event in events:
+            if getattr(event, 'instance_id', None) != self.instance_id:
+                continue
+            if event.type == pygame.JOYDEVICEREMOVED:
+                raise RuntimeError('ゲームパッドが切断されました')
+            if event.type == pygame.JOYAXISMOTION and event.axis < 6:
+                result.append(event)
+            elif event.type in (pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP) and event.button < 16:
+                result.append(event)
+            elif event.type == pygame.JOYHATMOTION and event.hat == 0:
+                x, y = event.value
+                hat = (1 if y > 0 else 4 if y < 0 else 0) | (2 if x > 0 else 8 if x < 0 else 0)
+                for mask, button in ((1, 11), (4, 12), (8, 13), (2, 14)):
+                    if bool(self.current_hat & mask) != bool(hat & mask):
+                        result.append(pygame.event.Event(pygame.JOYBUTTONDOWN if hat & mask else pygame.JOYBUTTONUP, button=button))
+                self.current_hat = hat
+        return result

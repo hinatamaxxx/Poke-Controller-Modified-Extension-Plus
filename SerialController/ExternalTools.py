@@ -74,7 +74,8 @@ class SocketCommunications:
         return:なし
         filename|str:ファイル名
         """
-        socket_first = open(filename, encoding="utf-8").readline()
+        with open(filename, encoding="utf-8") as stream:
+            socket_first = stream.readline()
         return socket_first[0] == "\ufeff"
 
     def change_ipaddr(self, addr):
@@ -310,7 +311,8 @@ class MQTTCommunications:
         return:なし
         filename|str:ファイル名
         """
-        mqtt_first = open(filename, encoding="utf-8").readline()
+        with open(filename, encoding="utf-8") as stream:
+            mqtt_first = stream.readline()
         return mqtt_first[0] == "\ufeff"
 
     def change_broker_address(self, broker_address):

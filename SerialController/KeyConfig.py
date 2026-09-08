@@ -9,6 +9,8 @@ import tkinter.ttk as ttk
 from logging import getLogger, DEBUG, NullHandler
 
 from pynput.keyboard import Listener
+from UiDispatch import on_ui
+from safe_settings import read_config, write_config
 
 
 class PokeKeycon:
@@ -290,6 +292,7 @@ class PokeKeycon:
         self.listener.stop()
         self.listener = None
 
+    @on_ui
     def on_press(self, key, var):
         try:
             # print('alphanumeric key {0} pressed'.format(key.char))
@@ -299,6 +302,7 @@ class PokeKeycon:
             # print(var)
             # print('special key {0} pressed'.format(key))
 
+    @on_ui
     def on_release(self, key, var, button_name):
         try:
             spc = button_name.split(".")[0]
@@ -309,8 +313,7 @@ class PokeKeycon:
         # print(f'{key} released')
 
     def load_config(self):
-        if os.path.isfile(self.SETTING_PATH):
-            self.setting.read(self.SETTING_PATH, encoding="utf-8")
+        self.setting = read_config(self.SETTING_PATH)
 
         self.ZL.set(self.setting["KeyMap-Button"]["Button.ZL"])
         self.L.set(self.setting["KeyMap-Button"]["Button.L"])
@@ -332,6 +335,7 @@ class PokeKeycon:
         self.HAT_RIGHT.set(self.setting["KeyMap-Hat"]["Hat.RIGHT"])
 
     def save_config(self):
+        self.setting = read_config(self.SETTING_PATH)
         self.setting["KeyMap-Button"]["Button.ZL"] = self.ZL.get()
         self.setting["KeyMap-Button"]["Button.L"] = self.L.get()
         self.setting["KeyMap-Button"]["Button.LCLICK"] = self.LCLICK.get()
@@ -352,13 +356,11 @@ class PokeKeycon:
         self.setting["KeyMap-Hat"]["Hat.BTM"] = self.HAT_DOWN.get()
         self.setting["KeyMap-Hat"]["Hat.LEFT"] = self.HAT_LEFT.get()
 
-        with open(self.SETTING_PATH, "w", encoding="utf-8") as file:
-            self.setting.write(file)
+        write_config(self.SETTING_PATH, self.setting)
 
     def apply_setting(self):
-        with open(self.SETTING_PATH, "w", encoding="utf-8") as file:
-            self._logger.debug("Apply key setting")
-            self.setting.write(file)
+        self._logger.debug("Apply key setting")
+        self.save_config()
         if self.listener is not None:
             self.listener.stop()
 

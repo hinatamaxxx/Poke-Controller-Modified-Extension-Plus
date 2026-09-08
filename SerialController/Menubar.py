@@ -14,10 +14,12 @@ from LineNotify import Line_Notify
 from DiscordNotify import Discord_Notify
 from get_pokestatistics import GetFromHomeGUI
 from PokeConShowInfo import PokeConQuestionDialogue, PokeConVersionCheck, PokeConChangeLog, PokeConCopyright
-from PokeConUpdateChecker import PokeConUpdateCheck
+import re
 from PokeConDialogue import PokeConDialogue
 from logging import getLogger, DEBUG, NullHandler
 import webbrowser
+from product import REPOSITORY_URL
+from safe_settings import write_config
 
 
 class PokeController_Menubar(tk.Menu):
@@ -28,6 +30,7 @@ class PokeController_Menubar(tk.Menu):
         self._logger.propagate = True
 
         self.master = master
+        self.app = master
         self.pokeconname = self.master.pokeconname
         self.pokeconversion = self.master.pokeconversion
         self.root = self.master.root
@@ -63,7 +66,7 @@ class PokeController_Menubar(tk.Menu):
         self.menu.add(tk.CASCADE, menu=self.menu_command, label="コマンド")
 
         self.menu.add("separator")
-        self.menu.add("command", label="設定(dummy)")
+        self.menu.add("command", label="設定", command=lambda: self.app.open_plus_settings())
         # TODO: setup command_id_arg 'false' for menuitem.
         self.menu.add("command", command=self.exit, label="終了")
 
@@ -106,8 +109,8 @@ class PokeController_Menubar(tk.Menu):
         """
         utf-8 ファイルが BOM ありかどうかを判定する
         """
-        line_first = open(filename, encoding="utf-8").readline()
-        return line_first[0] == "\ufeff"
+        with open(filename, encoding="utf-8") as stream:
+            return stream.readline().startswith("\ufeff")
 
     def LineTokenAssignment(self):
         self.message_dialogue = tk.Toplevel()
@@ -119,9 +122,7 @@ class PokeController_Menubar(tk.Menu):
             )
             token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True)
             token_file["LINE"] = {"token": ret[0]}
-            with open(token_path, "w", encoding="utf-8") as file:
-                token_file.write(file)
-            os.chmod(path=token_path, mode=0o777)
+            write_config(token_path, token_file)
             self._logger.debug("Assign Line Token")
             self.LineTokenSetting()
         else:
@@ -150,9 +151,7 @@ class PokeController_Menubar(tk.Menu):
                 "username": ret[1],
                 "avatar_url": ret[2],
             }
-            with open(setting_path, "w", encoding="utf-8") as file:
-                setting_file.write(file)
-            os.chmod(path=setting_path, mode=0o777)
+            write_config(setting_path, setting_file)
             self._logger.debug("Assign Discord Webhook Setting")
             self.DiscordSetting()
         else:
@@ -191,12 +190,15 @@ class PokeController_Menubar(tk.Menu):
         ).ret_value(list)
         self.message_dialogue = None
         if ret != []:
+            if not re.fullmatch(r'[\w -]{1,48}', str(ret[0])) or ret[0].endswith(' '):
+                messagebox.showerror('Profile', 'プロファイル名には文字・数字・空白・ハイフンを使用してください。')
+                return
             exe_path = os.path.join(
                 os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)),
                 f"ExecutePokeConModified-Extension_{ret[0]}.bat",
             )
             if not os.path.exists(exe_path):
-                txt = f"python SerialController/PokeConUpdateChecker.py\ncd SerialController\npython Window.py --profile {ret[0]}\npause\n"
+                txt = f'@echo off\ncd /d "%~dp0"\nstart "" "%~dp0PokeController.exe" --profile "{ret[0]}"\n'
                 with open(exe_path, "w", encoding="utf-8") as file:
                     file.write(txt)
             else:
@@ -236,7 +238,7 @@ class PokeController_Menubar(tk.Menu):
         self.show_size_cb.current(0)
 
     def OpenGithub(self):
-        webbrowser.open("https://github.com/futo030/Poke-Controller-Modified-Extension", 2)
+        webbrowser.open(REPOSITORY_URL, 2)
 
     def OpenGuide(self):
         webbrowser.open("https://pokecontroller.info/", 2)
@@ -248,20 +250,7 @@ class PokeController_Menubar(tk.Menu):
         PokeConChangeLog(tk.Toplevel())
 
     def CheckUpdate(self):
-        window = tk.Toplevel()
-        window.withdraw()  # メインウィンドウを非表示にする
-        res = messagebox.askyesno(title="更新確認", message="Poke-Controller Modified Extension の更新を確認しますか?")
-        if res:
-            res_check = PokeConUpdateCheck().check_repository_updates()
-            if res_check == "0":
-                res = tk.messagebox.showinfo(title="更新確認", message="更新はありませんでした。")
-            elif res_check == "1":
-                res = tk.messagebox.showinfo(
-                    title="更新確認", message="最新版が公開されています。Githubのページを開きます。"
-                )
-                self.OpenGithub()
-            else:
-                res = tk.messagebox.showwarning(title="更新確認", message="確認できませんでした。")
+        self.app.open_plus_settings('updates')
 
     def OpenLicense(self):
         PokeConCopyright(tk.Toplevel())

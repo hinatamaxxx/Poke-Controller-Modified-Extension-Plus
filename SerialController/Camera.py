@@ -6,6 +6,8 @@ from typing import List, TYPE_CHECKING
 import cv2
 import datetime
 import os
+import time
+import threading
 from logging import getLogger, DEBUG, NullHandler
 
 if TYPE_CHECKING:
@@ -57,10 +59,17 @@ def _get_save_filespec(filename: str) -> str:
 class Camera:
     def __init__(self, fps: int = 45):
         self.camera = None
+        self.lease = None
         self.capture_size = (1280, 720)
         # self.capture_size = (1920, 1080)
         self.capture_dir = "Captures"
         self.fps = int(fps)
+        self.image_bgr = None
+        self.frame_at = 0
+        self.error = ''
+        self._opened = False
+        self._stop = threading.Event()
+        self.thread = None
 
         self._logger = getLogger(__name__)
         self._logger.addHandler(NullHandler())
@@ -68,37 +77,69 @@ class Camera:
         self._logger.propagate = True
 
     def openCamera(self, cameraId: int):
-        if self.camera is not None and self.camera.isOpened():
-            self._logger.debug("Camera is already opened")
-            self.destroy()
-
-        if os.name == "nt":
-            self._logger.debug("NT OS")
-            self.camera = cv2.VideoCapture(cameraId, cv2.CAP_DSHOW)
-        # self.camera = cv2.VideoCapture(cameraId)
-        else:
-            self._logger.debug("Not NT OS")
-            self.camera = cv2.VideoCapture(cameraId)
-
-        if not self.camera.isOpened():
-            print("Camera ID " + str(cameraId) + " can't open.")
-            self._logger.error(f"Camera ID {cameraId} cannot open.")
+        self.destroy()
+        if cameraId < 0:
             return
-        print("Camera ID " + str(cameraId) + " opened successfully")
-        self._logger.debug(f"Camera ID {cameraId} opened successfully.")
-        # print(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-        # self.camera.set(cv2.CAP_PROP_FPS, 60)
-        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.capture_size[0])
-        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.capture_size[1])
+        if self.thread is not None and self.thread.is_alive():
+            self.error = '前のカメラを終了しています。少し待ってから再接続してください。'
+            print(self.error)
+            return
+        self.error = ''
+        self._stop = threading.Event()
+        self.thread = threading.Thread(target=self._capture_loop, args=(cameraId,), daemon=True)
+        self.thread.start()
+
+    def _capture_loop(self, cameraId):
+        capture, lease = None, None
+        try:
+            from WindowsDevices import enumerate_cameras, CameraLease
+            devices = enumerate_cameras()
+            if cameraId >= len(devices):
+                raise RuntimeError('キャプチャ機器が見つかりません')
+            lease = CameraLease(devices[cameraId]['path'] or str(cameraId))
+            capture = cv2.VideoCapture(cameraId, cv2.CAP_DSHOW)
+            if not capture.isOpened():
+                raise RuntimeError('カメラを開けません。他のアプリで使用していないか確認してください。')
+            capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.capture_size[0])
+            capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.capture_size[1])
+            self.camera, self.lease = capture, lease
+            self._opened = not self._stop.is_set()
+            failures = 0
+            while not self._stop.is_set():
+                ok, frame = capture.read()
+                if self._stop.is_set():
+                    break
+                if not ok or frame is None:
+                    failures += 1
+                    self.image_bgr, self.frame_at = None, 0
+                    if failures >= 5:
+                        raise RuntimeError('カメラ映像が途切れました。USB接続を確認して再接続してください。')
+                    self._stop.wait(.05)
+                    continue
+                failures = 0
+                self.image_bgr, self.frame_at = frame, time.time()
+                self._stop.wait(.001)
+        except Exception as exc:
+            self.error = str(exc)
+            print('カメラ: ' + self.error)
+            self._logger.exception('カメラ処理に失敗しました')
+        finally:
+            self._opened = False
+            self.image_bgr, self.frame_at = None, 0
+            if capture is not None:
+                capture.release()
+            if lease is not None:
+                lease.close()
+            self.camera, self.lease = None, None
 
     # self.camera.set(cv2.CAP_PROP_SETTINGS, 0)
 
     def isOpened(self):
-        self._logger.debug("Camera is opened")
-        return self.camera.isOpened()
+        return self._opened
 
     def readFrame(self):
-        _, self.image_bgr = self.camera.read()
+        if time.time() - self.frame_at > 2:
+            return None
         return self.image_bgr
 
     def saveCapture(self, filename: str = None, crop: int = None, crop_ax: List[int] = None, img: numpy.ndarray = None):
@@ -141,7 +182,6 @@ class Camera:
             self._logger.error(f"Capture Failed :{e}")
 
     def destroy(self):
-        if self.camera is not None and self.camera.isOpened():
-            self.camera.release()
-            self.camera = None
-            self._logger.debug("Camera destroyed")
+        self._stop.set()
+        self._opened = False
+        self.image_bgr, self.frame_at = None, 0

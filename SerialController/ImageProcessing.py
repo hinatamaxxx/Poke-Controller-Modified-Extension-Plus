@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import cv2
-from numpy import ndarray, array, argmax
+from numpy import ndarray, array, argmax, frombuffer, uint8
+from pathlib import Path
 import os
 from typing import List, Tuple, Optional
 from logging import getLogger, DEBUG, NullHandler
@@ -87,19 +88,23 @@ def getImage(path: str, mode: str = "color"):
     """
     画像の読み込みを行う。
     """
-    if path:
-        try:
-            if mode == "binary":
-                return cv2.imread(path, 0)
-            elif mode == "gray":
-                return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-            else:
-                return cv2.imread(path, cv2.IMREAD_COLOR)
-        except Exception:
-            print(f"{path}が開けませんでした。ファイル名およびファイルの格納場所を確認してください。")
-            return None
-    else:
+    if not path:
         return None
+    filename = Path(path).resolve()
+    try:
+        data = filename.read_bytes()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f'画像ファイルが見つかりません：{filename}\nファイル名と保存場所を確認してください。') from exc
+    except OSError as exc:
+        raise OSError(f'画像ファイルを読み込めません：{filename}\nアクセス権やファイルの使用状況を確認してください。') from exc
+    try:
+        flag = cv2.IMREAD_GRAYSCALE if mode in ('binary', 'gray') else cv2.IMREAD_COLOR
+        image = cv2.imdecode(frombuffer(data, dtype=uint8), flag) if data else None
+    except cv2.error:
+        image = None
+    if image is None:
+        raise ValueError(f'画像として読み込めません：{filename}\n空のファイル・破損・非対応形式でないか確認してください。')
+    return image
 
 
 def doPreprocessImage(
@@ -113,10 +118,15 @@ def doPreprocessImage(
     画像をトリミングしてグレースケール化/2値化する
     2値化関連のContributor: mikan kochan 空太 (敬称略)
     """
+    if not isinstance(image, ndarray) or image.size == 0:
+        raise ValueError('画像がありません。キャプチャ映像や、指定した画像データを確認してください。')
     src = crop_image(image, crop=crop)  # トリミング
+    if src.size == 0:
+        raise ValueError(f'切り抜き範囲が画像の外、または空です：範囲={crop}、画像サイズ={image.shape[1]}×{image.shape[0]}')
 
     if use_gray:
-        src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)  # グレースケール化
+        if src.ndim == 3:
+            src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)  # グレースケール化
     elif BGR_range is not None:  # 2値化
         src = cv2.inRange(
             src, array(BGR_range["lower"]), array(BGR_range["upper"])
@@ -207,6 +217,15 @@ class ImageProcessing:
         テンプレートマッチングをする
         画像は必要に応じて事前にグレースケール化やトリミングをしておく必要がある
         """
+        for label, candidate in (('比較対象', image), ('テンプレート', template_image)):
+            if not isinstance(candidate, ndarray) or candidate.size == 0 or candidate.ndim not in (2, 3):
+                raise ValueError(f'{label}の画像がありません。映像・画像ファイル・切り抜き範囲を確認してください。')
+        if template_image.shape[0] > image.shape[0] or template_image.shape[1] > image.shape[1]:
+            raise ValueError(f'テンプレート画像（{template_image.shape[1]}×{template_image.shape[0]}）が比較対象（{image.shape[1]}×{image.shape[0]}）より大きいため比較できません。解像度と切り抜き範囲を確認してください。')
+        if image.dtype != template_image.dtype or image.shape[2:] != template_image.shape[2:]:
+            raise ValueError('比較対象とテンプレートの色形式・データ型が一致しません。同じ形式に揃えてください。')
+        if mask_image is not None and (not isinstance(mask_image, ndarray) or mask_image.shape[:2] != template_image.shape[:2]):
+            raise ValueError('マスク画像とテンプレートのサイズが一致しません。マスクのサイズを確認してください。')
         # 比較方式を設定する
         method = cv2.TM_CCORR_NORMED if isinstance(mask_image, ndarray) else cv2.TM_CCOEFF_NORMED
 

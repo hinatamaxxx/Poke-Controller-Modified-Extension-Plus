@@ -6,6 +6,7 @@ from typing import List, TYPE_CHECKING
 from abc import ABCMeta, abstractclassmethod
 import tkinter as tk
 import os
+from UiDispatch import on_ui_log as on_ui, trim_log
 
 from PokeConDialogue import (
     PokeConDialogue,
@@ -67,6 +68,7 @@ class Command:
     def print_s(self, *objects: object, sep: str = " ", end: str = "\n"):
         print(*objects, sep=sep, end=end)
 
+    @on_ui
     def print_t1(self, *objects: object, sep: str = " ", end: str = "\n"):
         """
         上側のログ画面に文字列を出力する
@@ -75,11 +77,13 @@ class Command:
             txt = sep.join([str(obj) for obj in objects]) + end
             self.text_area_1.config(state="normal")
             self.text_area_1.insert("end", txt)
+            trim_log(self.text_area_1)
             self.text_area_1.config(state="disable")
             self.text_area_1.see("end")
         except Exception:
             print(*objects, sep=sep, end=end)
 
+    @on_ui
     def print_t2(self, *objects: object, sep: str = " ", end: str = "\n"):
         """
         下側のログ画面に文字列を出力する
@@ -88,6 +92,7 @@ class Command:
             txt = sep.join([str(obj) for obj in objects]) + end
             self.text_area_2.config(state="normal")
             self.text_area_2.insert("end", txt)
+            trim_log(self.text_area_2)
             self.text_area_2.config(state="disable")
             self.text_area_2.see("end")
         except Exception:
@@ -111,6 +116,7 @@ class Command:
         elif self.stdout_destination == "2":
             self.print_t2(*objects, sep=sep, end=end)
 
+    @on_ui
     def print_t1b(self, mode, *objects: object, sep: str = " ", end: str = "\n"):
         """
         上側のログ画面に文字列を出力する
@@ -125,11 +131,13 @@ class Command:
                 self.text_area_1.insert("1.0", txt)
             elif mode == "a":
                 self.text_area_1.insert("end", txt)
+            trim_log(self.text_area_1)
             self.text_area_1.config(state="disable")
             self.text_area_1.see("end")
         except Exception:
             pass
 
+    @on_ui
     def print_t2b(self, mode, *objects: object, sep: str = " ", end: str = "\n"):
         """
         下側のログ画面に文字列を出力する
@@ -144,6 +152,7 @@ class Command:
                 self.text_area_2.insert("1.0", txt)
             elif mode == "a":
                 self.text_area_2.insert("end", txt)
+            trim_log(self.text_area_2)
             self.text_area_2.config(state="disable")
             self.text_area_2.see("end")
         except Exception:

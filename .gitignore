@@ -134,3 +134,13 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Portable build and test outputs
+release/
+runtime/
+smoke.*
+qa-output/
+updates/
+.runtime-updates/
+runtime-choice.txt*
+!packaging/*.spec

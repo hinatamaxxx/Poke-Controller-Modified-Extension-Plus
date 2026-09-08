@@ -11,6 +11,8 @@ import cv2
 import platform
 import subprocess
 import threading
+from UiDispatch import Dispatcher, on_ui, on_ui_log, trim_log
+import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as tkmsg
 import Constant
@@ -55,8 +57,10 @@ class PokeControllerApp:
         self._logger.debug(f"User Profile Name: '{profile}'")
 
         self.root = master
+        self.root.withdraw()
+        self.dispatcher = Dispatcher(master)
         self.root.title(
-            f"{Constant.NAME} ver.{Constant.VERSION} (profile: {args.profile})"
+            f"{Constant.NAME} ver.{Constant.VERSION} (profile: {profile})"
         )
         # self.root.resizable(0, 0)
         self.controller = None
@@ -103,10 +107,7 @@ class PokeControllerApp:
         self.capture_button.grid(column="3", padx="5", pady="5", row="0", sticky="ew")
         self.capture_button.configure(command=self.saveCapture)
         self.open_capture_button = ttk.Button(self.top_command_f)
-        self.open_folder_img = tk.PhotoImage(
-            file="./assets/icons8-OpenDir-16.png"
-        )  # modified
-        self.open_capture_button.configure(image=self.open_folder_img)  # modified
+        self.open_capture_button.configure(text="開く")
         self.open_capture_button.grid(column="4", pady="5", row="0")
         self.open_capture_button.configure(command=self.OpenCaptureDir)
         # self.line_button = ttk.Button(self.top_command_f)
@@ -552,7 +553,7 @@ class PokeControllerApp:
         self.command_nb.pack(fill="both", expand=True, padx="5", pady="5", side="left")
         self.command_nb.bind("<<NotebookTabChanged>>", self.controllButtons, add="")
         self.open_command_dir_button = ttk.Button(self.select_commands_f)
-        self.open_command_dir_button.config(image=self.open_folder_img)
+        self.open_command_dir_button.config(text="開く")
         self.open_command_dir_button.pack(
             expand=False, side="left", ipadx="5", pady="15"
         )
@@ -1023,10 +1024,10 @@ class PokeControllerApp:
         self.fps_label_tooltip = ToolTip(self.fps_label, "FPSを設定します(即時反映)")
         self.fps_cb_tooltip = ToolTip(self.fps_cb, "設定されているFPS")
         self.show_size_label_tooltip = ToolTip(
-            self.show_size_label, "表示する画像のサイズを設定します(即時反映)"
+            self.show_size_label, "表示サイズの上限です。画面に収まらない場合は縦横比を保って縮小します。キャプチャ解像度は変わりません。"
         )
         self.show_size_cb_tooltip = ToolTip(
-            self.show_size_cb, "表示されている画像のサイズ"
+            self.show_size_cb, "表示サイズの上限（モニターに収まるサイズへ自動調整）"
         )
         self.camera_name_label_tooltip = ToolTip(
             self.camera_name_label, "使用するキャプチャデバイスを設定します"
@@ -1470,7 +1471,7 @@ class PokeControllerApp:
             #    self.ser,
             KeyPress(self.ser),
             self.camera_lf,
-            *list(map(int, self.show_size.get().split("x"))),
+            640, 360,
         )
         self.preview.config(cursor="crosshair")
         self.preview.grid(
@@ -1696,6 +1697,7 @@ class PokeControllerApp:
 
         self.menu = PokeController_Menubar(self)
         self.root.config(menu=self.menu)
+        self.root.after_idle(self.fitPreviewToScreen)
 
         # logging.debug(f'python version: {sys.version}')
 
@@ -1707,64 +1709,15 @@ class PokeControllerApp:
             self.camera_name_fromDLL.set(self.camera_dic[self.camera_id.get()])
 
     def locateCameraCmbbox(self):
-        if platform.system() == "Windows":
-            try:
-                import clr
-
-                clr.AddReference(r"..\DirectShowLib\DirectShowLib-2005")
-                from DirectShowLib import DsDevice, FilterCategory  # type: ignore
-
-                # Get names of detected camera devices
-                captureDevices = DsDevice.GetDevicesOfCat(
-                    FilterCategory.VideoInputDevice
-                )
-                self.camera_dic = {
-                    cam_id: device.Name + " (" + device.DevicePath + ")"
-                    for cam_id, device in enumerate(captureDevices)
-                }
-            except Exception:
-                import device as dv
-
-                captureDevices = dv.getDeviceList()
-                self.camera_dic = {
-                    cam_id: device[0] for cam_id, device in enumerate(captureDevices)
-                }
-
-            self.camera_dic[str(max(list(self.camera_dic.keys())) + 1)] = "Disable"
-            self.camera_name_cb["values"] = [
-                "No." + str(k) + ": " + v for k, v in self.camera_dic.items()
-            ]
-            self._logger.debug(
-                f"Camera list: {[device for device in self.camera_dic.values()]}"
-            )
-            dev_num = len(self.camera_dic)
-        elif platform.system() == "Darwin":
-            cmd = 'system_profiler SPCameraDataType | grep "^    [^ ]" | sed "s/    //" | sed "s/://" '
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
-            # 出力結果の加工
-            ret = res.stdout.decode("utf-8")
-            cam_list = list(filter(lambda a: a != "", ret.split("\n")))
-            self.camera_dic = {
-                cam_id: camera_name for cam_id, camera_name in enumerate(cam_list)
-            }
-            dev_num = len(self.camera_name_cb["values"])
-            self.camera_dic[str(max(list(self.camera_dic.keys())) + 1)] = "Disable"
-            self.camera_name_cb["values"] = [
-                "No." + str(k) + ": " + v for k, v in self.camera_dic.items()
-            ]
-        else:
-            return False
-        if self.camera_id.get() > dev_num - 1:
-            print("Inappropriate camera ID! -> set to 0")
-            self._logger.debug("Inappropriate camera ID! -> set to 0")
-            self.camera_id.set(0)
-            if dev_num == 0:
-                print("No camera devices can be found.")
-                self._logger.debug("No camera devices can be found.")
-
-        #
+        from WindowsDevices import enumerate_cameras
+        devices = enumerate_cameras()
+        self.camera_dic = {d['index']: d['name'] for d in devices}
+        self.camera_dic[-1] = "Disable"
+        self.camera_name_cb['values'] = [f"No.{k}: {v}" for k, v in self.camera_dic.items()]
+        if self.camera_id.get() not in self.camera_dic:
+            self.camera_id.set(-1)
+        self.camera_name_cb.current(list(self.camera_dic).index(self.camera_id.get()))
         self.camera_id_entry.bind("<KeyRelease>", self.assignCamera)
-        self.camera_name_cb.current(self.camera_id.get())
 
     def locateDeviceCmbbox(self):
         # ポート情報取得
@@ -1878,30 +1831,16 @@ class PokeControllerApp:
         pass
 
     def applyWindowSize(self, event=None):
-        width, height = map(int, self.show_size.get().split("x"))
-        self.preview.setShowsize(height, width)
-        self.changeAreaSize()
+        self.fitPreviewToScreen()
 
-        if self.show_size_tmp != self.show_size_cb["values"].index(
-            self.show_size_cb.get()
-        ):
-            ret = tkmsg.askokcancel("確認", "この画面サイズに変更しますか？")
-        else:
-            return
-
-        if ret:
-            self.show_size_tmp = self.show_size_cb["values"].index(
-                self.show_size_cb.get()
-            )
-        else:
-            self.show_size_cb.current(self.show_size_tmp)
-            width_bef, height_bef = map(int, self.show_size.get().split("x"))
-            self.preview.setShowsize(height_bef, width_bef)
-            # self.show_size_tmp = self.show_size_cb['values'].index(self.show_size_cb.get())
-
-        self.changeAreaSize()
+    def fitPreviewToScreen(self):
+        from PreviewLayout import fit_preview
+        fit_preview(self)
 
     def activateSerial(self):
+        if hasattr(self, 'lifecycle') and (self.lifecycle.busy() or self.lifecycle.closing or self.lifecycle.disconnecting):
+            print('接続を変更する前に実行中の処理を停止してください。')
+            return
         if self.ser.isOpened():
             print("Port is already opened and being closed.")
             self.ser.closeSerial()
@@ -1923,12 +1862,18 @@ class PokeControllerApp:
                 self.settings.save()
 
     def inactivateSerial(self):
+        if hasattr(self, 'lifecycle'):
+            self.lifecycle.request()
+            return
         if self.ser.isOpened():
             print("Port is already opened and being closed.")
             self.ser.closeSerial()
             self.keyPress = None
 
     def activateKeyboard(self):
+        if self.is_use_keyboard.get() and hasattr(self, 'lifecycle') and (self.lifecycle.closing or self.lifecycle.disconnecting):
+            self.is_use_keyboard.set(False)
+            return
         if self.is_use_keyboard.get():
             # enable Keyboard as controller
             if self.keyboard is None:
@@ -1943,6 +1888,8 @@ class PokeControllerApp:
         else:
             # stop listening to keyboard events
             if self.keyboard is not None:
+                if hasattr(self, 'lifecycle'):
+                    self.lifecycle.stopping_threads.extend(self.keyboard.threads)
                 self.keyboard.stop()
                 self.keyboard = None
 
@@ -1952,6 +1899,8 @@ class PokeControllerApp:
 
     def onFocusInController(self, event):
         # enable Keyboard as controller
+        if not self.is_use_keyboard.get() or (hasattr(self, 'lifecycle') and (self.lifecycle.closing or self.lifecycle.disconnecting)):
+            return
         if event.widget == self.root and self.keyboard is None:
             self.keyboard = SwitchKeyboardController(self.keyPress)
             self.keyboard.listen()
@@ -1959,6 +1908,8 @@ class PokeControllerApp:
     def onFocusOutController(self, event):
         # stop listening to keyboard events
         if event.widget == self.root and self.keyboard is not None:
+            if hasattr(self, 'lifecycle'):
+                self.lifecycle.stopping_threads.extend(self.keyboard.threads)
             self.keyboard.stop()
             self.keyboard = None
 
@@ -1981,7 +1932,15 @@ class PokeControllerApp:
         if self.procon is not None:
             self.procon = None
         self.procon = ProController()
-        self.procon.controller_loop(self.ser, self.flag_record, self.ControllerLogDir)
+        try:
+            self.procon.controller_loop(self.ser, self.flag_record, self.ControllerLogDir)
+        finally:
+            self._procon_finished()
+
+    @on_ui
+    def _procon_finished(self):
+        self.is_use_Pro_Controller.set(False)
+        self.mode_change_Pro_Controller()
 
     def mode_change_show_value(self):
         Command.isSimilarity = self.is_show_value.get()
@@ -2004,6 +1963,10 @@ class PokeControllerApp:
         Command.pos_dialogue_buttons = self.pos_dialogue_buttons.get()
 
     def mode_change_Pro_Controller(self):
+        if self.is_use_Pro_Controller.get() and hasattr(self, 'lifecycle') and (self.lifecycle.busy() or self.lifecycle.closing or self.lifecycle.disconnecting):
+            self.is_use_Pro_Controller.set(False)
+            print('実行中の処理を停止してからゲームパッドを有効にしてください。')
+            return
         if self.is_use_Pro_Controller.get():  # Proconでの操作を有効化する。
             try:
                 self.closingController()
@@ -2013,8 +1976,8 @@ class PokeControllerApp:
             self.flag_record = self.is_record_Pro_Controller.get()
             self.ControllerLogDir = "Controller_Log"
             self.record_pro_controller_checkbox["state"] = "disabled"
-            thread1 = threading.Thread(target=self.run_ProController)
-            thread1.start()
+            self.procon_thread = threading.Thread(target=self.run_ProController)
+            self.procon_thread.start()
             self.controller_nb.tab(tab_id=0, state="disabled")
             self.controller_nb.tab(tab_id=1, state="disabled")
             self.controller_nb.tab(tab_id=3, state="disabled")
@@ -2321,6 +2284,9 @@ class PokeControllerApp:
         self.pause_button["command"] = self.pausePlay
 
     def startPlay(self, *event):
+        if hasattr(self, 'lifecycle') and (self.lifecycle.busy() or self.lifecycle.closing or self.lifecycle.disconnecting):
+            print('前の処理の停止が完了するまで待ってください。')
+            return
         if self.cur_command is None:
             print("No commands have been assigned yet.")
             self._logger.info("No commands have been assigned yet.")
@@ -2401,6 +2367,7 @@ class PokeControllerApp:
 
         self.cur_command.end(self.ser)
 
+    @on_ui
     def stopPlayPost(self):
         self.start_button["text"] = "Start"
         self.start_top_button["text"] = "Start"
@@ -2428,13 +2395,20 @@ class PokeControllerApp:
         self._logger.debug("Start Poke-Controller")
         self.mainwindow.mainloop()
 
-    def exit(self):
+    def exit(self, confirm=True):
+        if hasattr(self, 'lifecycle'):
+            if not confirm or tkmsg.askyesno('確認', 'Poke Controllerを終了しますか？'):
+                self.lifecycle.request(closing=True)
+            return
+        self._finish_exit()
+
+    def _finish_exit(self):
         # 一度proconのスレッドを落とす
         self.flag_procon = False
         self.record_pro_controller_checkbox["state"] = "normal"
         self.is_use_Pro_Controller.set(False)
 
-        ret = tkmsg.askyesno("確認", "Poke Controllerを終了しますか？")
+        ret = True
         if ret:
             if self.ser.isOpened():
                 self.ser.closeSerial()
@@ -2513,6 +2487,7 @@ class PokeControllerApp:
             self.camera.destroy()
             cv2.destroyAllWindows()
             self._logger.debug("Stop Poke Controller")
+            self.dispatcher.close()
             self.root.destroy()
 
     def closingController(self):
@@ -2556,7 +2531,7 @@ class PokeControllerApp:
         self.clearTextArea2()
 
     def changeAreaSize(self, *event):
-        _, height = map(int, self.show_size.get().split("x"))
+        height = getattr(self, 'preview_viewport', (640, self.preview.show_height if hasattr(self, 'preview') else 360))[1]
         max_size = 0.075 * height
         mode = self.right_frame_widget_mode.get()
         flag = False
@@ -2578,8 +2553,8 @@ class PokeControllerApp:
                 round((float(self.area_size.get()) / 100.0) * adjust_size) + 4
             )
             text_area_2_size = max_size - text_area_1_size
-        self.text_area_1.config(height=text_area_1_size)
-        self.text_area_2.config(height=text_area_2_size)
+        self.text_area_1.config(height=max(1, int(text_area_1_size)))
+        self.text_area_2.config(height=max(1, int(text_area_2_size)))
 
     def switchStdoutDestination(self):
         val = self.stdout_destination.get()
@@ -2754,9 +2729,11 @@ class StdoutRedirector(object):
     def __init__(self, text_widget):
         self.text_space = text_widget
 
+    @on_ui_log
     def write(self, string):
         self.text_space.configure(state="normal")
         self.text_space.insert("end", string)
+        trim_log(self.text_space)
         self.text_space.see("end")
         # self.text_space.update_idletasks()
         self.text_space.configure(state="disabled")

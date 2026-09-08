@@ -7,6 +7,7 @@ import math
 import os
 import time
 import platform
+import threading
 
 import serial
 from logging import getLogger, DEBUG, NullHandler
@@ -18,6 +19,11 @@ if TYPE_CHECKING:
 class Sender:
     def __init__(self, is_show_serial: tk.BooleanVar, if_print: bool = True):
         self.ser = None
+        self._io_lock = threading.RLock()
+        self.last_error = ''
+        self._show_serial = bool(is_show_serial.get())
+        if hasattr(is_show_serial, 'trace_add'):
+            is_show_serial.trace_add('write', lambda *args: setattr(self, '_show_serial', bool(is_show_serial.get())))
         self.is_show_serial = is_show_serial
 
         self._logger = getLogger(__name__)
@@ -54,12 +60,15 @@ class Sender:
         self.Hat = ["TOP", "TOP_RIGHT", "RIGHT", "BTM_RIGHT", "BTM", "BTM_LEFT", "LEFT", "TOP_LEFT", "CENTER"]
 
     def openSerial(self, portNum: int, portName: str = "", baudrate: int = 9600):
+        self.last_error = ''
+        if not portName and portNum <= 0:
+            return False
         try:
             if portName is None or portName == "":
                 if os.name == "nt":
                     print("connecting to " + "COM" + str(portNum) + "(" + str(baudrate) + ")")
                     self._logger.info("connecting to " + "COM" + str(portNum) + "(" + str(baudrate) + ")")
-                    self.ser = serial.Serial("COM" + str(portNum), baudrate)
+                    self.ser = serial.Serial("COM" + str(portNum), baudrate, write_timeout=.25)
                     return True
                 elif os.name == "posix":
                     if platform.system() == "Darwin":
@@ -81,21 +90,41 @@ class Sender:
             else:
                 print("connecting to " + portName)
                 self._logger.info("connecting to " + portName)
-                self.ser = serial.Serial(portName, 9600)
+                self.ser = serial.Serial(portName, baudrate, write_timeout=.25)
                 return True
         except IOError as e:
-            print("COM Port: can't be established")
-            self._logger.error("COM Port: can't be established", e)
+            self.last_error = f'シリアル接続に失敗しました: {e}'
+            print(self.last_error)
+            self._logger.error('%s', self.last_error)
             # print(e)
             return False
 
     def closeSerial(self):
         self._logger.debug("Closing the serial communication")
-        self.ser.close()
+        with self._io_lock:
+            connection, self.ser = self.ser, None
+            if connection is not None:
+                connection.close()
 
     def isOpened(self):
-        self._logger.debug("Checking if serial communication is open")
         return True if self.ser is not None and self.ser.isOpen() else False
+
+    def _write(self, data):
+        with self._io_lock:
+            if self.last_error or self.ser is None:
+                return False
+            try:
+                if self.ser.write(data) != len(data):
+                    raise serial.SerialException('送信データが途中で途切れました')
+                return True
+            except (serial.SerialException, OSError) as exc:
+                self.last_error = f'シリアル通信が切断されました: {exc}'
+                self._logger.error('%s', self.last_error)
+                try:
+                    self.closeSerial()
+                except OSError:
+                    self.ser = None
+                return False
 
     def writeRow(self, row: str, is_show: bool = False):
         try:
@@ -104,7 +133,7 @@ class Sender:
                 output = self.before.split(" ")
                 self.show_input(output)
 
-            self.ser.write((row + "\r\n").encode("utf-8"))
+            self._write((row + "\r\n").encode("utf-8"))
             self.time_aft = time.perf_counter()
             self.before = row
         except serial.serialutil.SerialException as e:
@@ -116,7 +145,7 @@ class Sender:
             self._logger.error(e)
         # self._logger.debug(f"{row}")
         # Show sending serial datas
-        if self.is_show_serial.get():
+        if self._show_serial:
             print(row)
 
     def writeList(self, values: list, is_show: bool = False):
@@ -125,7 +154,7 @@ class Sender:
             if self.before is not None and self.before != "end" and is_show:
                 pass
 
-            self.ser.write(values)
+            self._write(values)
             self.time_aft = time.perf_counter()
             self.before = values
         except serial.serialutil.SerialException as e:
@@ -137,12 +166,12 @@ class Sender:
             self._logger.error(e)
         # self._logger.debug(f"{values}")
         # Show sending serial datas
-        if self.is_show_serial.get():
+        if self._show_serial:
             print(values)
 
     def writeRow_wo_perf_counter(self, row: str, is_show: bool = False):
         try:
-            self.ser.write((row + "\r\n").encode("utf-8"))
+            self._write((row + "\r\n").encode("utf-8"))
         except serial.serialutil.SerialException as e:
             # エラーはあえてprintでも出す。
             print(e)
@@ -153,7 +182,7 @@ class Sender:
             self._logger.error(e)
         # self._logger.debug(f"{row}")
         # Show sending serial datas
-        if self.is_show_serial.get():
+        if self._show_serial:
             print(row)
 
     def show_input(self, output: List[str]):

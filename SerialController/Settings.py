@@ -5,6 +5,8 @@ from __future__ import annotations
 import configparser
 import os
 import tkinter as tk
+from pathlib import Path
+from safe_settings import read_config, write_config
 from logging import getLogger  # , DEBUG, NullHandler
 
 
@@ -17,7 +19,7 @@ class GuiSettings:
         self.setting.optionxform = str
         # print("isExistConfig =", os.path.exists(self.SETTING_PATH))
 
-        if not os.path.exists(self.SETTING_PATH):
+        if not os.path.exists(self.SETTING_PATH) and not Path(self.SETTING_PATH + '.bak').exists():
             self._logger.debug("Setting file does not exists.")
             self.generate()
             self.load()
@@ -128,14 +130,28 @@ class GuiSettings:
             self.pos_dialogue_buttons = "2"
 
     def load(self):
-        if os.path.isfile(self.SETTING_PATH):
-            self.setting.read(self.SETTING_PATH, encoding="utf-8")
+        def validate(config):
+            for section in ('General Setting', 'Pokemon Home', 'Output', 'KeyMap-Button', 'KeyMap-Direction', 'KeyMap-Hat'):
+                if section not in config:
+                    raise ValueError('Missing section')
+            general = config['General Setting']
+            for key in ('camera_id', 'com_port', 'baud_rate'):
+                int(general[key])
+            for key in ('fps', 'show_size', 'com_port_name'):
+                general[key]
+            for key in ('is_show_realtime', 'is_show_value', 'is_show_guide', 'is_show_serial', 'is_use_keyboard'):
+                if key not in general:
+                    raise ValueError('Missing setting')
+                general.getboolean(key)
+            for key in ('area_size', 'stdout_destination'):
+                config['Output'][key]
+        self.setting = read_config(self.SETTING_PATH, validate)
 
     def generate(self):
         # logger.info('Create Default setting file.')
         # default
         self.setting["General Setting"] = {
-            "camera_id": 0,
+            "camera_id": -1,
             "com_port": 0,
             "com_port_name": "",
             "baud_rate": 9600,
@@ -145,7 +161,7 @@ class GuiSettings:
             "is_show_value": False,
             "is_show_guide": False,
             "is_show_serial": False,
-            "is_use_keyboard": True,
+            "is_use_keyboard": False,
             "serial_data_format_name": "Default",
             "touchscreen_start_x": 1,
             "touchscreen_start_y": 1,
@@ -232,12 +248,12 @@ class GuiSettings:
             "software_controller_position": "2",
             "dialogue_buttons_position": "2",
         }
-        with open(self.SETTING_PATH, "w", encoding="utf-8") as file:
-            self.setting.write(file)
-        os.chmod(path=self.SETTING_PATH, mode=0o777)
+        write_config(self.SETTING_PATH, self.setting)
 
     def save(self, path=None):
         # Some preparations are needed because tkinter related objects are not serializable.
+        # Preserve key mappings changed by a separate settings window.
+        self.load()
 
         self.setting["General Setting"] = {
             "camera_id": self.camera_id.get(),
@@ -304,7 +320,5 @@ class GuiSettings:
             "dialogue_buttons_position": self.pos_dialogue_buttons,
         }
 
-        with open(self.SETTING_PATH, "w", encoding="utf-8") as file:
-            self.setting.write(file)
-        os.chmod(path=self.SETTING_PATH, mode=0o777)
+        write_config(path or self.SETTING_PATH, self.setting)
         self._logger.debug("Settings file has been saved.")

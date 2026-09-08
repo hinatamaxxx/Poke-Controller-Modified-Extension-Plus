@@ -33,15 +33,13 @@ class Line_Notify:
         self._logger.propagate = True
 
         self.res = None
-        self.token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True)
+        self.token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True, interpolation=None)
         self.open_file_with_utf8()
         self.token_list = {key: self.token_file["LINE"][key] for key in self.token_file["LINE"]}
         self.token_num = len(self.token_list)
         # self.line_notify_token = self.token_file['LINE'][token_name]
         self.headers = [{"Authorization": f"Bearer {token}"} for key, token in self.token_list.items()]
-        self.res = [requests.get("https://notify-api.line.me/api/status", headers=head) for head in self.headers]
-        self.status = [responses.status_code for responses in self.res]
-        self.chk_token_json = [responses.json() for responses in self.res]
+        self.res, self.status, self.chk_token_json = [], [], []
 
     def open_file_with_utf8(self):
         """
@@ -70,10 +68,12 @@ class Line_Notify:
         """
         utf-8 ファイルが BOM ありかどうかを判定する
         """
-        line_first = open(filename, encoding="utf-8").readline()
-        return line_first[0] == "\ufeff"
+        with open(filename, "rb") as stream:
+            return stream.read(3) == b"\xef\xbb\xbf"
 
     def __str__(self):
+        if not self.status:
+            return "Notification settings loaded (not checked online)."
         for stat in self.status:
             if stat == 401:
                 self._logger.error("Invalid token")
@@ -100,11 +100,11 @@ class Line_Notify:
 
             # 何故か画像のみの送信はできなかった。
             if files is not None:  # テキストと画像
-                self.res = requests.post(line_notify_api, headers=headers, params=data, files=files)
+                self.res = requests.post(line_notify_api, headers=headers, params=data, files=files, timeout=(5, 10))
                 send_data_type = "テキスト・画像"
                 send_data_type_eng = "image with text"
             else:  # テキスト
-                self.res = requests.post(line_notify_api, headers=headers, params=data)
+                self.res = requests.post(line_notify_api, headers=headers, params=data, timeout=(5, 10))
                 send_data_type = "テキスト"
                 send_data_type_eng = "text"
 

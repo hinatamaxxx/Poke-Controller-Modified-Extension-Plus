@@ -118,12 +118,11 @@ class PythonCommand(CommandBase.Command):
         """
         自動化スクリプト実行準備→実行→終了処理を順番に行います。
         """
-        if self.keys is None:
-            self.keys = KeyPress(ser)
-            self.keys.init_hat()
-
         global flag_import_plyer
         try:
+            if self.keys is None:
+                self.keys = KeyPress(ser)
+                self.keys.init_hat()
             if self.alive:
                 if self.isWinNotStart:
                     if flag_import_plyer:
@@ -157,17 +156,23 @@ class PythonCommand(CommandBase.Command):
             if self.isDiscordNotEnd:
                 self.discord_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} finished.")
         except Exception as e:
-            if self.keys is None:
-                self.keys = KeyPress(ser)
-                self.keys.init_hat()
-            print("Interrupt:cmd(黒い画面)を確認してください。")
+            self.print_t(f"スクリプトがエラーで停止しました: {type(e).__name__}: {e}")
             print(e)
             self._logger.warning("Command stopped unexpectedly")
             import traceback
 
             traceback.print_exc()
-            self.keys.end()
+        finally:
             self.alive = False
+            try:
+                if self.keys is not None:
+                    self.keys.end()
+            except Exception:
+                self._logger.exception('停止時の入力解除に失敗しました')
+            self.keys = None
+            callback, self.postProcess = self.postProcess, None
+            if callback is not None:
+                callback()
 
     def start(self, ser: Sender, postProcess: PokeControllerApp.stopPlayPost):
         """
@@ -178,7 +183,7 @@ class PythonCommand(CommandBase.Command):
         self.mqtt0.alive = True
         self.postProcess = postProcess
         ImageProcPythonCommand.template_path_name = "./Template/"
-        if not self.thread:
+        if not self.thread or not self.thread.is_alive():
             self.thread = threading.Thread(target=self.do_safe, args=(ser,))
             self.thread.start()
 
@@ -188,10 +193,9 @@ class PythonCommand(CommandBase.Command):
         self.sendStopRequest()
 
     def sendStopRequest(self):
-        if self.checkIfAlive():  # try if we can stop now
-            self.alive = False
-            print("-- sent a stop request. --")
-            self._logger.info("Sending stop request")
+        self.alive = False
+        print("-- sent a stop request. --")
+        self._logger.info("Sending stop request")
         if self.socket0.flag_socket:
             self.socket_disconnect()
 
@@ -269,7 +273,10 @@ class PythonCommand(CommandBase.Command):
         指定時間待機する。
         """
         if float(wait) > 0.1:
-            sleep(wait)
+            deadline = time.monotonic() + float(wait)
+            while time.monotonic() < deadline:
+                self.checkIfAlive()
+                sleep(min(.02, max(0, deadline - time.monotonic())))
         else:
             current_time = time.perf_counter()
             while time.perf_counter() < current_time + wait:
@@ -282,14 +289,6 @@ class PythonCommand(CommandBase.Command):
         AliveフラグがFalseなら終了処理を行う。
         """
         if not self.alive:
-            self.keys.end()
-            self.keys = None
-            self.thread = None
-
-            if self.postProcess is not None:
-                self.postProcess()
-                self.postProcess = None
-
             # raise exception for exit working thread
             self._logger.info("Exit from command successfully")
             raise StopThread("exit successfully")

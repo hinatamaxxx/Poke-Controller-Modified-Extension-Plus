@@ -1,0 +1,2 @@
+# Preserve the upstream restricted helper byte-for-byte, including line endings.
+SerialController/Commands/PythonCommands/bridge_functions/** -text

@@ -37,7 +37,7 @@ class Discord_Notify:
         self.default_username = f"Poke-Controller Modified Extension (profile: {os.path.basename(os.path.dirname(self.DISCORD_SETTING_PATH))})"
 
         self.res = None
-        self.setting_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True)
+        self.setting_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True, interpolation=None)
         self.open_file_with_utf8()
 
         self.section_list = list(self.setting_file.keys())
@@ -52,12 +52,7 @@ class Discord_Notify:
         }
         self.webhook_keys = [key for key in self.section_list if "DISCORD_WEBHOOK" in key]
 
-        try:
-            self.res = [requests.get(self.webhook_url_dict[key]) for key in self.webhook_keys]
-            self.status = [responses.status_code for responses in self.res]
-            self.chk_webhook_json = [responses.json() for responses in self.res]
-        except Exception:
-            pass
+        self.res, self.status, self.chk_webhook_json = [], [], []
 
     def open_file_with_utf8(self):
         """
@@ -94,10 +89,12 @@ class Discord_Notify:
         """
         utf-8 ファイルが BOM ありかどうかを判定する
         """
-        line_first = open(filename, encoding="utf-8").readline()
-        return line_first[0] == "\ufeff"
+        with open(filename, "rb") as stream:
+            return stream.read(3) == b"\xef\xbb\xbf"
 
     def __str__(self):
+        if not self.status:
+            return "Notification settings loaded (not checked online)."
         for stat in self.status:
             if stat == 401:
                 self._logger.error("Invalid url")
@@ -163,7 +160,7 @@ class Discord_Notify:
                         send_data_type = "(empty)"
                         send_data_type_eng = "empty"
 
-                self.res = requests.post(self.webhook_url_dict[key], files=files)
+                self.res = requests.post(self.webhook_url_dict[key], files=files, timeout=(5, 10))
 
                 if self.res.status_code in [200, 204]:
                     print(f"[{key}]{send_data_type}を送信しました。")

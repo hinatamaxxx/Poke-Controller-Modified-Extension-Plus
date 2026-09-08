@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+from UiDispatch import on_ui_log
 # from typing import Tuple
 
 import cv2
@@ -156,12 +157,19 @@ class CaptureArea(tk.Canvas):
         self.bind("<Control-ButtonRelease-3>", self.ReleaseRangeTouchscreen)
 
         # Set disabled image first
-        disabled_img = cv2.imread("../Images/disabled.png", cv2.IMREAD_GRAYSCALE)
-        disabled_pil = Image.fromarray(disabled_img)
+        disabled_pil = Image.new('L', (640, 360), 32)
         self.disabled_tk = ImageTk.PhotoImage(disabled_pil)
         self.im = self.disabled_tk
         # self.configure(image=self.disabled_tk)  # labelからキャンバスに変更したので微修正
         self.im_ = self.create_image(0, 0, image=self.disabled_tk, anchor=tk.NW)
+        # A smaller image leaves unused canvas space; do not turn it into input.
+        guard = 'PreviewBounds_' + str(self)
+        self.bindtags((guard, *self.bindtags()))
+        self.bind_class(guard, '<ButtonPress>', self.checkPreviewBounds)
+
+    def checkPreviewBounds(self, event):
+        if not (0 <= event.x < self.show_width and 0 <= event.y < self.show_height):
+            return 'break'
 
     def ApplyLStickMouse(self):
         if self.master.is_use_left_stick_mouse.get():
@@ -405,11 +413,15 @@ class CaptureArea(tk.Canvas):
         self.next_frames = int(1000 / int(fps))
         self._logger.info(f"FPS set to {fps}")
 
-    def setShowsize(self, show_height, show_width):
+    def setShowsize(self, show_height, show_width, resize_canvas=True):
+        if self.show_size == (int(show_width), int(show_height)):
+            return
         self.show_width = int(show_width)
         self.show_height = int(show_height)
         self.show_size = (self.show_width, self.show_height)
-        self.config(width=self.show_width, height=self.show_height)
+        if resize_canvas:
+            self.config(width=self.show_width, height=self.show_height)
+        self.renderPreview()
         print("Show size set to {0} x {1}".format(self.show_width, self.show_height))
         self._logger.info(
             "Show size set to {0} x {1}".format(self.show_width, self.show_height)
@@ -735,24 +747,21 @@ class CaptureArea(tk.Canvas):
             self.after(self.next_frames, self.capture)
             return
 
-        if image_bgr is not None:
-            image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-            image_pil = Image.fromarray(image_rgb).resize(self.show_size)
-            image_tk = ImageTk.PhotoImage(image_pil)
-
-            self.im = image_tk
-            # self.configure( image=image_tk)
-            self.itemconfig(self.im_, image=image_tk)
-        else:
-            self.im = self.disabled_tk
-            # self.configure(image=self.disabled_tk)
-            self.itemconfig(self.im_, image=self.disabled_tk)
-
+        self.last_preview_frame = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)) if image_bgr is not None else None
+        self.renderPreview()
         self.after(self.next_frames, self.capture)
+
+    def renderPreview(self):
+        frame = getattr(self, 'last_preview_frame', None)
+        frame = frame.resize(self.show_size) if frame is not None else Image.new('L', self.show_size, 32)
+        image = ImageTk.PhotoImage(frame)
+        self.itemconfig(self.im_, image=image)
+        self.im = image
 
     def saveCapture(self):
         self.camera.saveCapture()
 
+    @on_ui_log
     def ImgRect(self, x1, y1, x2, y2, outline, tag, ms, flag=True):
         ratio_x = float(self.show_size[0] / self.camera.capture_size[0])
         ratio_y = float(self.show_size[1] / self.camera.capture_size[1])
@@ -780,6 +789,7 @@ class CaptureArea(tk.Canvas):
     def deleteImageRect(self, tag):
         self.delete(tag)
 
+    @on_ui_log
     def ImgText(
         self,
         x1,
