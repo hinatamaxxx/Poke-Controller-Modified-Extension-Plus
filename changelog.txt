@@ -1,4 +1,4 @@
-﻿Poke-Controller Modified Extension Plus 更新履歴
+Poke-Controller Modified Extension Plus 更新履歴
 
 ■ 0.2.0-alpha.1 — 初期アルファ版
   ・設定タブの高さを内容に合わせ、下端のチェック項目が切れる問題を修正。
@@ -12,11 +12,6 @@
   ・アプリ更新画面の不要な入力欄と説明を整理。
   ・更新履歴にこのフォークの変更内容を表示。
 
-カメラ選択
-  ・機器固有のIDでカメラの選択を保存。
-  ・USBの抜き差しでカメラ番号が変わっても、別の機器へ接続しないよう修正。
-  ・カメラ選択時の切り替えと接続状態の表示を追加。
-
 その他の主な変更（フォーク元との差分）
   ・Pythonと依存ライブラリを同梱したWindows用portable ZIPに対応。
   ・MCPによるスクリプト操作、映像・ログ取得を追加。初期状態はOFF。
@@ -27,7 +22,7 @@
   ・スクリプト停止時・USB切断時の入力解除と入力処理を改善。
   ・映像取得を別スレッドに分離し、画面ログの保持量を制限。
   ・COMポート接続とカメラ無効時の処理を修正。
-  ・DirectShowLibなどによるカメラ列挙をWindows COMによる処理へ変更。
+  ・DirectShowLibなどによるカメラ列挙をWindows標準のCOM APIへ変更。機器名と映像の対応を機器IDで管理。
 
 ■ ベースとなったアプリ
   futo030/Poke-Controller-Modified-Extension 0.1.9
