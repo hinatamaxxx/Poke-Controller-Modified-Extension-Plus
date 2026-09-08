@@ -854,10 +854,8 @@ class PokeControllerApp:
         self.others_f.configure(height="200", width="200")
         self.others_f.pack()
         self.controller_nb.add(self.others_f, sticky="nsew", text="Others")
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            self.controller_nb.configure(height="150")
-        else:
-            self.controller_nb.configure(height="180")
+        # Let the largest tab determine its height, including DPI-scaled controls.
+        self.controller_nb.configure(height=0)
         self.controller_nb.grid(column="0", padx="5", pady="5", row="1", sticky="ew")
         self.output_area_f = ttk.Frame(self.main_frame)
         self.text_scroll_1 = ttk.LabelFrame(self.output_area_f, relief=tk.GROOVE)
@@ -988,6 +986,9 @@ class PokeControllerApp:
         self.main_frame.config(height="720", padding="5", relief="flat", width="1280")
         self.main_frame.pack(expand="true", fill="both", side="top")
         self.main_frame.columnconfigure("3", weight="1")
+        # Keep the settings row visible; give extra vertical space to the preview.
+        self.main_frame.rowconfigure(0, weight=1)
+        self.main_frame.rowconfigure(1, weight=0)
         """
         ここまで
         """
@@ -2581,8 +2582,15 @@ class PokeControllerApp:
             mode == "ALL (default)" or "Controller" in mode
         ):
             self.softcon_frame.pack(
-                expand="true", fill="both", padx="0", pady="0", side="top"
+                expand=False, fill="x", padx="0", pady="0", side="top"
             )
+            self.softcon_frame.grid_anchor("center")
+
+        # Reserve controller space before the expanding logs consume the parcel.
+        if self.pos_software_controller.get() == "2" and (
+            mode == "ALL (default)" or "Controller" in mode
+        ):
+            self.softcon_frame.pack(expand=False, fill="x", side="bottom")
             self.softcon_frame.grid_anchor("center")
 
         if mode == "ALL (default)" or "#1" in mode:
@@ -2593,14 +2601,6 @@ class PokeControllerApp:
             self.text_scroll_2.pack(
                 expand="true", fill="both", padx="0", pady="0", side="top"
             )
-
-        if self.pos_software_controller.get() == "2" and (
-            mode == "ALL (default)" or "Controller" in mode
-        ):
-            self.softcon_frame.pack(
-                expand="true", fill="both", padx="0", pady="0", side="top"
-            )
-            self.softcon_frame.grid_anchor("center")
 
         self.changeAreaSize()
 

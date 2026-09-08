@@ -10,6 +10,7 @@ import tkinter.scrolledtext as st
 import platform
 import Constant
 from importlib import metadata
+from pathlib import Path
 
 # ソースコードの見た目がよくないので、こっちで定義する。
 QUESTION_TITLE = """--------------------------質問をする際の注意事項--------------------------
@@ -203,13 +204,13 @@ class PokeConChangeLog(object):
 
     def __init__(self, parent):
         try:
-            with open("../changelog.txt", "r", encoding="utf-8") as f:
+            with (Path(__file__).resolve().parents[1] / "changelog.txt").open("r", encoding="utf-8") as f:
                 txt = "".join(f.readlines())
         except Exception:
-            print("changelog.txtが開けません。")
+            txt = "更新履歴を読み込めませんでした。アプリのフォルダーにchangelog.txtがあるか確認してください。"
 
         self.window = parent
-        self.window.title("更新履歴")
+        self.window.title(Constant.NAME + " — 更新履歴")
         self.window.attributes("-topmost", True)
         self.window.protocol("WM_DELETE_WINDOW", self.close_window)
 

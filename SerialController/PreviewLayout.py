@@ -24,6 +24,7 @@ def fit_preview(app):
         render_size(app)
         return
     root = app.root
+    root.minsize(1, 1)
     root.update_idletasks()
     left, top, right, bottom = work_area(root)
     # Reserve space for the native frame, title bar and menu at Tk's DPI scale.
@@ -52,6 +53,8 @@ def fit_preview(app):
     x = max(left + 8, min(root.winfo_x(), right - root.winfo_reqwidth() - round(24 * scale)))
     y = max(top + 8, min(root.winfo_y(), bottom - root.winfo_reqheight() - round(82 * scale)))
     root.geometry(f'{root.winfo_reqwidth()}x{root.winfo_reqheight()}+{x}+{y}')
+    # A smaller client area clips the fixed settings and software controller.
+    root.minsize(root.winfo_reqwidth(), root.winfo_reqheight())
     render_size(app)
     root.deiconify()
 

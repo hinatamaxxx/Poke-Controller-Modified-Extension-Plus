@@ -35,6 +35,18 @@ with tempfile.TemporaryDirectory() as folder:
                     app.right_frame_widget_mode.set(mode)
                     app.replace_right_frame_widget()
                     root.update_idletasks()
+                    for tab in app.controller_nb.tabs():
+                        app.controller_nb.select(tab)
+                        root.update_idletasks()
+                        page = root.nametowidget(tab)
+                        assert page.winfo_height() >= page.winfo_reqheight(), (screen, tab, page.winfo_height(), page.winfo_reqheight(), 'tab contents clipped')
+                    app.controller_nb.select(0)
+                    root.update_idletasks()
+                    for panel in (app.controller_nb, app.softcon_frame):
+                        if panel.winfo_ismapped():
+                            assert panel.winfo_rooty() + panel.winfo_height() <= root.winfo_rooty() + root.winfo_height(), (screen, mode, str(panel), 'bottom clipped')
+                    if app.softcon_frame.winfo_ismapped():
+                        assert app.softcon_frame.winfo_height() >= app.softcon_frame.winfo_reqheight(), (screen, mode, 'controller clipped')
                     widgets = (root, app.camera_lf, app.preview, app.controller_nb, app.output_area_f)
                     def bounds():
                         return [(w.winfo_x(), w.winfo_y(), w.winfo_width(), w.winfo_height()) for w in widgets]

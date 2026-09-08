@@ -60,7 +60,57 @@ class UpdateTests(unittest.TestCase):
                 self.assertEqual(len(settings.checked_libraries()), len(settings.library_table.get_children()))
                 settings.select_libraries(False)
                 self.assertEqual(settings.checked_libraries(), [])
+                self.assertFalse(settings.library_all.get())
                 settings.select_libraries(True)
+                self.assertTrue(settings.library_all.get())
+                identifiers = settings.library_table.get_children()
+                settings.library_table.set(identifiers[0], 'check', '☐')
+                settings.sync_library_selection()
+                self.assertIn('alternate', settings.library_all_check.state())
+                settings.select_libraries(False)
+                for identifier in identifiers[:2]:
+                    settings.library_table.set(identifier, 'check', '☑')
+                response = Mock()
+                response.__enter__ = Mock(return_value=response)
+                response.__exit__ = Mock()
+                response.json.return_value = {'info': {'version': '99.0'}}
+                def fetch(*args, **kwargs):
+                    app.dispatcher.drain()
+                    if settings.library_table.set(identifiers[0], 'latest') == '99.0':
+                        raise requests.exceptions.Timeout('test timeout')
+                    return response
+                import requests
+                with patch.object(settings, 'run') as run, patch('plus_settings.requests.get', side_effect=fetch):
+                    settings.check_library()
+                    work, done = run.call_args.args
+                    result = work()
+                    while not app.dispatcher.critical.empty():
+                        app.dispatcher.drain()
+                    done(result)
+                self.assertEqual(settings.library_table.set(identifiers[0], 'latest'), '99.0')
+                self.assertEqual(settings.library_table.set(identifiers[1], 'latest'), '取得失敗')
+                self.assertEqual(settings.library_progress['value'], 2)
+                self.assertIn('取得失敗 1件', settings.library_status.get())
+                settings.select_libraries(True)
+                self.assertFalse(hasattr(settings, 'token'))
+                for identifier in identifiers:
+                    settings.library_table.set(identifier, 'latest', settings.library_table.set(identifier, 'version'))
+                with patch.object(settings, 'run') as run:
+                    settings.update_libraries()
+                    run.assert_not_called()
+                self.assertIn('更新は不要', settings.library_status.get())
+                self.assertEqual(settings.library_progress['value'], settings.library_progress['maximum'])
+                settings.begin_library_progress('更新中')
+                settings.libraries_done('完了')
+                self.assertEqual(str(settings.library_progress['mode']), 'determinate')
+                self.assertEqual(settings.library_progress['value'], settings.library_progress['maximum'])
+                with patch.object(settings, 'run') as run:
+                    settings.check_update()
+                    work, done = run.call_args.args
+                    with patch('plus_settings.find_release', return_value=None) as find:
+                        done(work())
+                        find.assert_called_once_with(prereleases=settings.prereleases.get())
+                    self.assertEqual(settings.status.get(), '現在のバージョンは最新です。')
                 self.assertFalse(hasattr(settings, 'apply_update'))
                 app.open_plus_settings = settings.show
                 menu = PokeController_Menubar(app)

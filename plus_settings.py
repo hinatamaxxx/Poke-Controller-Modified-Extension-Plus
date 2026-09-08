@@ -43,13 +43,10 @@ class SettingsWindow:
         ttk.Button(general, text='接続方法を開く', command=lambda: os.startfile(self.root / 'MCP.md')).pack(anchor='w')
         update = self.pages['updates']
         ttk.Label(update, text=f'{NAME}\n現在のバージョン：{VERSION}', wraplength=650).pack(anchor='w')
-        ttk.Label(update, text='更新は手動で行います。アプリを終了し、新しいZIPを別フォルダーへ展開してください。\nprofiles・独自スクリプト・画像などをコピーして起動します。アプリからファイルを書き換えることはありません。', wraplength=650).pack(anchor='w', pady=10)
+        ttk.Label(update, text='新しいバージョンは配布ページからダウンロードできます。\n更新するときはアプリを終了し、ZIPを展開して設定・スクリプト・画像を移してください。', wraplength=650).pack(anchor='w', pady=10)
         self.prereleases = tk.BooleanVar(value=self.preferences.values['prereleases'])
         ttk.Checkbutton(update, text='検証版（alpha / beta / rc）も確認する', variable=self.prereleases,
                         command=lambda: self.preferences.set('prereleases', self.prereleases.get())).pack(anchor='w')
-        ttk.Label(update, text='非公開リポジトリ用GitHubトークン（任意・保存しません）').pack(anchor='w', pady=(12, 2))
-        self.token = ttk.Entry(update, show='*')
-        self.token.pack(fill='x')
         actions = ttk.Frame(update)
         actions.pack(fill='x', pady=12)
         self.check = ttk.Button(actions, text='更新を確認', command=self.check_update)
@@ -62,6 +59,10 @@ class SettingsWindow:
         ttk.Button(update, text='GitHubのリリースを開く', command=lambda: webbrowser.open(REPOSITORY_URL + '/releases')).pack(anchor='w', pady=10)
         library = self.pages['libraries']
         ttk.Label(library, text='初期状態は全選択です。チェックを外すと個別更新できます。更新は再起動後に反映します。\nFFmpegはopencv-pythonと一緒に更新します。最新版でのスクリプト互換性は保証されません。', wraplength=650).pack(anchor='w')
+        self.library_all = tk.BooleanVar(value=True)
+        self.library_all_check = ttk.Checkbutton(library, text='すべて選択', variable=self.library_all,
+                                                command=lambda: self.select_libraries(self.library_all.get()))
+        self.library_all_check.pack(anchor='w', pady=(8, 0))
         self.library_table = ttk.Treeview(library, columns=('check', 'name', 'version', 'latest'), show='headings', height=7)
         for key, title in (('check', '更新'), ('name', '部品'), ('version', '次回起動のバージョン'), ('latest', 'PyPIの最新版')):
             self.library_table.heading(key, text=title)
@@ -73,8 +74,6 @@ class SettingsWindow:
         self.library_table.bind('<space>', self.toggle_library)
         actions = ttk.Frame(library)
         actions.pack(fill='x')
-        ttk.Button(actions, text='全選択', command=lambda: self.select_libraries(True)).pack(side='left')
-        ttk.Button(actions, text='全解除', command=lambda: self.select_libraries(False)).pack(side='left')
         self.library_check = ttk.Button(actions, text='更新確認', command=self.check_library)
         self.library_check.pack(side='left')
         self.library_update = ttk.Button(actions, text='チェックした部品を更新', command=self.update_libraries)
@@ -83,6 +82,10 @@ class SettingsWindow:
         self.library_reset.pack(anchor='w')
         self.library_status = tk.StringVar(value='チェックを外した部品のバージョンは維持します。')
         ttk.Label(library, textvariable=self.library_status, wraplength=650).pack(anchor='w')
+        self.library_progress = ttk.Progressbar(library, mode='determinate')
+        self.library_progress.pack(fill='x', pady=4)
+        self.library_log = tk.Text(library, height=4, wrap='word', state='disabled')
+        self.library_log.pack(fill='x')
         import cv2
         ffmpeg = '\n'.join(line.strip() for line in cv2.getBuildInformation().splitlines() if any(key in line for key in ('FFMPEG:', 'avcodec:', 'avformat:', 'avutil:')))
         ttk.Label(library, text='FFmpeg（OpenCV付属）\n' + ffmpeg, wraplength=650).pack(anchor='w', pady=8)
@@ -97,15 +100,20 @@ class SettingsWindow:
         self.library_check.configure(state='disabled')
         self.library_update.configure(state='disabled')
         self.library_reset.configure(state='disabled')
+        self.library_all_check.configure(state='disabled')
         def finish(result, error):
             self.busy = False
             self.check.configure(state='normal')
             self.library_check.configure(state='normal')
             self.library_update.configure(state='normal')
             self.library_reset.configure(state='normal')
+            self.library_all_check.configure(state='normal')
+            if str(self.library_progress['mode']) == 'indeterminate':
+                self.library_progress.stop()
             if error:
                 self.library_status.set('処理に失敗しました。現在の環境は維持されています。')
                 self.status.set('処理に失敗しました。再試行できます。')
+                self.show_library_progress(error)
                 messagebox.showerror('更新', error, parent=self.window)
             else:
                 done(result)
@@ -120,36 +128,84 @@ class SettingsWindow:
         threading.Thread(target=worker, daemon=True).start()
 
     def check_update(self):
-        token, prereleases = self.token.get(), self.prereleases.get()
+        if self.busy:
+            return
+        prereleases = self.prereleases.get()
         self.release = None
         self.status.set('GitHubで更新を確認しています…')
         def done(release):
             self.release = release
-            self.status.set(f"更新があります：{release['tag_name']}" if release else '利用できる新しい配布版はありません。下書きリリースは対象外です。')
-        self.run(lambda: find_release(token, prereleases), done)
+            self.status.set(f"更新があります：{release['tag_name']}" if release else '現在のバージョンは最新です。')
+        self.run(lambda: find_release(prereleases=prereleases), done)
 
     def download_update(self):
         if self.release:
             webbrowser.open(release_page(self.release))
 
     def check_library(self):
+        if self.busy:
+            return
         selected = self.checked_libraries()
         if not selected:
             messagebox.showinfo('同梱ライブラリ', '一覧から部品を選択してください。', parent=self.window)
             return
         def work():
             result = {}
-            for identifier, name in selected:
-                with requests.get('https://pypi.org/pypi/' + quote(name, safe='') + '/json', timeout=(5, 15)) as response:
-                    response.raise_for_status()
-                    result[identifier] = response.json()['info']['version']
+            for count, (identifier, name) in enumerate(selected, 1):
+                self.post_library_progress(f'確認中 {count}/{len(selected)}：{name}')
+                try:
+                    with requests.get('https://pypi.org/pypi/' + quote(name, safe='') + '/json', timeout=(5, 15)) as response:
+                        response.raise_for_status()
+                        latest = response.json()['info']['version']
+                except Exception as exc:
+                    latest = '取得失敗'
+                    self.post_library_progress(f'{name}：{exc}')
+                result[identifier] = latest
+                self.post_library_progress(f'確認済み {count}/{len(selected)}：{name} — {latest}',
+                                           count, identifier, latest)
             return result
         def done(result):
             for identifier, latest in result.items():
                 self.library_table.set(identifier, 'latest', latest)
-            self.library_status.set('更新確認が完了しました。')
-        self.library_status.set('チェックした部品の最新版を確認しています…')
+            failures = sum(value == '取得失敗' for value in result.values())
+            self.library_status.set(f'更新確認が完了しました（{len(result)}件、取得失敗 {failures}件）。')
+            self.complete_library_progress()
+        self.begin_library_progress('チェックした部品の最新版を確認しています…', len(selected))
         self.run(work, done)
+
+    def begin_library_progress(self, message, total=None):
+        self.library_log.configure(state='normal')
+        self.library_log.delete('1.0', 'end')
+        self.library_log.configure(state='disabled')
+        self.library_progress.stop()
+        self.library_progress.configure(mode='determinate' if total else 'indeterminate',
+                                        maximum=total or 100, value=0)
+        if not total:
+            self.library_progress.start(15)
+        self.show_library_progress(message)
+
+    def post_library_progress(self, message, count=None, identifier=None, latest=None):
+        if not self.app.dispatcher.closed:
+            self.app.dispatcher.critical.put((self.show_library_progress,
+                                              (message, count, identifier, latest), {}))
+
+    def complete_library_progress(self):
+        maximum = self.library_progress['maximum']
+        self.library_progress.stop()
+        self.library_progress.configure(mode='determinate', value=maximum)
+
+    def show_library_progress(self, message, count=None, identifier=None, latest=None):
+        self.library_status.set(message[:220])
+        if count is not None:
+            self.library_progress.configure(value=count)
+        if identifier is not None:
+            self.library_table.set(identifier, 'latest', latest)
+        self.library_log.configure(state='normal')
+        self.library_log.insert('end', message + '\n')
+        if int(self.library_log.index('end-1c').split('.')[0]) > 400:
+            self.library_log.delete('1.0', '100.0')
+        self.library_log.see('end')
+        self.library_log.configure(state='disabled')
 
     def checked_libraries(self):
         return [(i, self.library_table.set(i, 'name')) for i in self.library_table.get_children()
@@ -159,6 +215,13 @@ class SettingsWindow:
         if not self.busy:
             for i in self.library_table.get_children():
                 self.library_table.set(i, 'check', '☑' if selected else '☐')
+            self.sync_library_selection()
+
+    def sync_library_selection(self):
+        total = len(self.library_table.get_children())
+        count = len(self.checked_libraries())
+        self.library_all.set(total > 0 and count == total)
+        self.library_all_check.state(['alternate'] if 0 < count < total else ['!alternate'])
 
     def toggle_library(self, event):
         if self.busy:
@@ -167,16 +230,26 @@ class SettingsWindow:
         if identifier and (event.keysym == 'space' or self.library_table.identify_column(event.x) == '#1'):
             current = self.library_table.set(identifier, 'check')
             self.library_table.set(identifier, 'check', '☐' if current == '☑' else '☑')
+            self.sync_library_selection()
             return 'break'
 
     def update_libraries(self):
+        if self.busy:
+            return
         from library_update import update_libraries
         selected = [name for _, name in self.checked_libraries()]
         if not selected:
             self.library_status.set('更新する部品にチェックを入れてください。')
             return
-        self.library_status.set('別の環境へ更新を準備しています。数分かかる場合があります…')
-        self.run(lambda: update_libraries(self.root, selected), self.libraries_done)
+        versions = {item['name']: item['version'] for item in installed_libraries(self.root)}
+        def is_current(identifier, name):
+            return name in versions and versions[name] == self.library_table.set(identifier, 'latest')
+        if all(is_current(identifier, name) for identifier, name in self.checked_libraries()):
+            self.library_status.set('選択したライブラリはすべて最新版です。更新は不要です。')
+            self.complete_library_progress()
+            return
+        self.begin_library_progress('更新候補を調べています…')
+        self.run(lambda: update_libraries(self.root, selected, self.post_library_progress), self.libraries_done)
 
     def reset_libraries(self):
         from library_update import reset_libraries
@@ -184,6 +257,7 @@ class SettingsWindow:
 
     def libraries_done(self, message):
         self.library_status.set(message)
+        self.complete_library_progress()
         versions = {item['name']: item['version'] for item in installed_libraries(self.root)}
         for i in self.library_table.get_children():
             self.library_table.set(i, 'version', versions.get(self.library_table.set(i, 'name'), '—'))
