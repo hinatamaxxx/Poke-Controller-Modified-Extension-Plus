@@ -13,23 +13,24 @@
 
 Windows 10/11 x64向けです。Python・.NET SDK・Gitの事前インストールは不要です。Windows付属の.NET Frameworkと同梱Pythonを使用します。初回は書き込み可能な場所に置いてください。未署名のアルファ版です。
 
-## フォーク元と引き継いだ機能
+## フォーク元との差分
 
-[futo030/Poke-Controller-Modified-Extension](https://github.com/futo030/Poke-Controller-Modified-Extension) 0.1.9がベースです。その元は[KawaSwitch/Poke-Controller](https://github.com/KawaSwitch/Poke-Controller)、[Moi-poke/Poke-Controller-Modified](https://github.com/Moi-poke/Poke-Controller-Modified)です。
+比較対象は[futo030/Poke-Controller-Modified-Extension 0.1.9](https://github.com/futo030/Poke-Controller-Modified-Extension/tree/3274e77)です。
 
-元の画面とスクリプト方式、2つのログ欄、プロファイル、スクリプトの一時停止・絞り込み・ショートカット、ソフトウェアコントローラー、画像認識の範囲表示、ゲームパッド入力、3DS向け通信形式、MQTT・Socket通信などを引き継いでいます。詳細はリポジトリのREADME.upstream.mdに残しています。
+| 項目 | このフォークでの変更 |
+|---|---|
+| 配布 | Pythonと依存ライブラリを同梱したWindows用portable ZIPを提供。解凍してexeから起動できます。 |
+| MCP | スクリプトの開始・停止・一時停止・再開、映像・ログ取得に対応。初期状態はOFFです。 |
+| 設定保存 | 書き込み途中の破損を防ぐ保存方式、前回分のバックアップ、破損時の復元を追加。通常設定とキー設定が互いの変更を上書きする問題を修正。 |
+| 映像表示 | 大きな表示サイズでもモニター内に収め、解像度変更時のウィンドウ・操作欄・ログ欄の配置を固定。確認ダイアログを削除。 |
+| 画像認識 | 画像不足・破損・範囲やサイズの不一致を具体的に表示。日本語の画像パスに対応。 |
+| ライブラリ更新 | 設定画面から一括・個別更新と配布時の状態への復帰が可能。更新は再起動後に反映。 |
+| 停止・入力 | スクリプト停止時やUSB切断時の入力解除、キーボード入力処理、右スティックの変化判定を改善。 |
+| キャプチャ・ログ | 映像取得を別スレッドで処理し、画面ログの保持件数に上限を設定。 |
+| 接続・起動 | 指定COMポート名でのボーレート適用、カメラ無効時の処理、スクリプトの読み込み失敗時の処理を修正。通知設定を読むだけでは外部通信しないよう変更。 |
+| 依存部品 | DirectShowLib・pythonnet・windows-capture-device-listをWindows COMによるカメラ列挙へ置換。ログ装飾を標準loggingへ、フォルダー画像ボタンを文字ボタンへ変更。 |
 
-## 今回の主な変更
-
-- Pythonと依存ライブラリを同梱したportable ZIP。解凍してexeを起動するだけで使えます。
-- MCPを追加。初期状態はOFFで、プロファイルごとに保存します。MCPクライアントには展開先のPokeControllerMCP.exeを登録します。
-- 設定保存の一時ファイル・前回バックアップ・破損時の復元を追加。キー設定の上書き問題も修正。
-- 1080p指定時の画面外へのはみ出しと、低解像度への変更時のレイアウト変化を修正。解像度変更の確認ダイアログと途中の再配置を削除。
-- 画像不足・破損・範囲・サイズ不一致を具体的に表示。日本語の画像パスに対応。
-- ライブラリは初期状態で全選択。一括更新でき、チェックを外して個別更新も可能。別環境で更新し、全ウィンドウとMCPの再起動後に反映。配布時への復帰も可能。
-- アプリ本体は更新確認と配布ページへの案内を残し、手動更新・設定や独自スクリプトのコピー方式に整理。
-- 停止処理と入力解除、USB切断時の停止、非同期キャプチャ、画面ログの件数制限、ボーレート適用、右スティック判定などを改善。
-- DirectShowLibとpythonnetを除外し、Windows COMによるカメラ列挙へ置換。pygame・pynput・OpenCVのFFmpegは維持。
+元の画面とPythonスクリプト方式をベースにしています。元アプリの機能・操作方法は[フォーク元のREADME](https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/blob/master/README.upstream.md)を参照してください。
 
 実機への操作送信と全スクリプトの互換性は未検証です。旧版独自の関数や追加ライブラリを使うスクリプトは調整が必要な場合があります。Mac/Linux対応は行っていません。
 
