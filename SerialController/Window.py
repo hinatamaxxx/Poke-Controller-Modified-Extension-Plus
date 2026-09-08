@@ -205,6 +205,8 @@ class PokeControllerApp:
             column="1", columnspan="9", padx="5", pady="5", row="0", sticky="ew"
         )
         self.camera_name_cb.bind("<<ComboboxSelected>>", self.set_cameraid, add="")
+        self.camera_status = ttk.Label(self.camera_settings_lf, text='未接続', wraplength=600)
+        self.camera_status.grid(column=0, columnspan=10, row=2, sticky='w', padx=5)
         self.camera_settings_lf.configure(text="Settings", width="420")
         self.camera_settings_lf.grid(column="0", padx="5", row="0", sticky="ew")
         self.display_settings_lf = ttk.Labelframe(self.camera_f)
@@ -1413,6 +1415,7 @@ class PokeControllerApp:
                 self.camera_id_entry.config(state="disable")
             except Exception as e:
                 # Locate an entry instead whenever dll is not imported successfully
+                self.camera_id.set(-1)
                 self.camera_name_fromDLL.set(
                     "An error occurred when displaying the camera name in the Win/Mac environment."
                 )
@@ -1702,22 +1705,18 @@ class PokeControllerApp:
         # logging.debug(f'python version: {sys.version}')
 
     def openCamera(self):
-        self.camera.openCamera(self.camera_id.get())
+        if hasattr(self, 'camera_selection'):
+            self.camera_selection.connect()
+        else:
+            self.camera.openCamera(self.camera_id.get())
 
     def assignCamera(self, event):
         if platform.system() != "Linux":
             self.camera_name_fromDLL.set(self.camera_dic[self.camera_id.get()])
 
     def locateCameraCmbbox(self):
-        from WindowsDevices import enumerate_cameras
-        devices = enumerate_cameras()
-        self.camera_dic = {d['index']: d['name'] for d in devices}
-        self.camera_dic[-1] = "Disable"
-        self.camera_name_cb['values'] = [f"No.{k}: {v}" for k, v in self.camera_dic.items()]
-        if self.camera_id.get() not in self.camera_dic:
-            self.camera_id.set(-1)
-        self.camera_name_cb.current(list(self.camera_dic).index(self.camera_id.get()))
-        self.camera_id_entry.bind("<KeyRelease>", self.assignCamera)
+        from CameraSelection import CameraSelection
+        self.camera_selection = CameraSelection(self)
 
     def locateDeviceCmbbox(self):
         # ポート情報取得
@@ -1794,16 +1793,7 @@ class PokeControllerApp:
                 break
 
     def set_cameraid(self, event=None):
-        keys = [
-            k
-            for k, v in self.camera_dic.items()
-            if "No." + str(k) + ": " + v == self.camera_name_cb.get()
-        ]
-        if keys:
-            ret = keys[0]
-        else:
-            ret = None
-        self.camera_id.set(ret)
+        self.camera_selection.select()
 
     def set_device(self, event=None):
         self.com_port.set(

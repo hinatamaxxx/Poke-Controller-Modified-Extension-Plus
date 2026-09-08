@@ -65,7 +65,10 @@ class SafeSettingsTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as folder, patch.object(GuiSettings, 'SETTING_PATH', str(Path(folder) / 'settings.ini')):
                 settings = GuiSettings()
                 settings.fps.set('60')
+                settings.camera_path = 'persistent-device-id'
+                settings.camera_name = 'USB Video'
                 settings.save()
+                self.assertEqual(GuiSettings().camera_path, 'persistent-device-id')
                 changed = safe_settings.read_config(settings.SETTING_PATH)
                 changed['KeyMap-Button']['Button.A'] = 'q'
                 safe_settings.write_config(settings.SETTING_PATH, changed)

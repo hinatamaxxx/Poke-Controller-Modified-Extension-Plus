@@ -67,6 +67,7 @@ class Camera:
         self.image_bgr = None
         self.frame_at = 0
         self.error = ''
+        self.device_path = ''
         self._opened = False
         self._stop = threading.Event()
         self.thread = None
@@ -76,7 +77,7 @@ class Camera:
         self._logger.setLevel(DEBUG)
         self._logger.propagate = True
 
-    def openCamera(self, cameraId: int):
+    def openCamera(self, cameraId: int, device_path=None):
         self.destroy()
         if cameraId < 0:
             return
@@ -86,23 +87,32 @@ class Camera:
             return
         self.error = ''
         self._stop = threading.Event()
-        self.thread = threading.Thread(target=self._capture_loop, args=(cameraId,), daemon=True)
+        self.thread = threading.Thread(target=self._capture_loop, args=(cameraId, device_path), daemon=True)
         self.thread.start()
 
-    def _capture_loop(self, cameraId):
+    def _capture_loop(self, cameraId, device_path=None):
         capture, lease = None, None
         try:
             from WindowsDevices import enumerate_cameras, CameraLease
             devices = enumerate_cameras()
+            if device_path is not None:
+                cameraId = next((i for i, d in enumerate(devices) if d['path'] == device_path), -1)
+                if cameraId < 0:
+                    raise RuntimeError('選択したキャプチャ機器が未接続です')
             if cameraId >= len(devices):
                 raise RuntimeError('キャプチャ機器が見つかりません')
-            lease = CameraLease(devices[cameraId]['path'] or str(cameraId))
+            identity = devices[cameraId]['path'] or str(cameraId)
+            lease = CameraLease(identity)
             capture = cv2.VideoCapture(cameraId, cv2.CAP_DSHOW)
             if not capture.isOpened():
                 raise RuntimeError('カメラを開けません。他のアプリで使用していないか確認してください。')
+            current = enumerate_cameras()
+            if cameraId >= len(current) or (current[cameraId]['path'] or str(cameraId)) != identity:
+                raise RuntimeError('接続中に機器の一覧が変わりました。再接続してください。')
             capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.capture_size[0])
             capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.capture_size[1])
             self.camera, self.lease = capture, lease
+            self.device_path = identity
             self._opened = not self._stop.is_set()
             failures = 0
             while not self._stop.is_set():

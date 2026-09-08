@@ -31,6 +31,8 @@ class GuiSettings:
 
         # default
         self.camera_id = tk.IntVar(value=self.setting["General Setting"].getint("camera_id"))
+        self.camera_path = self.setting['General Setting'].get('camera_path', '')
+        self.camera_name = self.setting['General Setting'].get('camera_name', '')
         self.com_port = tk.IntVar(value=self.setting["General Setting"].getint("com_port"))
         self.com_port_name = tk.StringVar(value=self.setting["General Setting"].get("com_port_name"))
         self.baud_rate = tk.IntVar(value=self.setting["General Setting"].getint("baud_rate"))
@@ -257,6 +259,8 @@ class GuiSettings:
 
         self.setting["General Setting"] = {
             "camera_id": self.camera_id.get(),
+            "camera_path": self.camera_path,
+            "camera_name": self.camera_name,
             "com_port": self.com_port.get(),
             "com_port_name": self.com_port_name.get(),
             "baud_rate": self.baud_rate.get(),
