@@ -93,10 +93,10 @@ class PokeConQuestionDialogue(object):
         self.inputs.grid_anchor("center")
         self.result = ttk.Frame(self.main_frame)
         self.OK = ttk.Button(self.result, command=self.ok_command)
-        self.OK.configure(text="OK")
+        self.OK.configure(text='OK')
         self.OK.grid(column=0, row=1)
         self.Cancel = ttk.Button(self.result, command=self.cancel_command)
-        self.Cancel.configure(text="Cancel")
+        self.Cancel.configure(text='キャンセル')
         self.Cancel.grid(column=1, row=1, sticky="ew")
         self.result.grid(column=0, columnspan=2, pady=5, row=2, sticky="ew")
         self.result.grid_anchor("center")
@@ -177,7 +177,7 @@ class PokeConVersionCheck(object):
                 except Exception:
                     pass
         self.window = parent
-        self.window.title("Version確認")
+        self.window.title("バージョン情報")
         self.window.attributes("-topmost", True)
         self.window.protocol("WM_DELETE_WINDOW", self.close_window)
 
@@ -186,7 +186,7 @@ class PokeConVersionCheck(object):
         self.main_text.grid(column=0, ipadx="10", ipady="10", row=0, sticky="nsew")
 
         self.OK = ttk.Button(self.main_frame, command=self.close_window)
-        self.OK.configure(text="OK")
+        self.OK.configure(text='OK')
         self.OK.grid(column=0, padx="10", pady="10", row=1)
         self.OK.grid_anchor("center")
         self.main_frame.pack()
@@ -231,7 +231,7 @@ class PokeConChangeLog(object):
         self.text_widget.config(state="disabled")
 
         self.OK = ttk.Button(self.main_frame, command=self.close_window)
-        self.OK.configure(text="OK")
+        self.OK.configure(text='OK')
         self.OK.pack(pady=10)  # OKボタンの下に余白を追加
         self.main_frame.pack()
 
@@ -255,7 +255,7 @@ class PokeConCopyright(object):
             return
 
         self.window = parent
-        self.window.title("LICENSE")
+        self.window.title("ライセンス")
         self.window.attributes("-topmost", True)
         self.window.protocol("WM_DELETE_WINDOW", self.close_window)
 
@@ -264,7 +264,7 @@ class PokeConCopyright(object):
         self.main_text.grid(column=0, ipadx="10", ipady="10", row=0, sticky="nsew")
 
         self.OK = ttk.Button(self.main_frame, command=self.close_window)
-        self.OK.configure(text="OK")
+        self.OK.configure(text='OK')
         self.OK.grid(column=0, padx="10", pady="10", row=1)
         self.OK.grid_anchor("center")
         self.main_frame.pack()

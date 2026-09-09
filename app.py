@@ -9,6 +9,28 @@ import sys
 ROOT = Path(__file__).resolve().parent
 
 
+def acquire_profile(profiles, name):
+    """Claim the first free persistent settings slot, without a check/open race."""
+    import errno
+    import msvcrt
+    for number in range(1, 10001):
+        suffix = '' if number == 1 else f'-{number}'
+        candidate = name[:48 - len(suffix)] + suffix
+        profile = Path(profiles) / candidate
+        profile.mkdir(parents=True, exist_ok=True)
+        lock = (profile / '.instance.lock').open('a+b')
+        lock.seek(0)
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as error:
+            lock.close()
+            if error.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise
+            continue
+        return candidate, profile, lock
+    raise OSError('空いている設定枠がありません。不要なウィンドウを終了してください。')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--profile', '-p', default='default')
@@ -34,16 +56,11 @@ def main():
     import PokeConLogger
     import Window
     root = tk.Tk()
-    profile = serial / 'profiles' / args.profile
-    profile.mkdir(parents=True, exist_ok=True)
-    import msvcrt
-    lock = (profile / '.instance.lock').open('a+b')
-    lock.seek(0)
     try:
-        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-    except OSError:
+        args.profile, profile, lock = acquire_profile(serial / 'profiles', args.profile)
+    except OSError as error:
         from tkinter.messagebox import showerror
-        showerror('Poke Controller', 'このプロファイルは起動済みです。別の --profile 名を指定してください。')
+        showerror('起動できません', f'設定フォルダーを開けません。\n{error}', parent=root)
         root.destroy()
         return 1
     settings = profile / 'settings.ini'
@@ -98,7 +115,7 @@ def main():
     if args.smoke_test:
         import json
         def report():
-            args.smoke_test.write_text(json.dumps({'ready': True, 'python': sys.executable,
+            args.smoke_test.write_text(json.dumps({'ready': True, 'python': sys.executable, 'profile': args.profile,
                 'python_scripts': len(app.py_classes), 'mcu_scripts': len(app.mcu_classes),
                 'mcp_endpoint': str(api.path) if api else None}), encoding='utf-8')
         root.after(1200, report)

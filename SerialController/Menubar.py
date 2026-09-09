@@ -51,24 +51,24 @@ class PokeController_Menubar(tk.Menu):
         tk.Menu.__init__(self, self.root, **kw)
         self.menu = tk.Menu(self, tearoff="false")
         self.menu_command = tk.Menu(self, tearoff="false")
-        self.add(tk.CASCADE, menu=self.menu, label="メニュー")
+        self.add(tk.CASCADE, menu=self.menu, label='メニュー')
 
         self.help = tk.Menu(self, tearoff="false")
-        self.add(tk.CASCADE, menu=self.help, label="ヘルプ")
-        self.help.add("command", label="Github", command=self.OpenGithub)
-        self.help.add("command", label="Poke-Controller Guide", command=self.OpenGuide)
-        self.help.add("command", label="質問テンプレート", command=self.output_question)
-        self.help.add("command", label="Version確認", command=self.CheckVersion)
-        self.help.add("command", label="更新履歴表示", command=self.OpenChangeLog)
-        self.help.add("command", label="アップデート確認", command=self.CheckUpdate)
-        self.help.add("command", label="LICENSE", command=self.OpenLicense)
+        self.add(tk.CASCADE, menu=self.help, label='ヘルプ')
+        self.help.add("command", label='GitHub', command=self.OpenGithub)
+        self.help.add("command", label='使い方ガイド', command=self.OpenGuide)
+        self.help.add("command", label='質問テンプレート', command=self.output_question)
+        self.help.add("command", label='バージョン情報', command=self.CheckVersion)
+        self.help.add("command", label='更新履歴表示', command=self.OpenChangeLog)
+        self.help.add("command", label='アップデート確認', command=self.CheckUpdate)
+        self.help.add("command", label='ライセンス', command=self.OpenLicense)
 
-        self.menu.add(tk.CASCADE, menu=self.menu_command, label="コマンド")
+        self.menu.add(tk.CASCADE, menu=self.menu_command, label='コマンド')
 
         self.menu.add("separator")
-        self.menu.add("command", label="設定", command=lambda: self.app.open_plus_settings())
+        self.menu.add("command", label='設定', command=lambda: self.app.open_plus_settings())
         # TODO: setup command_id_arg 'false' for menuitem.
-        self.menu.add("command", command=self.exit, label="終了")
+        self.menu.add("command", command=self.exit, label='終了')
 
         self.AssignMenuCommand()
         self.LineTokenSetting()
@@ -78,15 +78,15 @@ class PokeController_Menubar(tk.Menu):
 
     def AssignMenuCommand(self):
         self._logger.debug("Assigning menu command")
-        self.menu_command.add("command", command=self.LineTokenAssignment, label="LINE Token Assignment")
-        self.menu_command.add("command", command=self.LineTokenSetting, label="LINE Token Check")
-        self.menu_command.add("command", command=self.DiscordSettingAssignment, label="Discord Setting Assignment")
-        self.menu_command.add("command", command=self.DiscordSetting, label="Discord Check")
-        self.menu_command.add("command", command=self.GenerateNewBat, label="Generate Bat File & Profile Directory")
+        self.menu_command.add("command", command=self.LineTokenAssignment, label='LINEトークンを設定')
+        self.menu_command.add("command", command=self.LineTokenSetting, label='LINE設定を確認')
+        self.menu_command.add("command", command=self.DiscordSettingAssignment, label='Discord通知を設定')
+        self.menu_command.add("command", command=self.DiscordSetting, label='Discord設定を確認')
+        self.menu_command.add("command", command=self.GenerateNewBat, label='起動用ファイルを作成')
         # TODO: setup command_id_arg 'false' for menuitem.
-        self.menu_command.add("command", command=self.OpenPokeHomeCoop, label="Pokemon Home 連携")
-        self.menu_command.add("command", command=self.OpenKeyConfig, label="キーコンフィグ")
-        self.menu_command.add("command", command=self.ResetWindowSize, label="画面サイズのリセット")
+        self.menu_command.add("command", command=self.OpenPokeHomeCoop, label='Pokemon Home 連携')
+        self.menu_command.add("command", command=self.OpenKeyConfig, label='キーコンフィグ')
+        self.menu_command.add("command", command=self.ResetWindowSize, label='画面サイズのリセット')
 
     # TODO: setup command_id_arg 'false' for menuitem.
 

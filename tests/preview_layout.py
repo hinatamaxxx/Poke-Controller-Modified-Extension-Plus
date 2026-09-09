@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as folder:
                 if hasattr(app, 'preview_viewport'):
                     del app.preview_viewport
                 app.fitPreviewToScreen()
-                for mode in app.select_right_frame_widget_cb['values']:
+                for mode in app.right_frame_mode_keys:
                     app.right_frame_widget_mode.set(mode)
                     app.replace_right_frame_widget()
                     root.update_idletasks()
@@ -64,6 +64,18 @@ with tempfile.TemporaryDirectory() as folder:
                         assert app.show_size.get() == preset
                         assert (app.preview.im.width(), app.preview.im.height()) == (w, h)
                         assert app.camera.capture_size == (1280, 720), app.camera.capture_size
+                        app.enlarge_preview.set(True)
+                        app.applyWindowSize()
+                        root.update_idletasks()
+                        expanded = app.preview.show_size
+                        assert bounds() == before, 'enlargement changed window layout'
+                        vw, vh = app.preview_viewport
+                        assert expanded[0] <= vw and expanded[1] <= vh
+                        assert abs(expanded[0] - vw) <= 1 or abs(expanded[1] - vh) <= 1
+                        assert abs(expanded[0] / expanded[1] - 16 / 9) < .02
+                        app.enlarge_preview.set(False)
+                        app.applyWindowSize()
+                        assert app.preview.show_size == (w, h)
         print('PASS: all presets and sidebar modes on 3 monitor sizes; stable widget bounds, no dialogs/intermediate redraws, immediate image resize, capture unchanged', file=stdout)
     finally:
         app.exit(confirm=False)

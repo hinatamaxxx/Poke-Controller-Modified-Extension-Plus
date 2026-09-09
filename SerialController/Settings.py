@@ -41,6 +41,7 @@ class GuiSettings:
         self.is_show_realtime = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_realtime"))
         self.is_show_value = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_value"))
         self.is_show_guide = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_guide"))
+        self.enlarge_preview = tk.BooleanVar(value=self.setting["General Setting"].getboolean("enlarge_preview", fallback=False))
         self.is_show_serial = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_serial"))
         self.is_use_keyboard = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_use_keyboard"))
         try:
@@ -137,6 +138,7 @@ class GuiSettings:
                 if section not in config:
                     raise ValueError('Missing section')
             general = config['General Setting']
+            general.getboolean('enlarge_preview', fallback=False)
             for key in ('camera_id', 'com_port', 'baud_rate'):
                 int(general[key])
             for key in ('fps', 'show_size', 'com_port_name'):
@@ -269,6 +271,7 @@ class GuiSettings:
             "is_show_realtime": self.is_show_realtime.get(),
             "is_show_value": self.is_show_value.get(),
             "is_show_guide": self.is_show_guide.get(),
+            "enlarge_preview": self.enlarge_preview.get(),
             "is_show_serial": self.is_show_serial.get(),
             "is_use_keyboard": self.is_use_keyboard.get(),
             "serial_data_format_name": self.serial_data_format_name.get(),

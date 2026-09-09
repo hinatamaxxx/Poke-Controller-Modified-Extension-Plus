@@ -62,5 +62,7 @@ def fit_preview(app):
 def render_size(app):
     width, height = map(int, app.show_size.get().split('x'))
     viewport_w, viewport_h = app.preview_viewport
-    ratio = min(1, viewport_w / width, viewport_h / height)
+    ratio = min(viewport_w / width, viewport_h / height)
+    if not app.enlarge_preview.get():
+        ratio = min(1, ratio)
     app.preview.setShowsize(max(1, round(height * ratio)), max(1, round(width * ratio)), resize_canvas=False)

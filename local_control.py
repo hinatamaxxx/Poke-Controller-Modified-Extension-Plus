@@ -118,7 +118,7 @@ class LocalControl:
         app = self.app
         live = getattr(app.camera, 'image_bgr', None) is not None and time.time() - getattr(app.camera, 'frame_at', 0) < 2
         return {'id': self.id, 'profile': app.profile, 'ready': True,
-                'running': str(app.start_button['text']) == 'Stop', 'paused': bool(Command.isPause),
+                'running': str(app.start_button['text']) == '停止', 'paused': bool(Command.isPause),
                 'command': Command.cur_command_name, 'demo': self.demo, 'exited': False,
                 'camera_live': live, 'catalog': {'python': [c.NAME for c in app.py_classes],
                                                 'mcu': [c.NAME for c in app.mcu_classes]},

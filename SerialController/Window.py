@@ -89,25 +89,25 @@ class PokeControllerApp:
         self.camera_lf = ttk.Labelframe(self.main_frame)
         self.top_command_f = ttk.Frame(self.camera_lf)
         self.start_top_button = ttk.Button(self.top_command_f)
-        self.start_top_button.configure(text="Start")
+        self.start_top_button.configure(text='開始')
         self.start_top_button.grid(column="0", padx="5", pady="5", row="0", sticky="ew")
         self.start_top_button.configure(command=self.startPlay)
         self.simplecon_top_button = ttk.Button(self.top_command_f)
-        self.simplecon_top_button.configure(text="Controller")
+        self.simplecon_top_button.configure(text='コントローラー')
         self.simplecon_top_button.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
         )
         self.simplecon_top_button.configure(command=self.createControllerWindow)
         self.clear_top_button = ttk.Button(self.top_command_f)
-        self.clear_top_button.configure(text="Clear Outputs")
+        self.clear_top_button.configure(text='ログを消去')
         self.clear_top_button.grid(column="2", padx="5", pady="5", row="0")
         self.clear_top_button.configure(command=self.clearOutputs)
         self.capture_button = ttk.Button(self.top_command_f)
-        self.capture_button.configure(text="Capture")
+        self.capture_button.configure(text='スクリーンショットを撮る', width=24)
         self.capture_button.grid(column="3", padx="5", pady="5", row="0", sticky="ew")
         self.capture_button.configure(command=self.saveCapture)
         self.open_capture_button = ttk.Button(self.top_command_f)
-        self.open_capture_button.configure(text="開く")
+        self.open_capture_button.configure(text='保存先を開く')
         self.open_capture_button.grid(column="4", pady="5", row="0")
         self.open_capture_button.configure(command=self.OpenCaptureDir)
         # self.line_button = ttk.Button(self.top_command_f)
@@ -115,7 +115,7 @@ class PokeControllerApp:
         # self.line_button.grid(column='5', padx='5', pady='5', row='0', sticky='ew')
         # self.line_button.configure(command=self.sendLineImage)
         self.discord_button = ttk.Button(self.top_command_f)
-        self.discord_button.configure(text="Discord")
+        self.discord_button.configure(text='Discord')
         self.discord_button.grid(column="5", padx="5", pady="5", row="0", sticky="ew")
         self.discord_button.configure(command=self.sendDiscordImage)
         self.top_command_f.grid(column="0", row="0", sticky="w")
@@ -123,7 +123,7 @@ class PokeControllerApp:
         self.canvas_frame = ttk.Frame(self.camera_lf)
         self.canvas_frame.configure(height="360", relief="groove", width="640")
         self.canvas_frame.grid(column="0", columnspan="7", row="1")
-        self.camera_lf.configure(text="Main Panel")  # modfied
+        self.camera_lf.configure(text='映像と操作')  # modfied
         self.camera_lf.grid(
             column="0", columnspan="3", padx="5", pady="5", row="0", sticky="ew"
         )
@@ -132,7 +132,7 @@ class PokeControllerApp:
         self.camera_f = ttk.Frame(self.controller_nb)
         self.camera_settings_lf = ttk.Labelframe(self.camera_f)
         self.camera_id_label = ttk.Label(self.camera_settings_lf)
-        self.camera_id_label.configure(anchor="center", text="Camera ID: ")
+        self.camera_id_label.configure(anchor="center", text='カメラ番号：')
         self.camera_id_label.grid(column="0", padx="5", pady="5", row="1", sticky="ew")
         self.camera_id_entry = ttk.Entry(self.camera_settings_lf)
         self.camera_id = tk.IntVar(value="")
@@ -146,7 +146,7 @@ class PokeControllerApp:
             column="2", padx="5", pady="5", row="1", sticky="ns"
         )
         self.fps_label = ttk.Label(self.camera_settings_lf)
-        self.fps_label.configure(text="FPS: ")
+        self.fps_label.configure(text='フレームレート：')
         self.fps_label.grid(column="3", padx="5", pady="5", row="1", sticky="ew")
         self.fps_cb = ttk.Combobox(self.camera_settings_lf)
         self.fps = tk.StringVar(value="")
@@ -165,7 +165,7 @@ class PokeControllerApp:
             column="5", padx="5", pady="5", row="1", sticky="ns"
         )
         self.show_size_label = ttk.Label(self.camera_settings_lf)
-        self.show_size_label.configure(text="Show Size: ")
+        self.show_size_label.configure(text='表示サイズ：')
         self.show_size_label.grid(column="6", padx="5", pady="5", row="1", sticky="ew")
         self.show_size_cb = ttk.Combobox(self.camera_settings_lf)
         self.show_size = tk.StringVar(value="")
@@ -188,11 +188,11 @@ class PokeControllerApp:
             column="8", padx="5", pady="5", row="1", sticky="ns"
         )
         self.reload_button = ttk.Button(self.camera_settings_lf)
-        self.reload_button.configure(text="Reload Camera")
+        self.reload_button.configure(text='カメラを再接続')
         self.reload_button.grid(column="9", padx="5", pady="5", row="1", sticky="ew")
         self.reload_button.configure(command=self.openCamera)
         self.camera_name_label = ttk.Label(self.camera_settings_lf)
-        self.camera_name_label.configure(anchor="center", text="Camera Name: ")
+        self.camera_name_label.configure(anchor="center", text='カメラ：')
         self.camera_name_label.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
         )
@@ -207,13 +207,13 @@ class PokeControllerApp:
         self.camera_name_cb.bind("<<ComboboxSelected>>", self.set_cameraid, add="")
         self.camera_status = ttk.Label(self.camera_settings_lf, text='未接続', wraplength=600)
         self.camera_status.grid(column=0, columnspan=10, row=2, sticky='w', padx=5)
-        self.camera_settings_lf.configure(text="Settings", width="420")
+        self.camera_settings_lf.configure(text='接続設定', width="420")
         self.camera_settings_lf.grid(column="0", padx="5", row="0", sticky="ew")
         self.display_settings_lf = ttk.Labelframe(self.camera_f)
         self.show_realtime_checkbox = ttk.Checkbutton(self.display_settings_lf)
         self.is_show_realtime = tk.BooleanVar()  # modified
         self.show_realtime_checkbox.configure(
-            text="Show Realtime", variable=self.is_show_realtime
+            text='映像を表示', variable=self.is_show_realtime
         )
         self.show_realtime_checkbox.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -221,7 +221,7 @@ class PokeControllerApp:
         self.show_value_checkbox = ttk.Checkbutton(self.display_settings_lf)
         self.is_show_value = tk.BooleanVar()  # modified
         self.show_value_checkbox.configure(
-            text="Show Value", variable=self.is_show_value
+            text='座標・色の値を表示', variable=self.is_show_value
         )
         self.show_value_checkbox.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
@@ -230,28 +230,33 @@ class PokeControllerApp:
         self.show_guide_checkbox = ttk.Checkbutton(self.display_settings_lf)
         self.is_show_guide = tk.BooleanVar()  # modified
         self.show_guide_checkbox.configure(
-            text="Show Guide", variable=self.is_show_guide
+            text='ガイドを表示', variable=self.is_show_guide
         )
         self.show_guide_checkbox.grid(
             column="2", padx="5", pady="5", row="0", sticky="ew"
         )
         self.show_guide_checkbox.configure(command=self.mode_change_show_guide)
+        self.enlarge_preview = tk.BooleanVar(value=False)
+        self.enlarge_preview_checkbox = ttk.Checkbutton(
+            self.display_settings_lf, text='表示領域に合わせて拡大',
+            variable=self.enlarge_preview, command=self.applyWindowSize)
+        self.enlarge_preview_checkbox.grid(column=0, columnspan=3, padx=5, pady=5, row=1, sticky='w')
         self.display_settings_lf.configure(
-            height="200", text="Display Settings", width="200"
+            height="200", text='表示設定', width="200"
         )
         self.display_settings_lf.grid(
             column="0", padx="5", pady="0", row="1", sticky="ew"
         )
         # self.camera_f.configure(height='200', width='200')    # removed
         self.camera_f.pack(side="top")
-        self.controller_nb.add(self.camera_f, padding="5", sticky="nsew", text="Camera")
+        self.controller_nb.add(self.camera_f, padding="5", sticky="nsew", text='カメラ')
         self.serial_f = ttk.Frame(self.controller_nb)
         self.settings_lf = ttk.Labelframe(self.serial_f)
         self.com_port_label = ttk.Label(self.settings_lf)
         if platform.system() == "Windows" or platform.system() == "Darwin":
-            self.com_port_label.configure(text="COM Port: ")
+            self.com_port_label.configure(text='COMポート：')
         else:
-            self.com_port_label.configure(text="Port: ")
+            self.com_port_label.configure(text='ポート：')
         self.com_port_label.grid(column="0", padx="5", pady="5", row="0", sticky="ew")
         # self.label2.rowconfigure('0', uniform='None', weight='0')   # added
         self.com_port_entry = ttk.Entry(self.settings_lf)
@@ -266,7 +271,7 @@ class PokeControllerApp:
         self.settings_separator_1.configure(orient="vertical")
         self.settings_separator_1.grid(column="2", pady="5", row="0", sticky="ns")
         self.baud_rate_label = ttk.Label(self.settings_lf)
-        self.baud_rate_label.configure(text="Baud Rate: ")
+        self.baud_rate_label.configure(text='通信速度：')
         self.baud_rate_label.grid(column="3", padx="5", pady="5", row="0", sticky="ew")
         self.baud_rate_cb = ttk.Combobox(self.settings_lf)
         self.baud_rate = tk.StringVar(value="")
@@ -283,21 +288,21 @@ class PokeControllerApp:
         self.settings_separator_2.configure(orient="vertical")
         self.settings_separator_2.grid(column="5", pady="5", row="0", sticky="ns")
         self.reload_com_port_button = ttk.Button(self.settings_lf)
-        self.reload_com_port_button.configure(text="Reload Port")
+        self.reload_com_port_button.configure(text='接続し直す')
         self.reload_com_port_button.grid(
             column="6", padx="10", pady="5", row="0", sticky="ew"
         )
         self.reload_com_port_button.configure(command=self.activateSerial)
         # self.reload_com_port.rowconfigure('0', uniform='None', weight='0')    # added
         self.disconnect_com_port_button = ttk.Button(self.settings_lf)
-        self.disconnect_com_port_button.configure(text="Disconnect Port")
+        self.disconnect_com_port_button.configure(text='接続を切る')
         self.disconnect_com_port_button.grid(
             column="7", padx="10", pady="5", row="0", sticky="ew"
         )
         self.disconnect_com_port_button.configure(command=self.inactivateSerial)
         # self.disconnect_com_port_button.rowconfigure('0', uniform='None', weight='0') # added
         self.serial_device_name_label = ttk.Label(self.settings_lf)
-        self.serial_device_name_label.configure(anchor="center", text="Device Name: ")
+        self.serial_device_name_label.configure(anchor="center", text='機器名：')
         self.serial_device_name_label.grid(
             column="0", padx="5", pady="5", row="1", sticky="ew"
         )
@@ -311,17 +316,17 @@ class PokeControllerApp:
         )
         self.serial_device_name_cb.bind("<<ComboboxSelected>>", self.set_device, add="")
         self.scan_device_button = ttk.Button(self.settings_lf)
-        self.scan_device_button.configure(text="Scan Device")
+        self.scan_device_button.configure(text='機器を再検索')
         self.scan_device_button.grid(
             column="7", padx="10", pady="3", row="1", sticky="ew"
         )
         self.scan_device_button.configure(command=self.locateDeviceCmbbox)
-        self.settings_lf.configure(text="Settings")
+        self.settings_lf.configure(text='接続設定')
         self.settings_lf.grid(column="0", padx="5", row="0", sticky="ew")
         self.serial_data_lf = ttk.Labelframe(self.serial_f)
         self.serial_data_format_name_label = ttk.Label(self.serial_data_lf)
         self.serial_data_format_name_label.configure(
-            anchor="center", text="Data Format: "
+            anchor="center", text='通信形式：'
         )
         self.serial_data_format_name_label.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -348,20 +353,20 @@ class PokeControllerApp:
         self.show_serial_checkbox = ttk.Checkbutton(self.serial_data_lf)
         self.is_show_serial = tk.BooleanVar()  # modified
         self.show_serial_checkbox.configure(
-            text="Show Serial", variable=self.is_show_serial
+            text='通信内容を表示', variable=self.is_show_serial
         )
         self.show_serial_checkbox.grid(
             column="2", padx="5", pady="5", row="0", sticky="ew"
         )
-        self.serial_data_lf.configure(height="200", text="Data", width="200")
+        self.serial_data_lf.configure(height="200", text='通信内容', width="200")
         self.serial_data_lf.grid(column="0", padx="5", row="1", sticky="ew")
         # self.serial_f.configure(height='200', width='200')    # removed
         self.serial_f.pack()
-        self.controller_nb.add(self.serial_f, padding="5", sticky="nsew", text="Serial")
+        self.controller_nb.add(self.serial_f, padding="5", sticky="nsew", text='機器接続')
         self.manual_control_f = ttk.Frame(self.controller_nb)
         self.software_lf = ttk.Labelframe(self.manual_control_f)
         self.simplecon_button = ttk.Button(self.software_lf)
-        self.simplecon_button.configure(text="Controller", width="15")
+        self.simplecon_button.configure(text='コントローラー', width="15")
         self.simplecon_button.grid(
             column="0", padx="10", pady="5", row="0", sticky="ew"
         )
@@ -369,7 +374,7 @@ class PokeControllerApp:
         self.use_keyboard_checkbox = ttk.Checkbutton(self.software_lf)
         self.is_use_keyboard = tk.BooleanVar()  # modified
         self.use_keyboard_checkbox.configure(
-            text="Use Keyboard", variable=self.is_use_keyboard
+            text='キーボードで操作', variable=self.is_use_keyboard
         )
         self.use_keyboard_checkbox.grid(
             column="0", padx="10", pady="5", row="1", sticky="ew"
@@ -380,7 +385,7 @@ class PokeControllerApp:
             tk.BooleanVar()
         )  # modified(継承いじるの面倒なので暫定的にこのまま)
         self.left_stick_mouse_checkbox.configure(
-            text="Use LStick Mouse", variable=self.camera_lf.is_use_left_stick_mouse
+            text='マウスで左スティックを操作', variable=self.camera_lf.is_use_left_stick_mouse
         )  # modified
         self.left_stick_mouse_checkbox.grid(
             column="1", padx="10", pady="5", row="1", sticky="ew"
@@ -391,7 +396,7 @@ class PokeControllerApp:
             tk.BooleanVar()
         )  # modified(継承いじるの面倒なので暫定的にこのまま)
         self.right_stick_mouse_checkbox.configure(
-            text="Use RStick Mouse", variable=self.camera_lf.is_use_right_stick_mouse
+            text='マウスで右スティックを操作', variable=self.camera_lf.is_use_right_stick_mouse
         )  # modified
         self.right_stick_mouse_checkbox.grid(
             column="2", padx="10", pady="5", row="1", sticky="ew"
@@ -399,13 +404,13 @@ class PokeControllerApp:
         self.right_stick_mouse_checkbox.configure(
             command=self.activate_Right_stick_mouse
         )
-        self.software_lf.configure(height="200", text="Software")
+        self.software_lf.configure(height="200", text='パソコンから操作')
         self.software_lf.grid(padx="5", sticky="ew")
         self.hardware_lf = ttk.Labelframe(self.manual_control_f)
         self.use_pro_controller_checkbox = ttk.Checkbutton(self.hardware_lf)
         self.is_use_Pro_Controller = tk.BooleanVar()  # modified
         self.use_pro_controller_checkbox.configure(
-            text="Use Pro Controller", variable=self.is_use_Pro_Controller
+            text='Proコントローラーで操作', variable=self.is_use_Pro_Controller
         )
         self.use_pro_controller_checkbox.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -416,7 +421,7 @@ class PokeControllerApp:
         self.record_pro_controller_checkbox = ttk.Checkbutton(self.hardware_lf)
         self.is_record_Pro_Controller = tk.BooleanVar()  # modified
         self.record_pro_controller_checkbox.configure(
-            text="Record Pro Controller", variable=self.is_record_Pro_Controller
+            text='Proコントローラーの操作を記録', variable=self.is_record_Pro_Controller
         )
         self.record_pro_controller_checkbox.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
@@ -424,19 +429,19 @@ class PokeControllerApp:
         self.record_pro_controller_checkbox.configure(
             command=self.record_Pro_Controller
         )
-        self.hardware_lf.configure(height="200", text="Hardware", width="200")
+        self.hardware_lf.configure(height="200", text='実機コントローラー', width="200")
         self.hardware_lf.grid(column="0", padx="5", row="1", sticky="ew")
         self.manual_control_f.configure(height="200", width="200")
         self.manual_control_f.pack()
         self.controller_nb.add(
-            self.manual_control_f, padding="5", text="Manual Control"
+            self.manual_control_f, padding="5", text='手動操作'
         )
         self.commands_f = ttk.Frame(self.controller_nb)
         self.select_commands_f = ttk.Frame(self.commands_f)
         self.command_nb = ttk.Notebook(self.select_commands_f)
         self.py_f = ttk.Frame(self.command_nb)
         self.command_filter_py_label = ttk.Label(self.py_f)
-        self.command_filter_py_label.configure(text="Filter: ")
+        self.command_filter_py_label.configure(text='絞り込み：')
         self.command_filter_py_label.grid(
             column="0", padx="5", pady="4", row="0", sticky="ew"
         )
@@ -452,7 +457,7 @@ class PokeControllerApp:
             "<<ComboboxSelected>>", self.applyFilterPy, add=""
         )
         self.py_label = ttk.Label(self.py_f)
-        self.py_label.configure(text="Command: ")
+        self.py_label.configure(text='スクリプト：')
         self.py_label.grid(column="0", padx="5", pady="4", row="1", sticky="ew")
         self.py_cb = ttk.Combobox(self.py_f)
         self.py_name = tk.StringVar(value="")
@@ -460,10 +465,10 @@ class PokeControllerApp:
         self.py_cb.grid(column="1", padx="5", pady="4", row="1", sticky="ew")
         self.py_f.pack(fill="x", side="top")
         self.py_f.columnconfigure(1, weight=1)
-        self.command_nb.add(self.py_f, padding="5", text="Python Command")
+        self.command_nb.add(self.py_f, padding="5", text='Pythonスクリプト')
         self.mcu_f = ttk.Frame(self.command_nb)
         self.command_filter_mcu_label = ttk.Label(self.mcu_f)
-        self.command_filter_mcu_label.configure(text="Filter: ")
+        self.command_filter_mcu_label.configure(text='絞り込み：')
         self.command_filter_mcu_label.grid(
             column="0", padx="5", pady="4", row="0", sticky="ew"
         )
@@ -479,7 +484,7 @@ class PokeControllerApp:
             "<<ComboboxSelected>>", self.applyFilterMcu, add=""
         )
         self.mcu_label = ttk.Label(self.mcu_f)
-        self.mcu_label.configure(text="Command: ")
+        self.mcu_label.configure(text='スクリプト：')
         self.mcu_label.grid(column="0", padx="5", pady="4", row="1", sticky="ew")
         self.mcu_cb = ttk.Combobox(self.mcu_f)
         self.mcu_name = tk.StringVar(value="")
@@ -489,7 +494,7 @@ class PokeControllerApp:
         self.mcu_cb.grid(column="1", padx="5", pady="4", row="1", sticky="ew")
         self.mcu_f.pack(fill="x", side="top")
         self.mcu_f.columnconfigure(1, weight=1)
-        self.command_nb.add(self.mcu_f, padding="5", text="Mcu Command")
+        self.command_nb.add(self.mcu_f, padding="5", text='マイコン用コマンド')
         self.shortcut_f = ttk.Frame(self.command_nb)
         self.shortcut1_f = ttk.Frame(self.shortcut_f)
         self.shortcut_button_1 = ttk.Button(self.shortcut1_f)
@@ -549,13 +554,13 @@ class PokeControllerApp:
         )
         self.shortcut2_f.configure(padding="2")
         self.shortcut2_f.pack(side="top", expand="true", fill="both")
-        self.command_nb.add(self.shortcut_f, padding="5", text="Shortcut")
+        self.command_nb.add(self.shortcut_f, padding="5", text='ショートカット')
         self.command_nb.configure(padding="0", width="580")
         self.command_nb.pack(padx="5", pady="5", side="left")
         self.command_nb.pack(fill="both", expand=True, padx="5", pady="5", side="left")
         self.command_nb.bind("<<NotebookTabChanged>>", self.controllButtons, add="")
         self.open_command_dir_button = ttk.Button(self.select_commands_f)
-        self.open_command_dir_button.config(text="開く")
+        self.open_command_dir_button.config(text='スクリプトのフォルダーを開く')
         self.open_command_dir_button.pack(
             expand=False, side="left", ipadx="5", pady="15"
         )
@@ -564,7 +569,7 @@ class PokeControllerApp:
         self.select_commands_f.grid(column="0", row="0", sticky="ew")
         self.action_commands_f = ttk.Frame(self.commands_f)
         self.set_shortcut_label = ttk.Label(self.action_commands_f)
-        self.set_shortcut_label.configure(text="Set Shortcut: ")
+        self.set_shortcut_label.configure(text='ショートカット登録：')
         self.set_shortcut_label.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
         )
@@ -578,7 +583,7 @@ class PokeControllerApp:
         self.set_shortcut_num_sb.insert("0", """(select)""")
         self.set_shortcut_num_sb.grid(column="1", row="0", sticky="ew")
         self.shortcut_set_button = ttk.Button(self.action_commands_f)
-        self.shortcut_set_button.configure(takefocus=False, text="Set")
+        self.shortcut_set_button.configure(takefocus=False, text='登録')
         self.shortcut_set_button.grid(
             column="2", padx="10", pady="5", row="0", sticky="ew"
         )
@@ -587,24 +592,24 @@ class PokeControllerApp:
         self.commands_separator_1.configure(orient="vertical")
         self.commands_separator_1.grid(column="3", pady="5", row="0", sticky="ns")
         self.reload_command_button = ttk.Button(self.action_commands_f)
-        self.reload_command_button.configure(text="Reload")
+        self.reload_command_button.configure(text='再読み込み')
         self.reload_command_button.grid(
             column="4", padx="10", pady="5", row="0", sticky="ew"
         )
         self.reload_command_button.configure(command=self.reloadCommands)
         self.start_button = ttk.Button(self.action_commands_f)
-        self.start_button.configure(text="Start")
+        self.start_button.configure(text='開始')
         self.start_button.grid(column="5", padx="10", pady="5", row="0", sticky="ew")
         self.start_button.configure(command=self.startPlay)
         self.pause_button = ttk.Button(self.action_commands_f)
-        self.pause_button.configure(text="Pause")
+        self.pause_button.configure(text='一時停止')
         self.pause_button.grid(column="6", padx="10", pady="5", row="0", sticky="ew")
         self.pause_button.configure(command=self.pausePlay)
         self.action_commands_f.configure(height="200", width="200")
         self.action_commands_f.grid(column="0", row="1", sticky="e")
         self.commands_f.configure(height="200", width="500")
         self.commands_f.pack(side="top")
-        self.controller_nb.add(self.commands_f, padding="5", text="Commands")
+        self.controller_nb.add(self.commands_f, padding="5", text='スクリプト')
         self.notification_f = ttk.Frame(self.controller_nb)
         self.windows_notification_lf = ttk.Labelframe(self.notification_f)
         self.win_notification_start_checkbox = ttk.Checkbutton(
@@ -612,7 +617,7 @@ class PokeControllerApp:
         )
         self.is_win_notification_start = tk.BooleanVar()
         self.win_notification_start_checkbox.configure(
-            text="Start", variable=self.is_win_notification_start
+            text='開始時', variable=self.is_win_notification_start
         )
         self.win_notification_start_checkbox.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -625,7 +630,7 @@ class PokeControllerApp:
         )
         self.is_win_notification_end = tk.BooleanVar()
         self.win_notification_end_checkbox.configure(
-            text="End", variable=self.is_win_notification_end
+            text='終了時', variable=self.is_win_notification_end
         )
         self.win_notification_end_checkbox.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
@@ -634,10 +639,10 @@ class PokeControllerApp:
             command=self.mode_change_notification
         )
         self.send_win_button = ttk.Button(self.windows_notification_lf)
-        self.send_win_button.configure(text="Test")
+        self.send_win_button.configure(text='テスト通知')
         self.send_win_button.grid(column="2", padx="5", pady="5", row="0", sticky="ew")
         self.send_win_button.configure(command=self.sendWinNotfication)
-        self.windows_notification_lf.configure(text="Windows Notification")
+        self.windows_notification_lf.configure(text='Windows通知')
         self.windows_notification_lf.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
         )
@@ -647,7 +652,7 @@ class PokeControllerApp:
         )
         self.is_line_notification_start = tk.BooleanVar()
         self.line_notification_start_checkbox.configure(
-            text="Start", variable=self.is_line_notification_start
+            text='開始時', variable=self.is_line_notification_start
         )
         self.line_notification_start_checkbox.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -658,7 +663,7 @@ class PokeControllerApp:
         self.line_notification_end_checkbox = ttk.Checkbutton(self.line_notification_lf)
         self.is_line_notification_end = tk.BooleanVar()
         self.line_notification_end_checkbox.configure(
-            text="End", variable=self.is_line_notification_end
+            text='終了時', variable=self.is_line_notification_end
         )
         self.line_notification_end_checkbox.grid(
             column="1", padx="5", pady="0", row="0", sticky="ew"
@@ -667,10 +672,10 @@ class PokeControllerApp:
             command=self.mode_change_notification
         )
         self.send_line_button = ttk.Button(self.line_notification_lf)
-        self.send_line_button.configure(text="Test")
+        self.send_line_button.configure(text='テスト通知')
         self.send_line_button.grid(column="2", padx="5", pady="5", row="0", sticky="ew")
         self.send_line_button.configure(command=self.sendLineImage)
-        self.line_notification_lf.configure(text="Line Notification")
+        self.line_notification_lf.configure(text='LINE通知')
         self.line_notification_lf.grid(
             column="1", padx="5", pady="0", row="0", sticky="ew"
         )
@@ -680,7 +685,7 @@ class PokeControllerApp:
         )
         self.is_discord_notification_start = tk.BooleanVar()
         self.discord_notification_start_checkbox.configure(
-            text="Start", variable=self.is_discord_notification_start
+            text='開始時', variable=self.is_discord_notification_start
         )
         self.discord_notification_start_checkbox.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -693,7 +698,7 @@ class PokeControllerApp:
         )
         self.is_discord_notification_end = tk.BooleanVar()
         self.discord_notification_end_checkbox.configure(
-            text="End", variable=self.is_discord_notification_end
+            text='終了時', variable=self.is_discord_notification_end
         )
         self.discord_notification_end_checkbox.grid(
             column="1", padx="5", pady="0", row="0", sticky="ew"
@@ -702,17 +707,17 @@ class PokeControllerApp:
             command=self.mode_change_notification
         )
         self.send_discord_button = ttk.Button(self.discord_notification_lf)
-        self.send_discord_button.configure(text="Test")
+        self.send_discord_button.configure(text='テスト通知')
         self.send_discord_button.grid(
             column="2", padx="5", pady="5", row="0", sticky="ew"
         )
         self.send_discord_button.configure(command=self.sendDiscordImage)
-        self.discord_notification_lf.configure(text="Discord Notification")
+        self.discord_notification_lf.configure(text='Discord通知')
         self.discord_notification_lf.grid(
             column="0", padx="5", pady="0", row="1", sticky="ew"
         )
         self.notification_f.pack()
-        self.controller_nb.add(self.notification_f, sticky="nsew", text="Notification")
+        self.controller_nb.add(self.notification_f, sticky="nsew", text='通知')
         self.others_f = ttk.Frame(self.controller_nb)
         self.othres_outputs_lf = ttk.Labelframe(self.others_f)
         self.outputs_size_adjuster_lf = ttk.Labelframe(self.othres_outputs_lf)
@@ -724,7 +729,7 @@ class PokeControllerApp:
         self.area_size_scale.configure(value="50", variable=self.area_size)
         self.area_size_scale.grid(column="0", padx="5", pady="5", row="0", sticky="ew")
         self.area_size_scale.configure(command=self.changeAreaSize)
-        self.outputs_size_adjuster_lf.configure(text="Size Adjuster")
+        self.outputs_size_adjuster_lf.configure(text='ログ欄の高さ配分')
         self.outputs_size_adjuster_lf.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
         )
@@ -732,7 +737,7 @@ class PokeControllerApp:
         self.stdout_destination_1_rb = ttk.Radiobutton(self.outputs_stdout_dest_lf)
         self.stdout_destination = tk.StringVar(value="1")
         self.stdout_destination_1_rb.configure(
-            text="Output#1", value="1", variable=self.stdout_destination
+            text='ログ1', value="1", variable=self.stdout_destination
         )
         self.stdout_destination_1_rb.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -740,33 +745,33 @@ class PokeControllerApp:
         self.stdout_destination_1_rb.configure(command=self.switchStdoutDestination)
         self.stdout_destination_2_rb = ttk.Radiobutton(self.outputs_stdout_dest_lf)
         self.stdout_destination_2_rb.configure(
-            text="Output#2", value="2", variable=self.stdout_destination
+            text='ログ2', value="2", variable=self.stdout_destination
         )
         self.stdout_destination_2_rb.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
         )
         self.stdout_destination_2_rb.configure(command=self.switchStdoutDestination)
-        self.outputs_stdout_dest_lf.configure(text="Standard Output Destination")
+        self.outputs_stdout_dest_lf.configure(text='実行ログの表示先')
         self.outputs_stdout_dest_lf.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
         )
         self.outputs_clear_lf = ttk.Labelframe(self.othres_outputs_lf)
         self.outputs_text_area_1_clear_button = ttk.Button(self.outputs_clear_lf)
-        self.outputs_text_area_1_clear_button.configure(text="Clear(#1)")
+        self.outputs_text_area_1_clear_button.configure(text='ログ1を消去')
         self.outputs_text_area_1_clear_button.grid(
             column="0", padx="10", pady="5", row="0", sticky="ew"
         )
         self.outputs_text_area_1_clear_button.configure(command=self.clearTextArea1)
         self.outputs_text_area_2_clear_button = ttk.Button(self.outputs_clear_lf)
-        self.outputs_text_area_2_clear_button.configure(text="Clear(#2)")
+        self.outputs_text_area_2_clear_button.configure(text='ログ2を消去')
         self.outputs_text_area_2_clear_button.grid(
             column="1", padx="10", pady="5", row="0", sticky="ew"
         )
         self.outputs_text_area_2_clear_button.configure(command=self.clearTextArea2)
-        self.outputs_clear_lf.configure(text="Clear Outputs")
+        self.outputs_clear_lf.configure(text='ログを消去')
         self.outputs_clear_lf.grid(column="2", padx="5", pady="5", row="0", sticky="ew")
         self.othres_outputs_lf.configure(
-            height="200", text="Outputs/Dialogue Settings", width="200"
+            height="200", text='ログ・ダイアログ設定', width="200"
         )
         self.othres_outputs_lf.grid(column="0", padx="5", row="0", sticky="ew")
         # self.othres_right_frame_lf = ttk.Labelframe(self.others_f)
@@ -782,11 +787,23 @@ class PokeControllerApp:
             "Output#2 Only",
             "Software-Controller Only",
         ]
+        mode_labels = dict(zip(right_frame_widget_mode_list, [
+            'すべて表示', 'ログ1 ＋ ログ2', 'ログ1 ＋ コントローラー',
+            'ログ2 ＋ コントローラー', 'ログ1のみ', 'ログ2のみ', 'コントローラーのみ']))
+        self.right_frame_mode_label = tk.StringVar(value=mode_labels[self.right_frame_widget_mode.get()])
+        def show_mode(*_):
+            self.right_frame_mode_label.set(mode_labels.get(self.right_frame_widget_mode.get(), 'すべて表示'))
+        def choose_mode(*_):
+            reverse = {label: key for key, label in mode_labels.items()}
+            self.right_frame_widget_mode.set(reverse[self.right_frame_mode_label.get()])
+        self.right_frame_widget_mode.trace_add('write', show_mode)
+        self.right_frame_mode_label.trace_add('write', choose_mode)
+        self.right_frame_mode_keys = right_frame_widget_mode_list
         self.select_right_frame_widget_cb.configure(
             justify="left",
             state="readonly",
-            textvariable=self.right_frame_widget_mode,
-            values=right_frame_widget_mode_list,
+            textvariable=self.right_frame_mode_label,
+            values=list(mode_labels.values()),
         )
         self.select_right_frame_widget_cb.configure(width="30")
         self.select_right_frame_widget_cb.grid(
@@ -795,7 +812,7 @@ class PokeControllerApp:
         self.select_right_frame_widget_cb.bind(
             "<<ComboboxSelected>>", self.replace_right_frame_widget
         )
-        self.select_right_frame_widget.configure(text="Widget Mode")
+        self.select_right_frame_widget.configure(text='右側に表示する項目')
         self.select_right_frame_widget.grid(
             column="0", padx="5", pady="5", row="1", sticky="ew"
         )
@@ -803,17 +820,17 @@ class PokeControllerApp:
         self.pos_software_controller = tk.StringVar(value="2")
         self.pos_top_rb = ttk.Radiobutton(self.pos_software_controller_lf)
         self.pos_top_rb.configure(
-            text="TOP", value="1", variable=self.pos_software_controller
+            text='上', value="1", variable=self.pos_software_controller
         )
         self.pos_top_rb.grid(column="0", padx="5", pady="5", row="0", sticky="ew")
         self.pos_top_rb.configure(command=self.replace_right_frame_widget)
         self.pos_bottom_rb = ttk.Radiobutton(self.pos_software_controller_lf)
         self.pos_bottom_rb.configure(
-            text="BOTTOM", value="2", variable=self.pos_software_controller
+            text='下', value="2", variable=self.pos_software_controller
         )
         self.pos_bottom_rb.grid(column="1", padx="5", pady="5", row="0", sticky="ew")
         self.pos_bottom_rb.configure(command=self.replace_right_frame_widget)
-        self.pos_software_controller_lf.configure(text="Software-Controller Position")
+        self.pos_software_controller_lf.configure(text='コントローラーの表示位置')
         self.pos_software_controller_lf.grid(
             column="1", padx="5", pady="5", row="1", sticky="ew"
         )
@@ -821,7 +838,7 @@ class PokeControllerApp:
         self.pos_dialogue_buttons = tk.StringVar(value="2")
         self.pos_dialogue_top_rb = ttk.Radiobutton(self.pos_dialogue_buttons_lf)
         self.pos_dialogue_top_rb.configure(
-            text="TOP", value="1", variable=self.pos_dialogue_buttons
+            text='上', value="1", variable=self.pos_dialogue_buttons
         )
         self.pos_dialogue_top_rb.grid(
             column="0", padx="5", pady="5", row="0", sticky="ew"
@@ -829,7 +846,7 @@ class PokeControllerApp:
         self.pos_dialogue_top_rb.configure(command=self.change_buttons_position)
         self.pos_dialogue_bottom_rb = ttk.Radiobutton(self.pos_dialogue_buttons_lf)
         self.pos_dialogue_bottom_rb.configure(
-            text="BOTTOM", value="2", variable=self.pos_dialogue_buttons
+            text='下', value="2", variable=self.pos_dialogue_buttons
         )
         self.pos_dialogue_bottom_rb.grid(
             column="1", padx="5", pady="5", row="0", sticky="ew"
@@ -837,13 +854,13 @@ class PokeControllerApp:
         self.pos_dialogue_bottom_rb.configure(command=self.change_buttons_position)
         self.pos_dialogue_both_rb = ttk.Radiobutton(self.pos_dialogue_buttons_lf)
         self.pos_dialogue_both_rb.configure(
-            text="BOTH", value="3", variable=self.pos_dialogue_buttons
+            text='上下両方', value="3", variable=self.pos_dialogue_buttons
         )
         self.pos_dialogue_both_rb.grid(
             column="2", padx="5", pady="5", row="0", sticky="ew"
         )
         self.pos_dialogue_both_rb.configure(command=self.change_buttons_position)
-        self.pos_dialogue_buttons_lf.configure(text="Dialogue OK/Cancel Position")
+        self.pos_dialogue_buttons_lf.configure(text='ダイアログのボタン位置')
         self.pos_dialogue_buttons_lf.grid(
             column="2", padx="5", pady="5", row="1", sticky="ew"
         )
@@ -853,13 +870,13 @@ class PokeControllerApp:
         # self.others_help_lf.grid(column='0', padx='5', row='1', sticky='ew')
         self.others_f.configure(height="200", width="200")
         self.others_f.pack()
-        self.controller_nb.add(self.others_f, sticky="nsew", text="Others")
+        self.controller_nb.add(self.others_f, sticky="nsew", text='その他')
         # Let the largest tab determine its height, including DPI-scaled controls.
         self.controller_nb.configure(height=0)
         self.controller_nb.grid(column="0", padx="5", pady="5", row="1", sticky="ew")
         self.output_area_f = ttk.Frame(self.main_frame)
         self.text_scroll_1 = ttk.LabelFrame(self.output_area_f, relief=tk.GROOVE)
-        self.text_scroll_1.configure(text="Output#1")
+        self.text_scroll_1.configure(text='ログ1')
         self.text_area_1 = tk.Text(self.text_scroll_1)
         self.text_area_1.config(
             blockcursor="true", height="3", insertunfocussed="none", maxundo="0"
@@ -877,7 +894,7 @@ class PokeControllerApp:
             expand="true", fill="both", padx="0", pady="0", side="top"
         )
         self.text_scroll_2 = ttk.LabelFrame(self.output_area_f, relief=tk.GROOVE)
-        self.text_scroll_2.configure(text="Output#2")
+        self.text_scroll_2.configure(text='ログ2')
         self.text_area_2 = tk.Text(self.text_scroll_2)
         self.text_area_2.config(
             blockcursor="true", height="3", insertunfocussed="none", maxundo="0"
@@ -898,46 +915,46 @@ class PokeControllerApp:
             column="3", padx="5", pady="5", row="0", rowspan="2", sticky="nsew"
         )
         self.softcon_frame = ttk.LabelFrame(self.output_area_f, relief=tk.GROOVE)
-        self.softcon_frame.configure(text="Software-Controller")
+        self.softcon_frame.configure(text='画面上のコントローラー')
         self.softcon_left_frame = tk.Frame(self.softcon_frame, bg="#56CCF2")
         self.softcon_left_frame.configure(height=200, width=200)
         self.softcon_zl_button = tk.Button(self.softcon_left_frame)
-        self.softcon_zl_button.configure(text="ZL", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_zl_button.configure(text='ZL', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_zl_button.grid(column=0, padx=2, pady=2, row=0)
         self.softcon_l_button = tk.Button(self.softcon_left_frame)
-        self.softcon_l_button.configure(text="L", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_l_button.configure(text='L', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_l_button.grid(column=0, padx=2, pady=2, row=1)
         self.softcon_minus_button = tk.Button(self.softcon_left_frame)
         self.softcon_minus_button.configure(
-            text="－", width=5, bg="#343434", fg="#FFFFFF"
+            text='－', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_minus_button.grid(column=2, padx=2, pady=2, row=1)
         self.softcon_l_click_button = tk.Button(self.softcon_left_frame)
         self.softcon_l_click_button.configure(
-            text="L-C", width=5, bg="#343434", fg="#FFFFFF"
+            text='L-C', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_l_click_button.grid(column=1, padx=2, pady=2, row=1)
         self.softcon_up_button = tk.Button(self.softcon_left_frame)
-        self.softcon_up_button.configure(text="↑", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_up_button.configure(text='↑', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_up_button.grid(column=1, padx=2, pady=2, row=2)
         self.softcon_left_button = tk.Button(self.softcon_left_frame)
         self.softcon_left_button.configure(
-            text="←", width=5, bg="#343434", fg="#FFFFFF"
+            text='←', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_left_button.grid(column=0, padx=2, pady=2, row=3)
         self.softcon_right_button = tk.Button(self.softcon_left_frame)
         self.softcon_right_button.configure(
-            text="→", width=5, bg="#343434", fg="#FFFFFF"
+            text='→', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_right_button.grid(column=2, padx=2, pady=2, row=3)
         self.softcon_down_button = tk.Button(self.softcon_left_frame)
         self.softcon_down_button.configure(
-            text="↓", width=5, bg="#343434", fg="#FFFFFF"
+            text='↓', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_down_button.grid(column=1, padx=2, pady=2, row=4)
         self.softcon_capture_button = tk.Button(self.softcon_left_frame)
         self.softcon_capture_button.configure(
-            text="CAP", width=5, bg="#343434", fg="#FFFFFF"
+            text='CAP', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_capture_button.grid(column=2, padx=2, pady=2, row=4)
         self.softcon_left_frame.grid(column=0, ipadx=3, ipady=3, row=0, sticky="nsew")
@@ -945,36 +962,36 @@ class PokeControllerApp:
         self.softcon_right_frame = tk.Frame(self.softcon_frame, bg="#E9514E")
         self.softcon_right_frame.configure(height=200, width=200)
         self.softcon_zr_button = tk.Button(self.softcon_right_frame)
-        self.softcon_zr_button.configure(text="ZR", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_zr_button.configure(text='ZR', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_zr_button.grid(column=2, padx=2, pady=2, row=0)
         self.softcon_r_button = tk.Button(self.softcon_right_frame)
-        self.softcon_r_button.configure(text="R", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_r_button.configure(text='R', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_r_button.grid(column=2, padx=2, pady=2, row=1)
         self.softcon_plus_button = tk.Button(self.softcon_right_frame)
         self.softcon_plus_button.configure(
-            text="＋", width=5, bg="#343434", fg="#FFFFFF"
+            text='＋', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_plus_button.grid(column=0, padx=2, pady=2, row=1)
         self.softcon_r_click_button = tk.Button(self.softcon_right_frame)
         self.softcon_r_click_button.configure(
-            text="R-C", width=5, bg="#343434", fg="#FFFFFF"
+            text='R-C', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_r_click_button.grid(column=1, padx=2, pady=2, row=4)
         self.softcon_x_button = tk.Button(self.softcon_right_frame)
-        self.softcon_x_button.configure(text="X", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_x_button.configure(text='X', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_x_button.grid(column=1, padx=2, pady=2, row=1)
         self.softcon_y_button = tk.Button(self.softcon_right_frame)
-        self.softcon_y_button.configure(text="Y", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_y_button.configure(text='Y', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_y_button.grid(column=0, padx=2, pady=2, row=2)
         self.softcon_a_button = tk.Button(self.softcon_right_frame)
-        self.softcon_a_button.configure(text="A", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_a_button.configure(text='A', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_a_button.grid(column=2, padx=2, pady=2, row=2)
         self.softcon_b_button = tk.Button(self.softcon_right_frame)
-        self.softcon_b_button.configure(text="B", width=5, bg="#343434", fg="#FFFFFF")
+        self.softcon_b_button.configure(text='B', width=5, bg="#343434", fg="#FFFFFF")
         self.softcon_b_button.grid(column=1, padx=2, pady=2, row=3)
         self.softcon_home_button = tk.Button(self.softcon_right_frame)
         self.softcon_home_button.configure(
-            text="HOME", width=5, bg="#343434", fg="#FFFFFF"
+            text='HOME', width=5, bg="#343434", fg="#FFFFFF"
         )
         self.softcon_home_button.grid(column=0, padx=2, pady=2, row=4)
         self.softcon_right_frame.grid(column=1, ipadx=3, ipady=3, row=0, sticky="nsew")
@@ -1288,6 +1305,7 @@ class PokeControllerApp:
         self.is_show_realtime.set(self.settings.is_show_realtime.get())
         self.is_show_value.set(self.settings.is_show_value.get())
         self.is_show_guide.set(self.settings.is_show_guide.get())
+        self.enlarge_preview.set(self.settings.enlarge_preview.get())
         self.is_show_serial.set(self.settings.is_show_serial.get())
         self.is_use_keyboard.set(self.settings.is_use_keyboard.get())
         self.fps.set(self.settings.fps.get())
@@ -2187,7 +2205,7 @@ class PokeControllerApp:
 
     def controllButtons(self, event):
         note = event.widget
-        if self.start_button["text"] == "Start":
+        if self.start_button["text"] == "開始":
             if note.tab(note.select(), "text") == "Shortcut":
                 self.start_button["state"] = "disabled"
                 self.start_top_button["state"] = "disabled"
@@ -2266,12 +2284,12 @@ class PokeControllerApp:
 
     def pausePlay(self, *event):
         Command.isPause = True
-        self.pause_button["text"] = "Restart"
+        self.pause_button["text"] = "再開"
         self.pause_button["command"] = self.restartPlay
 
     def restartPlay(self, *event):
         Command.isPause = False
-        self.pause_button["text"] = "Pause"
+        self.pause_button["text"] = "一時停止"
         self.pause_button["command"] = self.pausePlay
 
     def startPlay(self, *event):
@@ -2292,8 +2310,8 @@ class PokeControllerApp:
         self._logger.info(self.start_button["text"] + " " + self.cur_command.NAME)
         self.cur_command.start(self.ser, self.stopPlayPost)
 
-        self.start_button["text"] = "Stop"
-        self.start_top_button["text"] = "Stop"
+        self.start_button["text"] = "停止"
+        self.start_top_button["text"] = "停止"
         self.start_button["command"] = self.stopPlay
         self.start_top_button["command"] = self.stopPlay
         self.reload_command_button["state"] = "disabled"
@@ -2324,8 +2342,8 @@ class PokeControllerApp:
             Command.cur_command_name = self.cur_command.NAME
             self.cur_command.start(self.ser, self.stopPlayPost)
 
-            self.start_button["text"] = "Stop"
-            self.start_top_button["text"] = "Stop"
+            self.start_button["text"] = "停止"
+            self.start_top_button["text"] = "停止"
             self.start_button["command"] = self.stopPlay
             self.start_top_button["command"] = self.stopPlay
             self.start_button["state"] = "normal"
@@ -2352,7 +2370,7 @@ class PokeControllerApp:
         self.start_top_button["state"] = "disabled"
 
         Command.isPause = False
-        self.pause_button["text"] = "Pause"
+        self.pause_button["text"] = "一時停止"
         self.pause_button["command"] = self.pausePlay
         self.pause_button["state"] = "disable"
 
@@ -2360,8 +2378,8 @@ class PokeControllerApp:
 
     @on_ui
     def stopPlayPost(self):
-        self.start_button["text"] = "Start"
-        self.start_top_button["text"] = "Start"
+        self.start_button["text"] = "開始"
+        self.start_top_button["text"] = "開始"
         self.start_button["command"] = self.startPlay
         self.start_top_button["command"] = self.startPlay
         if (self.command_nb.index(self.command_nb.select())) == 2:
@@ -2415,6 +2433,7 @@ class PokeControllerApp:
             self.settings.is_show_realtime.set(self.is_show_realtime.get())
             self.settings.is_show_value.set(self.is_show_value.get())
             self.settings.is_show_guide.set(self.is_show_guide.get())
+            self.settings.enlarge_preview.set(self.enlarge_preview.get())
             self.settings.is_show_serial.set(self.is_show_serial.get())
             self.settings.is_use_keyboard.set(self.is_use_keyboard.get())
             self.settings.fps.set(self.fps.get())
@@ -2497,14 +2516,14 @@ class PokeControllerApp:
         self.reloadCommands()
 
     def StartCommandWithF6(self, *event):
-        if self.start_button["text"] == "Stop":
+        if self.start_button["text"] == "停止":
             print("Command is now working!")
             self._logger.debug("Command is now working!")
-        elif self.start_button["text"] == "Start":
+        elif self.start_button["text"] == "開始":
             self.startPlay()
 
     def StopCommandWithEsc(self, *event):
-        if self.start_button["text"] == "Stop":
+        if self.start_button["text"] == "停止":
             self.stopPlay()
 
     def clearTextArea1(self):
@@ -2553,14 +2572,14 @@ class PokeControllerApp:
             sys.stdout = StdoutRedirector(self.text_area_1)
             print("standard output destination is switched.")
             Command.stdout_destination = val
-            self.text_scroll_1.configure(text="Output#1 (Stdout)")
-            self.text_scroll_2.configure(text="Output#2")
+            self.text_scroll_1.configure(text='ログ1（実行ログ）')
+            self.text_scroll_2.configure(text='ログ2')
         elif val == "2":
             sys.stdout = StdoutRedirector(self.text_area_2)
             print("standard output destination is switched.")
             Command.stdout_destination = val
-            self.text_scroll_1.configure(text="Output#1")
-            self.text_scroll_2.configure(text="Output#2 (Stdout)")
+            self.text_scroll_1.configure(text='ログ1')
+            self.text_scroll_2.configure(text='ログ2（実行ログ）')
 
     def replace_right_frame_widget(self, *event):
         try:
@@ -2657,7 +2676,7 @@ class PokeControllerApp:
 
 
 class ToolTip:
-    def __init__(self, widget, text="default tooltip"):
+    def __init__(self, widget, text='default tooltip'):
         self.widget = widget
         self.text = text
         self.widget.bind("<Motion>", self.moveCursor)

@@ -21,7 +21,7 @@ class CameraSelection:
 
     def refresh(self):
         self.rows = enumerate_cameras()
-        labels = ['Disable']
+        labels = ['使用しない']
         for device in self.rows:
             identity = device['path']
             suffix = hashlib.sha256(identity.encode()).hexdigest()[:6] if identity else 'IDなし'

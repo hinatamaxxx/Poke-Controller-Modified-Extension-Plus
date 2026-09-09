@@ -19,7 +19,7 @@ class PokeKeycon:
     def __init__(self, master=None, **kw):
         self.master = master
         self.kc = tk.Toplevel(master)
-        self.kc.title("Key Config")
+        self.kc.title("キー設定")
         self.listener = None
         self.setting = configparser.ConfigParser()
         self.setting.optionxform = str
@@ -44,7 +44,7 @@ class PokeKeycon:
         self.frame_2 = ttk.Frame(self.key_config_frame, style="Frame1.TFrame")
 
         self.label_ZL = ttk.Label(self.frame_2)
-        self.label_ZL.configure(padding="5", text="ZL", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_ZL.configure(padding="5", text='ZL', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_ZL.grid(sticky="e")
         self.entry_ZL = ttk.Entry(self.frame_2)
         self.ZL = tk.StringVar()
@@ -52,7 +52,7 @@ class PokeKeycon:
         self.entry_ZL.grid(column="1", padx="5", pady="5", row="0")
 
         self.label_L = ttk.Label(self.frame_2)
-        self.label_L.configure(padding="5", text="L", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_L.configure(padding="5", text='L', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_L.grid(row="1", sticky="e")
         self.entry_L = ttk.Entry(self.frame_2)
         self.L = tk.StringVar()
@@ -60,7 +60,7 @@ class PokeKeycon:
         self.entry_L.grid(column="1", padx="5", pady="5", row="1")
 
         self.label_MINUS = ttk.Label(self.frame_2)
-        self.label_MINUS.configure(padding="5", text="MINUS", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_MINUS.configure(padding="5", text='－', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_MINUS.grid(row="2", sticky="e")
         self.entry_MINUS = ttk.Entry(self.frame_2)
         self.MINUS = tk.StringVar()
@@ -68,7 +68,7 @@ class PokeKeycon:
         self.entry_MINUS.grid(column="1", padx="5", pady="5", row="2")
 
         self.label_HAT_UP = ttk.Label(self.frame_2)
-        self.label_HAT_UP.configure(padding="5", text="HAT UP", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_HAT_UP.configure(padding="5", text='十字キー上', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_HAT_UP.grid(row="3", sticky="e")
         self.entry_HAT_UP = ttk.Entry(self.frame_2)
         self.HAT_UP = tk.StringVar()
@@ -77,7 +77,7 @@ class PokeKeycon:
 
         self.label__HAT_LEFT = ttk.Label(self.frame_2)
         self.label__HAT_LEFT.configure(
-            padding="5", text="HAT LEFT", background="#00c3e3", font="{游ゴシック} 12 {bold}"
+            padding="5", text='十字キー左', background="#00c3e3", font="{游ゴシック} 12 {bold}"
         )
         self.label__HAT_LEFT.grid(row="4", sticky="e")
         self.entry_HAT_LEFT = ttk.Entry(self.frame_2)
@@ -87,7 +87,7 @@ class PokeKeycon:
 
         self.label_HAT_RIGHT = ttk.Label(self.frame_2)
         self.label_HAT_RIGHT.configure(
-            padding="5", text="HAT RIGHT", background="#00c3e3", font="{游ゴシック} 12 {bold}"
+            padding="5", text='十字キー右', background="#00c3e3", font="{游ゴシック} 12 {bold}"
         )
         self.label_HAT_RIGHT.grid(row="5", sticky="e")
         self.entry_HAT_RIGHT = ttk.Entry(self.frame_2)
@@ -96,7 +96,7 @@ class PokeKeycon:
         self.entry_HAT_RIGHT.grid(column="1", padx="5", pady="5", row="5")
 
         self.label_HAT_DOWN = ttk.Label(self.frame_2)
-        self.label_HAT_DOWN.configure(padding="5", text="HAT DOWN", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_HAT_DOWN.configure(padding="5", text='十字キー下', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_HAT_DOWN.grid(row="6", sticky="e")
         self.entry_HAT_DOWN = ttk.Entry(self.frame_2)
         self.HAT_DOWN = tk.StringVar()
@@ -104,7 +104,7 @@ class PokeKeycon:
         self.entry_HAT_DOWN.grid(column="1", padx="5", pady="5", row="6")
 
         self.label_CAPTURE = ttk.Label(self.frame_2)
-        self.label_CAPTURE.configure(padding="5", text="CAPTURE", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_CAPTURE.configure(padding="5", text='CAPTURE', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_CAPTURE.grid(row="7", sticky="e")
         self.entry_CAPTURE = ttk.Entry(self.frame_2)
         self.CAPTURE = tk.StringVar()
@@ -112,7 +112,7 @@ class PokeKeycon:
         self.entry_CAPTURE.grid(column="1", padx="5", pady="5", row="7")
 
         self.label_LCLICK = ttk.Label(self.frame_2)
-        self.label_LCLICK.configure(padding="5", text="L CLICK", background="#00c3e3", font="{游ゴシック} 12 {bold}")
+        self.label_LCLICK.configure(padding="5", text='左スティック押し込み', background="#00c3e3", font="{游ゴシック} 12 {bold}")
         self.label_LCLICK.grid(row="8", sticky="e")
         self.entry_LCLICK = ttk.Entry(self.frame_2)
         self.LCLICK = tk.StringVar()
@@ -128,7 +128,7 @@ class PokeKeycon:
 
         self.label_ZR = ttk.Label(self.frame_2_3)
         self.label_ZR.configure(
-            padding="5", text="ZR", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='ZR', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_ZR.grid(row="0", sticky="e")
         self.entry_ZR = ttk.Entry(self.frame_2_3)
@@ -138,7 +138,7 @@ class PokeKeycon:
 
         self.label_R = ttk.Label(self.frame_2_3)
         self.label_R.configure(
-            padding="5", text="R", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='R', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_R.grid(row="1", sticky="e")
         self.entry_R = ttk.Entry(self.frame_2_3)
@@ -148,7 +148,7 @@ class PokeKeycon:
 
         self.label_PLUS = ttk.Label(self.frame_2_3)
         self.label_PLUS.configure(
-            padding="5", text="PLUS", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='＋', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_PLUS.grid(row="2", sticky="e")
         self.entry_PLUS = ttk.Entry(self.frame_2_3)
@@ -158,7 +158,7 @@ class PokeKeycon:
 
         self.label_A = ttk.Label(self.frame_2_3)
         self.label_A.configure(
-            padding="5", text="A", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='A', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_A.grid(row="3", sticky="e")
         self.entry_A = ttk.Entry(self.frame_2_3)
@@ -168,7 +168,7 @@ class PokeKeycon:
 
         self.label__B = ttk.Label(self.frame_2_3)
         self.label__B.configure(
-            padding="5", text="B", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='B', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label__B.grid(row="4", sticky="e")
         self.entry_B = ttk.Entry(self.frame_2_3)
@@ -178,7 +178,7 @@ class PokeKeycon:
 
         self.label_X = ttk.Label(self.frame_2_3)
         self.label_X.configure(
-            padding="5", text="X", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='X', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_X.grid(row="5", sticky="e")
         self.entry_X = ttk.Entry(self.frame_2_3)
@@ -188,7 +188,7 @@ class PokeKeycon:
 
         self.label_Y = ttk.Label(self.frame_2_3)
         self.label_Y.configure(
-            padding="5", text="Y", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='Y', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_Y.grid(row="6", sticky="e")
         self.entry_Y = ttk.Entry(self.frame_2_3)
@@ -198,7 +198,7 @@ class PokeKeycon:
 
         self.label_HOME = ttk.Label(self.frame_2_3)
         self.label_HOME.configure(
-            padding="5", text="HOME", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='HOME', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_HOME.grid(row="7", sticky="e")
         self.entry_HOME = ttk.Entry(self.frame_2_3)
@@ -208,7 +208,7 @@ class PokeKeycon:
 
         self.label_RCLICK = ttk.Label(self.frame_2_3)
         self.label_RCLICK.configure(
-            padding="5", text="R CLICK", background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
+            padding="5", text='右スティック押し込み', background="#ff4554", foreground="#ffffff", font="{游ゴシック} 12 {bold}"
         )
         self.label_RCLICK.grid(row="8", sticky="e")
         self.entry_RCLICK = ttk.Entry(self.frame_2_3)
@@ -223,7 +223,7 @@ class PokeKeycon:
 
         self.frame_button = ttk.Frame(self.key_config_frame)
         self.apply_button = ttk.Button(self.frame_button)
-        self.apply_button.configure(text="適用")
+        self.apply_button.configure(text='適用')
         self.apply_button.grid(column="0", padx="10", sticky="e")
         self.apply_button.configure(command=self.apply_setting)
         self.frame_button.configure(height="200", width="200")
