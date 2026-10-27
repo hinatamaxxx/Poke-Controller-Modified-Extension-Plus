@@ -40,11 +40,11 @@ class SafeSettingsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'plus-settings.json'
             preferences = Preferences(path)
-            preferences.set('mcp_enabled', True)
-            preferences.set('mcp_enabled', False)
+            preferences.set('auto_update', False)
+            preferences.set('auto_update', True)
             backup = path.with_name(path.name + '.bak').read_bytes()
             path.write_text('{broken')
-            self.assertTrue(Preferences(path).values['mcp_enabled'])
+            self.assertFalse(Preferences(path).values['auto_update'])
             self.assertEqual(path.with_name(path.name + '.bak').read_bytes(), backup)
             self.assertEqual(next(Path(folder).glob('*.corrupt-*')).read_text(), '{broken')
 

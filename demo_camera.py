@@ -6,8 +6,6 @@ def install():
     import numpy as np
     from Camera import Camera
     from Commands.Sender import Sender
-    import Window
-    from pynput.keyboard import Listener
 
     def read(self):
         frame = np.zeros((360, 640, 3), dtype=np.uint8)
@@ -21,5 +19,5 @@ def install():
     Camera.readFrame = read
     Sender.openSerial = lambda self, *a, **kw: False
     Sender.writeRow = lambda self, *a, **kw: None
+    Sender.writeList = lambda self, *a, **kw: None
     Sender.writeRow_wo_perf_counter = lambda self, *a, **kw: None
-    Listener.start = lambda self: None

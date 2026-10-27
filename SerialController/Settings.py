@@ -4,14 +4,28 @@ from __future__ import annotations
 
 import configparser
 import os
+import Paths
 import tkinter as tk
 from pathlib import Path
 from safe_settings import read_config, write_config
 from logging import getLogger  # , DEBUG, NullHandler
 
 
+class Var:
+    """Minimal stand-in for tkinter variables so settings work without a window."""
+
+    def __init__(self, value=None):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+    def set(self, value):
+        self._value = value
+
+
 class GuiSettings:
-    SETTING_PATH = os.path.join(os.path.dirname(__file__), "profiles", "default", "settings.ini")
+    SETTING_PATH = os.path.join(Paths.PROFILES, "default", "settings.ini")
 
     def __init__(self):
         self._logger = getLogger(__name__)
@@ -30,26 +44,26 @@ class GuiSettings:
             self._logger.debug("Settings file has been loaded.")
 
         # default
-        self.camera_id = tk.IntVar(value=self.setting["General Setting"].getint("camera_id"))
+        self.camera_id = Var(value=self.setting["General Setting"].getint("camera_id"))
         self.camera_path = self.setting['General Setting'].get('camera_path', '')
         self.camera_name = self.setting['General Setting'].get('camera_name', '')
-        self.com_port = tk.IntVar(value=self.setting["General Setting"].getint("com_port"))
-        self.com_port_name = tk.StringVar(value=self.setting["General Setting"].get("com_port_name"))
-        self.baud_rate = tk.IntVar(value=self.setting["General Setting"].getint("baud_rate"))
-        self.fps = tk.StringVar(value=self.setting["General Setting"]["fps"])
-        self.show_size = tk.StringVar(value=self.setting["General Setting"].get("show_size"))
-        self.is_show_realtime = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_realtime"))
-        self.is_show_value = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_value"))
-        self.is_show_guide = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_guide"))
-        self.enlarge_preview = tk.BooleanVar(value=self.setting["General Setting"].getboolean("enlarge_preview", fallback=False))
-        self.is_show_serial = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_show_serial"))
-        self.is_use_keyboard = tk.BooleanVar(value=self.setting["General Setting"].getboolean("is_use_keyboard"))
+        self.com_port = Var(value=self.setting["General Setting"].getint("com_port"))
+        self.com_port_name = Var(value=self.setting["General Setting"].get("com_port_name"))
+        self.baud_rate = Var(value=self.setting["General Setting"].getint("baud_rate"))
+        self.fps = Var(value=self.setting["General Setting"]["fps"])
+        self.show_size = Var(value=self.setting["General Setting"].get("show_size"))
+        self.is_show_realtime = Var(value=self.setting["General Setting"].getboolean("is_show_realtime"))
+        self.is_show_value = Var(value=self.setting["General Setting"].getboolean("is_show_value"))
+        self.is_show_guide = Var(value=self.setting["General Setting"].getboolean("is_show_guide"))
+        self.enlarge_preview = Var(value=self.setting["General Setting"].getboolean("enlarge_preview", fallback=False))
+        self.is_show_serial = Var(value=self.setting["General Setting"].getboolean("is_show_serial"))
+        self.is_use_keyboard = Var(value=self.setting["General Setting"].getboolean("is_use_keyboard"))
         try:
-            self.serial_data_format_name = tk.StringVar(
+            self.serial_data_format_name = Var(
                 value=self.setting["General Setting"]["serial_data_format_name"]
             )
         except Exception:
-            self.serial_data_format_name = tk.StringVar(value="Default")
+            self.serial_data_format_name = Var(value="Default")
         try:
             self.touchscreen_start_x = int(self.setting["General Setting"]["touchscreen_start_x"])
         except Exception:
@@ -67,55 +81,55 @@ class GuiSettings:
         except Exception:
             self.touchscreen_end_y = 240
         # Pokemon Home用の設定
-        self.season = tk.StringVar(value=self.setting["Pokemon Home"].get("Season"))
-        self.is_SingleBattle = tk.StringVar(value=self.setting["Pokemon Home"].get("Single or Double"))
+        self.season = Var(value=self.setting["Pokemon Home"].get("Season"))
+        self.is_SingleBattle = Var(value=self.setting["Pokemon Home"].get("Single or Double"))
         # Shortcut用の設定
         self.command_class_dict = {}
         self.command_name_dict = {}
         for i in range(1, 11):  # Update直後のError回避策
             try:
                 self.command_class_dict[str(i)] = self.setting["Shortcut"][f"command_class_{i}"]
-                self.command_name_dict[str(i)] = tk.StringVar(value=self.setting["Shortcut"][f"command_name_{i}"])
+                self.command_name_dict[str(i)] = Var(value=self.setting["Shortcut"][f"command_name_{i}"])
             except Exception:
                 self.command_class_dict[str(i)] = "None"
-                self.command_name_dict[str(i)] = tk.StringVar(value="(empty)")
+                self.command_name_dict[str(i)] = Var(value="(empty)")
         # Notification用の設定
         try:
-            self.is_win_notification_start = tk.BooleanVar(
+            self.is_win_notification_start = Var(
                 value=self.setting["Notification"].getboolean("is_win_notification_start")
             )
         except Exception:
-            self.is_win_notification_start = tk.BooleanVar(value=False)
+            self.is_win_notification_start = Var(value=False)
         try:
-            self.is_win_notification_end = tk.BooleanVar(
+            self.is_win_notification_end = Var(
                 value=self.setting["Notification"].getboolean("is_win_notification_end")
             )
         except Exception:
-            self.is_win_notification_end = tk.BooleanVar(value=False)
+            self.is_win_notification_end = Var(value=False)
         try:
-            self.is_line_notification_start = tk.BooleanVar(
+            self.is_line_notification_start = Var(
                 value=self.setting["Notification"].getboolean("is_line_notification_start")
             )
         except Exception:
-            self.is_line_notification_start = tk.BooleanVar(value=False)
+            self.is_line_notification_start = Var(value=False)
         try:
-            self.is_line_notification_end = tk.BooleanVar(
+            self.is_line_notification_end = Var(
                 value=self.setting["Notification"].getboolean("is_line_notification_end")
             )
         except Exception:
-            self.is_line_notification_end = tk.BooleanVar(value=False)
+            self.is_line_notification_end = Var(value=False)
         try:
-            self.is_discord_notification_start = tk.BooleanVar(
+            self.is_discord_notification_start = Var(
                 value=self.setting["Notification"].getboolean("is_discord_notification_start")
             )
         except Exception:
-            self.is_discord_notification_start = tk.BooleanVar(value=False)
+            self.is_discord_notification_start = Var(value=False)
         try:
-            self.is_discord_notification_end = tk.BooleanVar(
+            self.is_discord_notification_end = Var(
                 value=self.setting["Notification"].getboolean("is_discord_notification_end")
             )
         except Exception:
-            self.is_discord_notification_end = tk.BooleanVar(value=False)
+            self.is_discord_notification_end = Var(value=False)
         # Output Area用の設定
         self.area_size = self.setting["Output"]["area_size"]
         self.stdout_destination = self.setting["Output"]["stdout_destination"]

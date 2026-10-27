@@ -53,3 +53,4 @@ def register_desktop(path, root):
     data = read_checked(path, parse)
     data.setdefault('mcpServers', {})[SERVER_NAME] = server_entry(root)
     write_text(path, json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+

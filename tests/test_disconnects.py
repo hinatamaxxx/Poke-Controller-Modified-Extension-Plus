@@ -29,40 +29,6 @@ class SerialFailureTest(unittest.TestCase):
         port.close.assert_not_called()
 
 
-class KeyboardResumeTest(unittest.TestCase):
-    def make_app(self):
-        app = Mock()
-        app.cur_command = None
-        app.procon_thread = None
-        app.keyboard = None
-        app.ser.last_error = ''
-        state = {'keyboard': True}
-        app.is_use_keyboard.get.side_effect = lambda: state['keyboard']
-        app.is_use_keyboard.set.side_effect = lambda value: state.update(keyboard=value)
-        return app, state
-
-    def test_exit_after_disconnect_saves_original_keyboard_setting(self):
-        from AppLifecycle import Lifecycle
-        app, state = self.make_app()
-        life = Lifecycle(app)
-        life.request()            # cable unplugged: keyboard is switched off
-        life.tick()
-        self.assertFalse(state['keyboard'])
-        life.request(closing=True)
-        life.tick()
-        self.assertTrue(state['keyboard'])
-        app._finish_exit.assert_called_once()
-
-    def test_closing_while_waiting_stops_new_producers(self):
-        from AppLifecycle import Lifecycle
-        app, _ = self.make_app()
-        life = Lifecycle(app)
-        life.stop_producers = Mock()
-        life.request()
-        life.request(closing=True)
-        self.assertEqual(life.stop_producers.call_count, 2)
-
-
 class CameraIdentityTest(unittest.TestCase):
     def test_devices_without_path_get_name_identity(self):
         import WindowsDevices

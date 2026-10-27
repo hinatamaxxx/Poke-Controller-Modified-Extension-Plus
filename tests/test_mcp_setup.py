@@ -6,7 +6,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import library_update
 import mcp_setup
 
 
@@ -43,18 +42,6 @@ class McpSetupTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mcp_setup.register_desktop(config, folder)
             self.assertEqual(config.read_text(encoding='utf-8'), '{"mcpServers": []}')
-
-
-class PruneRuntimesTest(unittest.TestCase):
-    def test_removes_unused_runtimes_only(self):
-        with tempfile.TemporaryDirectory() as folder:
-            updates = Path(folder) / '.runtime-updates'
-            keep, old = updates / ('a' * 32), updates / ('b' * 32)
-            for path in (keep, old, updates / 'leftover.delete', updates / 'other'):
-                path.mkdir(parents=True)
-                (path / 'python.exe').touch()
-            library_update.prune_runtimes(folder, [keep])
-            self.assertEqual(sorted(p.name for p in updates.iterdir()), ['a' * 32, 'other'])
 
 
 if __name__ == '__main__':

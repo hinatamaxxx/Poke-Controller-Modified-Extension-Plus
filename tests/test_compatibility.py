@@ -55,46 +55,5 @@ class CompatibilityTests(unittest.TestCase):
             finally:
                 reader.release()
 
-    def test_key_release_matches_keydown_when_shift_changes(self):
-        from Keyboard import Keyboard
-        from pynput.keyboard import KeyCode
-        keyboard = Keyboard()
-        # Feed native pynput key objects without installing a physical hook.
-        keyboard.listener = Mock()
-        pressed, released = threading.Event(), threading.Event()
-        keyboard.on_press = Mock(side_effect=lambda key: pressed.set())
-        keyboard.on_release = Mock(side_effect=lambda key: released.set())
-        keyboard.worker.start()
-        down = KeyCode(vk=65, char='A')
-        try:
-            keyboard._enqueue(True, down)
-            self.assertTrue(pressed.wait(2))
-            keyboard._enqueue(False, KeyCode(vk=65, char='a'))
-            self.assertTrue(released.wait(2))
-            keyboard.on_release.assert_called_once_with(down)
-        finally:
-            keyboard.stop()
-            keyboard.worker.join(2)
-        self.assertFalse(keyboard.worker.is_alive())
-
-    def test_stop_releases_held_key_off_ui_thread(self):
-        from Keyboard import Keyboard
-        from pynput.keyboard import Key
-        keyboard = Keyboard()
-        keyboard.listener = Mock()
-        pressed = threading.Event()
-        owners = []
-        keyboard.on_press = lambda key: pressed.set()
-        keyboard.on_release = lambda key: owners.append(threading.get_ident())
-        keyboard.worker.start()
-        try:
-            keyboard._enqueue(True, Key.ctrl_l)
-            self.assertTrue(pressed.wait(2))
-        finally:
-            keyboard.stop()
-            keyboard.worker.join(2)
-        self.assertEqual(owners, [keyboard.worker.ident])
-
-
 if __name__ == '__main__':
     unittest.main()

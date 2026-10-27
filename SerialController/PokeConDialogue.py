@@ -10,6 +10,17 @@ import glob
 # from logging import getLogger, DEBUG, NullHandlerxx
 
 
+# A window-less host (the browser UI) answers dialogues through this function instead of Tk.
+DIALOGUE_PROVIDER = None
+
+
+def show_dialogue(title: str, message, desc: str = None, mode: int = 0, pos: int = 2, need: type = list):
+    """Ask the user and return the values (list or dict), or False when cancelled."""
+    if DIALOGUE_PROVIDER is not None:
+        return DIALOGUE_PROVIDER(title, message, desc=desc, mode=mode, need=need)
+    return PokeConDialogue(tk.Toplevel(), title, message, desc=desc, mode=mode, pos=pos).ret_value(need)
+
+
 class PokeConDialogue(object):
     def __init__(self, parent, title: str, message: int | str | list, desc: str = None, mode: int = 0, pos: int = 2):
         """

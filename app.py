@@ -1,12 +1,14 @@
-"""Portable launcher for the original Tk interface. MIT."""
+"""Window-less Poke-Controller: serves the browser UI and the MCP endpoint. MIT."""
 import argparse
-import configparser
 import os
 from pathlib import Path
 import re
 import sys
+import time
 
-ROOT = Path(__file__).resolve().parent
+import app_paths
+
+ROOT = app_paths.PROGRAM
 
 
 def acquire_profile(profiles, name):
@@ -28,118 +30,114 @@ def acquire_profile(profiles, name):
                 raise
             continue
         return candidate, profile, lock
-    raise OSError('空いている設定枠がありません。不要なウィンドウを終了してください。')
+    raise OSError('空いている設定枠がありません。不要な Poke-Controller を終了してください。')
+
+
+def running_page():
+    """The browser page of an already running copy, if any."""
+    import json
+    from controller_api import call
+    for endpoint in sorted(app_paths.RUNTIME.glob('controller-*.json')):
+        try:
+            call(endpoint, 'sessions', retries=2)
+            return json.loads(endpoint.read_text(encoding='utf-8'))['web_url']
+        except (OSError, ValueError, KeyError):
+            continue
+    return None
+
+
+def show_error(message):
+    import ctypes
+    ctypes.windll.user32.MessageBoxW(None, message, 'Poke-Controller', 0x10)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--profile', '-p', default='default')
-    parser.add_argument('--mcp', action=argparse.BooleanOptionalAction, default=None, help='Override saved MCP setting (default: disabled)')
-    parser.add_argument('--demo', action='store_true', help='Synthetic camera; serial and keyboard disabled')
+    parser.add_argument('--profile', '-p')
+    parser.add_argument('--background', action='store_true', help='Do not open the browser (used by the MCP server)')
+    parser.add_argument('--host', action='store_true', help='Run under the tray app, talking JSON lines over stdin/stdout')
+    parser.add_argument('--new', action='store_true', help='Start another copy even if one is running')
+    parser.add_argument('--demo', action='store_true', help='Synthetic camera; serial disabled')
     parser.add_argument('--smoke-test', type=Path)
     args = parser.parse_args()
+    explicit_profile = args.profile is not None
+    args.profile = args.profile or 'default'
     if not re.fullmatch(r'[\w -]{1,48}', args.profile) or args.profile.endswith(' '):
         parser.error('Invalid profile name')
     if args.profile.upper() in {'CON', 'PRN', 'AUX', 'NUL', *[f'{p}{i}' for p in ('COM', 'LPT') for i in range(1, 10)]}:
         parser.error('Reserved profile name')
+    import webbrowser
+    if not (explicit_profile or args.new or args.background or args.smoke_test or args.host):
+        page = running_page()
+        if page:
+            webbrowser.open(page)
+            return 0
     serial = ROOT / 'SerialController'
-    sys.path.insert(0, str(serial))
-    os.chdir(serial)
-    logs = serial / 'log'
-    logs.mkdir(exist_ok=True)
-    if sys.stdout is None:
-        sys.stdout = open(logs / f'console-{os.getpid()}.log', 'a', encoding='utf-8', buffering=1)
+    app_paths.prepare_workspace()
+    # The workspace comes first so its copies of the scripts win over the bundled originals.
+    for path in dict.fromkeys([serial, app_paths.WORKSPACE]):
+        sys.path.insert(0, str(path))
+    os.chdir(app_paths.WORKSPACE)
+    app_paths.LOGS.mkdir(parents=True, exist_ok=True)
+    console_path = app_paths.LOGS / f'console-{os.getpid()}.log'
+    channel = None
+    if args.host:
+        # Claim stdio for the tray before libraries print their banners.
+        from host_channel import HostChannel
+        channel = HostChannel(console_path)
+    console = open(console_path, 'a', encoding='utf-8', buffering=1)
     if sys.stderr is None:
-        sys.stderr = sys.stdout
-    import tkinter as tk
-    import Settings
-    import PokeConLogger
-    import Window
-    root = tk.Tk()
+        sys.stderr = console
+    import Paths
+    Paths.PROFILES, Paths.LOGS = str(app_paths.PROFILES), str(app_paths.LOGS)
     try:
-        args.profile, profile, lock = acquire_profile(serial / 'profiles', args.profile)
+        args.profile, profile, lock = acquire_profile(app_paths.PROFILES, args.profile)
     except OSError as error:
-        from tkinter.messagebox import showerror
-        showerror('起動できません', f'設定フォルダーを開けません。\n{error}', parent=root)
-        root.destroy()
+        show_error(f'設定フォルダーを開けません。\n{error}')
         return 1
-    settings = profile / 'settings.ini'
-    Settings.GuiSettings.SETTING_PATH = str(settings)
     if args.demo:
         from demo_camera import install
         install()
+    import PokeConLogger
     PokeConLogger.root_logger()
-    from plus_preferences import Preferences
+    from core import Core
+    from local_control import LocalControl
     try:
-        preferences = Preferences(profile / 'plus-settings.json')
-        if not settings.exists() and not settings.with_name(settings.name + '.bak').exists():
-            Settings.GuiSettings()
-        app = Window.PokeControllerApp(root, args.profile)
-    except (OSError, ValueError, configparser.Error) as error:
-        from tkinter.messagebox import showerror
-        showerror('起動できません', f'設定や起動に必要なファイルを確認してください。\n{profile}\n\n{error}', parent=root)
-        root.destroy()
+        core = Core(args.profile, str(profile), demo=args.demo, console_mirror=console)
+    except (OSError, ValueError) as error:
+        show_error(f'起動できません。設定ファイルを確認してください。\n{profile}\n\n{error}')
         lock.close()
         return 1
-    from AppLifecycle import Lifecycle
-    app.lifecycle = Lifecycle(app)
-    def report_ui_error(kind, error, traceback):
-        import logging
-        logging.getLogger(__name__).error('画面操作でエラーが発生しました', exc_info=(kind, error, traceback))
-        print(f'画面操作でエラーが発生しました: {kind.__name__}: {error}')
-    root.report_callback_exception = report_ui_error
-    api = None
-    enabled = tk.BooleanVar(value=preferences.values['mcp_enabled'] if args.mcp is None else args.mcp)
-    def toggle_mcp(save=True):
-        nonlocal api
-        try:
-            if enabled.get() and api is None:
-                from local_control import LocalControl
-                api = LocalControl(app, ROOT / 'runtime', demo=args.demo)
-            elif not enabled.get() and api is not None:
-                api.close()
-                api = None
-        except Exception:
-            enabled.set(api is not None)
-            raise
-        if save:
-            preferences.set('mcp_enabled', enabled.get())
-    mcp_menu = tk.Menu(app.menu, tearoff=False)
-    def open_browser():
-        import webbrowser
-        from tkinter.messagebox import showinfo
-        if api is None:
-            showinfo('ブラウザで開く', 'MCP・Web操作を有効にしてから開いてください。', parent=root)
-        else:
-            webbrowser.open(api.web_url)
-    mcp_menu.add_checkbutton(label='MCP・Web操作を有効にする', variable=enabled, command=toggle_mcp)
-    mcp_menu.add_command(label='ブラウザで開く', command=open_browser)
-    mcp_menu.add_command(label='MCPクライアントに登録…', command=lambda: app.open_plus_settings('general'))
-    mcp_menu.add_command(label='接続方法', command=lambda: os.startfile(ROOT / 'MCP.md'))
-    app.menu.add_cascade(label='MCP', menu=mcp_menu)
-    from plus_settings import SettingsWindow
-    settings_window = SettingsWindow(app, ROOT, preferences, enabled, toggle_mcp, open_browser)
-    app.open_plus_settings = settings_window.show
-    toggle_mcp(save=False)
+    api = LocalControl(core, app_paths.RUNTIME)
+    from plus_preferences import Preferences
+    import update_service
+    core.preferences = Preferences(app_paths.APP_SETTINGS)
+    update_service.start_background_updates(core.preferences)
     if args.smoke_test:
         import json
-        def report():
-            args.smoke_test.write_text(json.dumps({'ready': True, 'python': sys.executable, 'profile': args.profile,
-                'python_scripts': len(app.py_classes), 'mcu_scripts': len(app.mcu_classes),
-                'mcp_endpoint': str(api.path) if api else None}), encoding='utf-8')
-        root.after(1200, report)
-        def finish_test():
-            if args.smoke_test.with_suffix('.stop').exists():
-                app.exit(confirm=False)
-            else:
-                root.after(100, finish_test)
-        root.after(100, finish_test)
+        args.smoke_test.write_text(json.dumps({'ready': True, 'python': sys.executable, 'profile': args.profile,
+            'python_scripts': len(core.py_classes), 'mcu_scripts': len(core.mcu_classes),
+            'mcp_endpoint': str(api.path), 'workspace': str(app_paths.WORKSPACE)}), encoding='utf-8')
+    elif channel is not None:
+        channel.send({'event': 'ready', 'web_url': api.web_url, 'profile': args.profile, 'pid': os.getpid()})
+        channel.serve(api, core)
+    elif not args.background:
+        webbrowser.open(api.web_url)
     try:
-        app.run()
+        while not core.exit_requested:
+            if args.smoke_test and args.smoke_test.with_suffix('.stop').exists():
+                break
+            core.tick()
+            time.sleep(.05)
+    except KeyboardInterrupt:
+        pass
     finally:
-        if api:
-            api.close()
+        core.exit_requested = True
+        core.close()
+        api.close()
         lock.close()
+        if channel is not None:
+            channel.send({'event': 'exit'})
     return 0
 
 
