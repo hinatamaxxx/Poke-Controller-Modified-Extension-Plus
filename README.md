@@ -50,7 +50,7 @@ Windows 10/11 x64向けです。Python、.NET SDK、Gitのインストールは�
 
 ## MCP
 
-MCPは初期状態でOFFです。「メニュー → 設定 → MCP」またはMCPメニューからONにし、MCPクライアントに`PokeControllerMCP.exe`を登録してください。[接続方法とツール一覧](MCP.md)。MCPも同梱Pythonで動作します。設定はプロファイルごとに保存されます。`--mcp` / `--no-mcp`はその起動だけの指定です。
+MCPは初期状態でOFFです。「メニュー → 設定 → MCP」またはMCPメニューからONにし、同じ画面の「Claude Desktopに登録」「Claude Code用コマンドをコピー」「設定JSONをコピー」でMCPクライアントに`PokeControllerMCP.exe`を登録してください。登録は一度だけで、複数ウィンドウも自動で見つけます。[接続方法とツール一覧](MCP.md)。MCPも同梱Pythonで動作します。設定はプロファイルごとに保存されます。`--mcp` / `--no-mcp`はその起動だけの指定です。
 
 ## ブラウザで操作（Claudeの内蔵ブラウザ対応）
 

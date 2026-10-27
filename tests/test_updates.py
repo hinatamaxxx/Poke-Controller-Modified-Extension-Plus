@@ -53,7 +53,7 @@ class UpdateTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as folder:
                 app = Mock(root=root, dispatcher=Dispatcher(root))
                 enabled = tk.BooleanVar(root, value=False)
-                settings = SettingsWindow(app, ROOT, Preferences(Path(folder) / 'prefs.json'), enabled, Mock())
+                settings = SettingsWindow(app, ROOT, Preferences(Path(folder) / 'prefs.json'), enabled, Mock(), Mock())
                 settings.show('updates')
                 root.update()
                 self.assertEqual(len(settings.tabs.tabs()), 3)

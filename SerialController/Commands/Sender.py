@@ -60,6 +60,7 @@ class Sender:
         self.Hat = ["TOP", "TOP_RIGHT", "RIGHT", "BTM_RIGHT", "BTM", "BTM_LEFT", "LEFT", "TOP_LEFT", "CENTER"]
 
     def openSerial(self, portNum: int, portName: str = "", baudrate: int = 9600):
+        # last_error means "an open port was lost"; a failed open must not trigger disconnect handling.
         self.last_error = ''
         if not portName and portNum <= 0:
             return False
@@ -93,9 +94,9 @@ class Sender:
                 self.ser = serial.Serial(portName, baudrate, write_timeout=.25)
                 return True
         except IOError as e:
-            self.last_error = f'シリアル接続に失敗しました: {e}'
-            print(self.last_error)
-            self._logger.error('%s', self.last_error)
+            message = f'シリアル接続に失敗しました: {e}'
+            print(message)
+            self._logger.error('%s', message)
             # print(e)
             return False
 
@@ -107,7 +108,8 @@ class Sender:
                 connection.close()
 
     def isOpened(self):
-        return True if self.ser is not None and self.ser.isOpen() else False
+        port = self.ser  # read once; another thread may close and clear it
+        return port is not None and port.isOpen()
 
     def _write(self, data):
         with self._io_lock:
@@ -117,6 +119,10 @@ class Sender:
                 if self.ser.write(data) != len(data):
                     raise serial.SerialException('送信データが途中で途切れました')
                 return True
+            except serial.SerialTimeoutException as exc:
+                # A busy microcontroller is not a lost port; drop this report and keep the connection.
+                self._logger.warning('シリアル送信がタイムアウトしました: %s', exc)
+                return False
             except (serial.SerialException, OSError) as exc:
                 self.last_error = f'シリアル通信が切断されました: {exc}'
                 self._logger.error('%s', self.last_error)

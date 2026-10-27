@@ -12,9 +12,9 @@ from update_service import find_release, installed_libraries, release_page
 
 
 class SettingsWindow:
-    def __init__(self, app, root, preferences, mcp_enabled, toggle_mcp):
+    def __init__(self, app, root, preferences, mcp_enabled, toggle_mcp, open_browser):
         self.app, self.root, self.preferences = app, Path(root), preferences
-        self.mcp_enabled, self.toggle_mcp = mcp_enabled, toggle_mcp
+        self.mcp_enabled, self.toggle_mcp, self.open_browser = mcp_enabled, toggle_mcp, open_browser
         self.window = None
         self.busy = False
         self.release = None
@@ -39,7 +39,22 @@ class SettingsWindow:
             self.pages[key] = page
         general = self.pages['general']
         ttk.Checkbutton(general, text='MCP・Web操作を有効にする', variable=self.mcp_enabled, command=self.toggle_mcp).pack(anchor='w')
-        ttk.Label(general, text='初期状態はOFFです。設定はプロファイルごとに保存します。\n接続先はこのPC内（127.0.0.1）のみで、接続トークンを使います。\nMCPクライアントやブラウザ（Claudeの内蔵ブラウザなど）から、映像の確認、ボタン操作、既存スクリプトの開始・停止などを行えます。', wraplength=650).pack(anchor='w', pady=14)
+        ttk.Label(general, text='初期状態はOFFです。設定はプロファイルごとに保存します。\n接続先はこのPC内（127.0.0.1）のみで、接続トークンを使います。\nMCPクライアントやブラウザ（Claudeの内蔵ブラウザなど）から、映像の確認、ボタン操作、既存スクリプトの開始・停止などを行えます。', wraplength=650).pack(anchor='w', pady=(14, 8))
+        ttk.Button(general, text='ブラウザで操作画面を開く', command=self.open_browser).pack(anchor='w')
+        ttk.Label(general, text='MCPクライアントへの登録（全プロファイル共通・一度だけ）', font=('', 10, 'bold')).pack(anchor='w', pady=(16, 4))
+        ttk.Label(general, text='起動中のすべてのウィンドウを1つの登録で操作できます。アプリのフォルダーを移動したら登録し直してください。', wraplength=650).pack(anchor='w')
+        from mcp_setup import config_json
+        config = tk.Text(general, height=8, wrap='none')
+        config.insert('1.0', config_json(self.root))
+        config.configure(state='disabled')
+        config.pack(fill='x', pady=6)
+        actions = ttk.Frame(general)
+        actions.pack(fill='x')
+        ttk.Button(actions, text='Claude Desktopに登録', command=self.register_desktop).pack(side='left')
+        ttk.Button(actions, text='Claude Code用コマンドをコピー', command=self.copy_claude_code).pack(side='left', padx=8)
+        ttk.Button(actions, text='設定JSONをコピー', command=lambda: self.copy(config_json(self.root), '設定JSONをコピーしました。')).pack(side='left')
+        self.mcp_status = tk.StringVar(value='')
+        ttk.Label(general, textvariable=self.mcp_status, wraplength=650).pack(anchor='w', pady=6)
         ttk.Button(general, text='接続方法を開く', command=lambda: os.startfile(self.root / 'MCP.md')).pack(anchor='w')
         update = self.pages['updates']
         ttk.Label(update, text=f'{NAME}\n現在のバージョン：{VERSION}', wraplength=650).pack(anchor='w')
@@ -90,6 +105,32 @@ class SettingsWindow:
         ffmpeg = '\n'.join(line.strip() for line in cv2.getBuildInformation().splitlines() if any(key in line for key in ('FFMPEG:', 'avcodec:', 'avformat:', 'avutil:')))
         ttk.Label(library, text='FFmpeg（OpenCV付属）\n' + ffmpeg, wraplength=650).pack(anchor='w', pady=8)
         self.tabs.select(self.pages.get(tab, general))
+
+    def copy(self, text, message):
+        self.window.clipboard_clear()
+        self.window.clipboard_append(text)
+        self.mcp_status.set(message)
+
+    def copy_claude_code(self):
+        from mcp_setup import claude_code_command
+        self.copy(claude_code_command(self.root), 'コマンドをコピーしました。ターミナルに貼り付けて実行してください。')
+
+    def register_desktop(self):
+        from mcp_setup import SERVER_NAME, desktop_configs, register_desktop
+        paths = desktop_configs()
+        if not paths:
+            messagebox.showinfo('Claude Desktopに登録', 'Claude Desktopの設定ファイルが見つかりません。\nClaude Desktopの「設定 → 開発者 → 設定を編集」で開いたファイルに、「設定JSONをコピー」の内容を追記してください。', parent=self.window)
+            return
+        listing = '\n'.join(str(path) for path in paths)
+        if not messagebox.askyesno('Claude Desktopに登録', f'次の設定ファイルに「{SERVER_NAME}」を登録します。ほかの設定は変更せず、変更前の内容を .bak に残します。\n\n{listing}', parent=self.window):
+            return
+        try:
+            for path in paths:
+                register_desktop(path, self.root)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('Claude Desktopに登録', f'登録できませんでした。\n{exc}', parent=self.window)
+            return
+        self.mcp_status.set('Claude Desktopに登録しました。Claude Desktopを終了して起動し直すと使えます。')
 
     def run(self, work, done):
         if self.busy:

@@ -70,7 +70,7 @@ def build():
     (licenses / 'dependencies.json').write_text(json.dumps(inventory, indent=2), encoding='utf-8')
     compiler = Path(os.environ['WINDIR']) / 'Microsoft.NET' / 'Framework64' / 'v4.0.30319' / 'csc.exe'
     for name, mode in [('PokeController', '/target:winexe'), ('PokeControllerMCP', '/define:MCP')]:
-        subprocess.run([str(compiler), '/nologo', '/optimize+', mode,
+        subprocess.run([str(compiler), '/nologo', '/optimize+', '/codepage:65001', mode,
                         '/out:' + str(OUT / (name + '.exe')), str(ROOT / 'packaging/Launcher.cs')], check=True)
     forbidden = [p for p in OUT.rglob('*') if any(word in p.name.lower() for word in (
         'directshowlib', 'pythonnet'))]

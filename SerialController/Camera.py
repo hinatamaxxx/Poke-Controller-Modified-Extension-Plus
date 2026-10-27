@@ -114,19 +114,19 @@ class Camera:
             self.camera, self.lease = capture, lease
             self.device_path = identity
             self._opened = not self._stop.is_set()
-            failures = 0
+            failing_since = None
             while not self._stop.is_set():
                 ok, frame = capture.read()
                 if self._stop.is_set():
                     break
                 if not ok or frame is None:
-                    failures += 1
-                    self.image_bgr, self.frame_at = None, 0
-                    if failures >= 5:
+                    # Tolerate short dropouts (signal change, USB hiccup) by time, not by a few reads.
+                    failing_since = failing_since or time.monotonic()
+                    if time.monotonic() - failing_since > 2:
                         raise RuntimeError('カメラ映像が途切れました。USB接続を確認して再接続してください。')
                     self._stop.wait(.05)
                     continue
-                failures = 0
+                failing_since = None
                 self.image_bgr, self.frame_at = frame, time.time()
                 self._stop.wait(.001)
         except Exception as exc:
@@ -165,16 +165,21 @@ class Camera:
         else:
             filename = filename + ".png"
 
+        frame = self.image_bgr
         if crop is None:
-            image = self.image_bgr
+            image = frame
         elif crop == 1 or crop == "1":
-            image = self.image_bgr[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
+            image = frame[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
         elif crop == 2 or crop == "2":
-            image = self.image_bgr[crop_ax[1] : crop_ax[1] + crop_ax[3], crop_ax[0] : crop_ax[0] + crop_ax[2]]
+            image = frame[crop_ax[1] : crop_ax[1] + crop_ax[3], crop_ax[0] : crop_ax[0] + crop_ax[2]]
         elif img is not None:
             image = img
         else:
-            image = self.image_bgr
+            image = frame
+        if image is None:
+            print("Capture Failed: カメラ映像がありません")
+            self._logger.error("Capture Failed: no camera frame")
+            return
 
         save_path = _get_save_filespec(filename)
 
@@ -184,7 +189,8 @@ class Camera:
             self._logger.debug("Created Capture folder")
 
         try:
-            imwrite(save_path, image)
+            if not imwrite(save_path, image):
+                raise cv2.error("image could not be encoded or written")
             self._logger.debug(f"Capture succeeded: {save_path}")
             print("capture succeeded: " + save_path)
         except cv2.error as e:

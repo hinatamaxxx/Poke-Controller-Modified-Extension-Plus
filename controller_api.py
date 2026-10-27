@@ -9,7 +9,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 import uuid
 
 
-def call(endpoint_path, method, params=None, *, token_override=None, request_id=None):
+def call(endpoint_path, method, params=None, *, token_override=None, request_id=None, retries=4):
     endpoint = json.loads(Path(endpoint_path).read_text(encoding='utf-8'))
     url = urlparse(endpoint['url'])
     if url.scheme != 'http' or url.hostname != '127.0.0.1':
@@ -17,7 +17,7 @@ def call(endpoint_path, method, params=None, *, token_override=None, request_id=
     data = json.dumps({'method': method, 'params': params or {}, 'request_id': request_id or uuid.uuid4().hex}).encode()
     token = endpoint['token'] if token_override is None else token_override
     opener = build_opener(ProxyHandler({}))
-    for attempt in range(4):
+    for attempt in range(retries):
         request = Request(endpoint['url'], data=data, headers={
             'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
         try:
@@ -29,6 +29,6 @@ def call(endpoint_path, method, params=None, *, token_override=None, request_id=
         except HTTPError:
             raise
         except (OSError, URLError, http.client.HTTPException):
-            if attempt == 3:
+            if attempt == retries - 1:
                 raise
             time.sleep(.1 * (attempt + 1))

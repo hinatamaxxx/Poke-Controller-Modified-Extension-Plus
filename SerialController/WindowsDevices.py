@@ -37,7 +37,10 @@ def release(obj):
 def enumerate_cameras():
     ole = c.OleDLL("ole32")
     automation = c.OleDLL("oleaut32")
-    hr = ole.CoInitializeEx(None, 2)
+    # OleDLL raises on RPC_E_CHANGED_MODE (thread already MTA, e.g. after OpenCV), which is fine to use as is.
+    initialize = c.windll.ole32.CoInitializeEx
+    initialize.restype = c.c_long
+    hr = initialize(None, 2)
     uninitialize = hr >= 0
     devices, enumerator = c.c_void_p(), c.c_void_p()
     result = []
@@ -78,6 +81,13 @@ def enumerate_cameras():
             finally:
                 release(bag)
                 release(moniker)
+        # Virtual cameras such as OBS report no DevicePath; give them a stable name-based identity.
+        seen = {}
+        for device in result:
+            if not device["path"]:
+                count = seen.get(device["name"], 0)
+                seen[device["name"]] = count + 1
+                device["path"] = f"name:{device['name']}#{count}"
         return result
     finally:
         release(enumerator)

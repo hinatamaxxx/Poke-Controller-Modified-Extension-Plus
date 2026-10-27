@@ -14,6 +14,8 @@ class Lifecycle:
         self.reported = False
         self.seen_error = ''
         self.stopping_threads = []
+        # Keyboard control that was on before a disconnect; restored on reconnect and saved on exit.
+        self.keyboard_resume = False
         app.root.after(50, self.tick)
 
     def busy(self):
@@ -50,10 +52,11 @@ class Lifecycle:
         if self.closing or self.disconnecting:
             if closing:
                 self.closing, self.disconnecting = True, False
+                self.stop_producers()  # anything started while waiting must stop too
             return
         self.closing, self.disconnecting = closing, not closing
         self.started, self.reported = time.monotonic(), False
-        self.keyboard_enabled = self.app.is_use_keyboard.get()
+        self.keyboard_resume = self.keyboard_resume or self.app.is_use_keyboard.get()
         self.stop_producers()
         print('スクリプトと入力処理の停止を待っています。')
 
@@ -85,7 +88,7 @@ class Lifecycle:
                         logging.getLogger(__name__).exception('シリアル接続の終了に失敗しました')
                 app.keyPress = None
                 if self.closing:
-                    app.is_use_keyboard.set(self.keyboard_enabled)
+                    app.is_use_keyboard.set(self.keyboard_resume)
                     app._finish_exit()
                     return
                 self.disconnecting = False
