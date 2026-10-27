@@ -103,7 +103,7 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings { position: fixed; left: 0; right: 0; bottom: 0; top: var(--head); z-index: 9; background: var(--shade); display: grid; place-items: center; padding: 16px;
             animation: fade-in .12s ease-out; }
 .settings[hidden] { display: none; }
-.settings-window { width: min(720px, 100%); height: min(600px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+.settings-window { position: relative; width: min(720px, 100%); height: min(580px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
                    box-shadow: 0 16px 48px rgba(0, 0, 0, .35); overflow: hidden; animation: pop-in .14s ease-out; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
@@ -117,7 +117,6 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings-main { flex: 1; min-width: 0; position: relative; overflow-y: auto; padding: 18px 24px 20px; background: var(--panel); }
 .settings-page { display: flex; flex-direction: column; gap: 8px; }
 .settings-page[hidden] { display: none; }
-.settings-window { font-size: 15px; }
 /* Key settings: the Pro Controller, each button showing its key; the chosen one waits for the next key. */
 .keymap-pad { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: repeat(6, 38px); gap: 4px; padding: 10px;
               max-width: 480px; border-radius: 16px; background: linear-gradient(90deg, var(--joy-l) 50%, var(--joy-r) 50%); }
@@ -132,12 +131,9 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .tip { position: fixed; z-index: 60; max-width: 320px; padding: 4px 8px; border-radius: 6px; background: #2b2f36; color: #f2f3f5; font-size: 12px;
        line-height: 1.4; white-space: pre-line; pointer-events: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
 .tip[hidden] { display: none; }
-.settings-window .mini { font-size: 13px; padding: 1px 10px; }
-.settings-page h2 { font-size: 19px; margin: 0 0 2px; }
+.settings-page h2 { font-size: 16px; margin: 0 0 2px; }
 table.notify tr.off th, table.notify tr.off td { color: var(--muted); }
-table.notify tr.off input { opacity: .4; }
-table.notify .link-go { color: var(--accent); border-color: var(--accent); }
-table.notify .link-go[hidden], table.notify [data-test][hidden] { display: none; }
+table.notify tr.off input, table.notify tr.off button { opacity: .4; cursor: default; }
 table.notify th, table.notify td { padding: 4px 10px; }
 /* Folders as in Explorer: icon, name and where it is; a row opens the folder. */
 .folder-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -155,23 +151,22 @@ dl.about dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space:
 dl.about.libs { grid-template-columns: repeat(3, max-content minmax(0, 1fr)); font-size: 12px; }
 .license { margin: 0; font-size: 12px; color: var(--muted); }
 a.ext { color: var(--accent); font-size: 13px; }
-#discord-inline .row { flex-wrap: nowrap; }
-#discord-inline input { flex: 1; min-width: 0; }
 .folder-list button { padding: 4px 12px; }
 #set-about h3 { margin-top: 6px; padding-top: 6px; }
 .settings-page h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .settings-page h2 + h3 { border-top: 0; padding-top: 0; margin-top: 0; }
 .settings-page pre { flex: none; max-height: 40dvh; }
-.settings-close { position: absolute; right: 14px; top: 10px; font: inherit; font-size: 15px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.settings-close { position: absolute; right: 8px; top: 8px; z-index: 1; font: inherit; font-size: 15px; width: 32px; height: 32px; border-radius: 6px; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .settings-close:hover { background: var(--chip); color: var(--text); }
 @media (max-width: 700px) {
   .settings { padding: 8px; }
-  .settings-window { flex-direction: column; height: min(360px, 100%); }
+  .settings-window { flex-direction: column; height: min(610px, 100%); }
   .settings-nav { width: auto; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
   .settings-title, .settings-nav hr { display: none; }
   .settings-nav button { padding: 3px 10px; }
   .settings-main { padding: 8px; }
-  .settings-close { top: 4px; right: 6px; }
+  .settings-close { top: 4px; right: 4px; }
+  .settings-nav { padding-right: 40px; }
 }
 .modal .actions .grow { flex: 1; }
 .settings-page h3 .state { font-size: 12px; font-weight: normal; color: var(--ok); margin-left: 8px; }
@@ -699,16 +694,14 @@ table.notify input { margin: 1px 0; }
     <button type="button" data-page="set-keys">キー設定</button>
     <button type="button" data-page="set-log">ログ</button>
     <hr>
-    <button type="button" data-page="set-link">Discord 連携</button>
     <hr>
     <button type="button" data-page="set-update">更新</button>
     <button type="button" data-page="set-about">このアプリについて</button>
   </nav>
+  <button type="button" class="settings-close" id="settings-close" aria-label="設定を閉じる" title="閉じる（Esc）">✕</button>
   <div class="settings-main">
-    <button type="button" class="settings-close" id="settings-close" aria-label="設定を閉じる" title="閉じる（Esc）">✕</button>
     <section class="settings-page" id="set-notify">
       <h2>通知</h2>
-      <h3>通知する時</h3>
 
         <table class="notify">
           <thead><tr><th></th><th>開始</th><th>終了</th><th></th></tr></thead>
@@ -720,19 +713,10 @@ table.notify input { margin: 1px 0; }
             <tr data-service="discord"><th>Discord</th>
               <td><input type="checkbox" data-option="discord_start" aria-label="Discord通知（開始）"></td>
               <td><input type="checkbox" data-option="discord_end" aria-label="Discord通知（終了）"></td>
-              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button><button class="mini link-go" id="discord-link-go">連携する</button></td></tr>
-            <tr class="inline-link" id="discord-inline" hidden><td colspan="4">
-              <div class="row">
-                <input type="password" id="discord-inline-url" autocomplete="off" placeholder="Discord の Webhook URL" aria-label="DiscordのWebhook URL">
-                <button type="button" class="cmd primary" id="discord-inline-save">連携</button>
-                <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
-              </div>
-            </td></tr>
+              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button></td></tr>
           </tbody>
         </table>
-    </section>
-    <section class="settings-page" id="set-link" hidden>
-      <h2>Discord 連携 <span class="state" id="discord-set" hidden>設定済み</span></h2>
+      <h3>Discord <span class="state" id="discord-set" hidden>連携済み</span></h3>
       <div class="form">
         <label for="discord-url">Webhook URL</label>
         <input type="password" id="discord-url" autocomplete="off" placeholder="変えるときだけ入力" aria-label="DiscordのWebhook URL">
@@ -741,7 +725,6 @@ table.notify input { margin: 1px 0; }
       </div>
       <div class="row">
         <button type="button" class="cmd primary" id="save-discord">保存</button>
-        <button type="button" class="cmd" data-test="discord">テスト通知</button>
         <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
       </div>
     </section>
@@ -1096,10 +1079,8 @@ function renderSettings() {
     const row = document.querySelector(`tr[data-service="${service}"]`);
     row.classList.toggle('off', !linked);
     row.querySelectorAll('input').forEach(box => { box.disabled = !linked; });
-    row.querySelector('[data-test]').hidden = !linked;
-    row.querySelector('.link-go').hidden = !!linked;
+    row.querySelector('[data-test]').disabled = !linked;
   }
-  if (note.discord_webhook_set) $('discord-inline').hidden = true;
   if (document.activeElement !== $('discord-name') && !$('discord-name').dataset.edited) $('discord-name').value = note.discord_username || '';
 }
 
@@ -1441,12 +1422,15 @@ function openSettings(page) {
 function closeSettings() {
   $('settings').hidden = true;
   if (assigning) { assigning = null; renderKeymap(); }
+  settingsPage = 'set-notify';
+  $('discord-url').value = '';
+  delete $('discord-name').dataset.edited;
 }
 document.querySelectorAll('.settings-nav [data-page]').forEach(button => button.addEventListener('click', () => showSettingsPage(button.dataset.page)));
 $('settings-close').addEventListener('click', closeSettings);
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) closeSettings(); });
 // Discord and LINE pages: Enter saves. Saved secrets are never shown again.
-[['discord-url', 'save-discord'], ['discord-name', 'save-discord'], ['discord-inline-url', 'discord-inline-save']].forEach(([field, save]) =>
+[['discord-url', 'save-discord'], ['discord-name', 'save-discord']].forEach(([field, save]) =>
   $(field).addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) $(save).click(); }));
 document.addEventListener('keydown', event => {
   if (event.key === ',' && event.ctrlKey) { event.preventDefault(); if ($('settings').hidden) openSettings(); else closeSettings(); }
@@ -2197,13 +2181,6 @@ document.querySelectorAll('[data-folder]').forEach(button => button.addEventList
 document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
   quiet(command('notify_test', {channel: button.dataset.test}))));
 // Saved secrets are never shown again; the fields are cleared after saving.
-// 通知's Discord row links in place: the Webhook URL is typed right there.
-$('discord-link-go').addEventListener('click', () => { $('discord-inline').hidden = false; $('discord-inline-url').focus(); });
-$('discord-inline-save').addEventListener('click', () => {
-  const url = $('discord-inline-url').value.trim();
-  if (!url) return;
-  quiet(command('notification', {discord_webhook_url: url}).then(() => { $('discord-inline-url').value = ''; $('discord-inline').hidden = true; }));
-});
 // Help pages open in the user's own browser, where they are signed in.
 document.querySelectorAll('a.ext[data-link]').forEach(link => link.addEventListener('click', event => {
   event.preventDefault();
