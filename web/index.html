@@ -104,7 +104,7 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings { position: fixed; left: 0; right: 0; bottom: 0; top: var(--head); z-index: 9; background: var(--shade); display: grid; place-items: center; padding: 16px;
             animation: fade-in .12s ease-out; }
 .settings[hidden] { display: none; }
-.settings-window { position: relative; width: min(720px, 100%); height: min(580px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+.settings-window { position: relative; width: min(720px, 100%); height: min(var(--settings-h, 580px), 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
                    box-shadow: 0 16px 48px rgba(0, 0, 0, .35); overflow: hidden; animation: pop-in .14s ease-out; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
@@ -171,7 +171,7 @@ a.ext { color: var(--accent); font-size: 13px; }
 .settings-close:hover { background: var(--chip); color: var(--text); }
 @media (max-width: 700px) {
   .settings { padding: 8px; }
-  .settings-window { flex-direction: column; height: min(610px, 100%); }
+  .settings-window { flex-direction: column; height: min(var(--settings-h, 610px), 100%); }
   .settings-nav { width: auto; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
   .settings-title, .settings-nav hr { display: none; }
   .settings-nav button { padding: 3px 10px; }
@@ -700,7 +700,7 @@ table.notify input { margin: 1px 0; }
  <div class="settings-window">
   <nav class="settings-nav" aria-label="設定の項目">
     <h2 class="settings-title">設定</h2>
-    <button type="button" data-page="set-notify" aria-current="page">通知</button>
+    <button type="button" data-page="set-notify" aria-current="page">Discord 連携</button>
     <button type="button" data-page="set-watch">見張り</button>
     <button type="button" data-page="set-keys">キー設定</button>
     <button type="button" data-page="set-log">ログ</button>
@@ -713,7 +713,7 @@ table.notify input { margin: 1px 0; }
   <button type="button" class="settings-close" id="settings-close" aria-label="設定を閉じる" title="閉じる（Esc）">✕</button>
   <div class="settings-main">
     <section class="settings-page" id="set-notify">
-      <h2>通知</h2>
+      <h2>Discord 連携</h2>
 
         <table class="notify">
           <thead><tr><th></th><th>開始</th><th>終了</th><th></th></tr></thead>
@@ -785,7 +785,6 @@ table.notify input { margin: 1px 0; }
       <h2>このアプリについて</h2>
       <dl class="about" id="about-env"></dl>
       <div class="links">
-        <a href="#" class="ext" data-link="guide">使い方ガイド</a>
         <a href="#" class="ext" data-link="github">GitHub</a>
       </div>
       <h3>ライブラリ</h3>
@@ -1429,9 +1428,28 @@ function showSettingsPage(page) {
   }).catch(error => { $('about-env').textContent = error.message; });
   document.querySelector('.settings-main').scrollTo(0, 0);
 }
+// The window is as tall as its tallest page, so no page scrolls and none leaves a large gap below.
+function fitSettings() {
+  const win = document.querySelector('.settings-window');
+  const main = document.querySelector('.settings-main');
+  const nav = document.querySelector('.settings-nav');
+  const pad = parseFloat(getComputedStyle(main).paddingTop) + parseFloat(getComputedStyle(main).paddingBottom);
+  let tallest = 0;
+  document.querySelectorAll('.settings-page').forEach(page => {
+    const hidden = page.hidden;
+    page.hidden = false;
+    tallest = Math.max(tallest, page.scrollHeight);
+    page.hidden = hidden;
+  });
+  const column = getComputedStyle(win).flexDirection === 'column';
+  const height = column ? nav.offsetHeight + tallest + pad : Math.max(nav.scrollHeight, tallest + pad);
+  win.style.setProperty('--settings-h', Math.ceil(height + 2) + 'px');
+}
+window.addEventListener('resize', () => { if (!$('settings').hidden) fitSettings(); });
 function openSettings(page) {
   $('settings').hidden = false;
   showSettingsPage(page || settingsPage);
+  fitSettings();
   document.querySelector('.settings-nav [aria-current=page]').focus();
 }
 function closeSettings() {

@@ -22,8 +22,7 @@ MIN_PRESS = .08
 MAX_PRESS = 5.0
 MAX_STREAMS = 4
 # Pages the app opens in the default browser (where the user is signed in, so the private repository shows).
-LINKS = {'guide': 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus#使い方',
-         'github': 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus',
+LINKS = {'github': 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus',
          'discord_webhook': 'https://support.discord.com/hc/ja/articles/228383668'}
 
 
