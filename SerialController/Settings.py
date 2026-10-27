@@ -209,23 +209,24 @@ class GuiSettings:
             "Button.CAPTURE": "c",
         }
         self.setting["KeyMap-Direction"] = {
-            "Direction.UP": "Key.up",
-            "Direction.RIGHT": "Key.right",
-            "Direction.DOWN": "Key.down",
-            "Direction.LEFT": "Key.left",
+            # The arrow keys play the D-pad (KeyMap-Hat); the left stick is unassigned until chosen in the key settings.
+            "Direction.UP": "20100",
+            "Direction.RIGHT": "20101",
+            "Direction.DOWN": "20110",
+            "Direction.LEFT": "20111",
             "Direction.UP_RIGHT": "20001",
             "Direction.DOWN_RIGHT": "20002",
             "Direction.DOWN_LEFT": "20010",
             "Direction.UP_LEFT": "20011",
         }
         self.setting["KeyMap-Hat"] = {
-            "Hat.TOP": "10000",
+            "Hat.TOP": "Key.up",
             "Hat.TOP_RIGHT": "10001",
-            "Hat.RIGHT": "10010",
+            "Hat.RIGHT": "Key.right",
             "Hat.BTM_RIGHT": "10011",
-            "Hat.BTM": "10100",
+            "Hat.BTM": "Key.down",
             "Hat.BTM_LEFT": "10101",
-            "Hat.LEFT": "10110",
+            "Hat.LEFT": "Key.left",
             "Hat.TOP_LEFT": "10111",
             "Hat.CENTER": "11000",
         }
