@@ -146,10 +146,21 @@ const $ = id => document.getElementById(id);
 let state = null, catalogKey = '';
 
 async function call(method, params = {}) {
-  const response = await fetch('/api/call', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({method, params}),
-  });
+  // Retry dropped connections; a lost "release" would otherwise leave a button held.
+  let response;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await fetch('/api/call', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({method, params}),
+      });
+      break;
+    } catch (error) {
+      // A timed press may already have run, so it is never repeated.
+      if (attempt >= 3 || params.action === 'press') throw new Error('アプリに接続できません');
+      await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
+    }
+  }
   const result = await response.json().catch(() => ({ok: false, error: `HTTP ${response.status}`}));
   if (!result.ok) throw new Error(result.error || 'Operation failed');
   return result.result;

@@ -1869,6 +1869,10 @@ class PokeControllerApp:
                 self.settings.com_port.set(self.com_port.get())
                 self.settings.baud_rate.set(self.baud_rate.get())
                 self.settings.save()
+                if hasattr(self, 'lifecycle') and self.lifecycle.keyboard_resume:
+                    self.lifecycle.keyboard_resume = False
+                    self.is_use_keyboard.set(True)
+                    self.activateKeyboard()
 
     def inactivateSerial(self):
         if hasattr(self, 'lifecycle'):
@@ -1883,6 +1887,15 @@ class PokeControllerApp:
         if self.is_use_keyboard.get() and hasattr(self, 'lifecycle') and (self.lifecycle.closing or self.lifecycle.disconnecting):
             self.is_use_keyboard.set(False)
             return
+        if self.is_use_keyboard.get() and self.keyPress is None:
+            # Without a port the listener would die on the first key press.
+            print('キーボード操作はCOMポートの接続後に有効になります。')
+            self.is_use_keyboard.set(False)
+            if hasattr(self, 'lifecycle'):
+                self.lifecycle.keyboard_resume = True
+            return
+        if hasattr(self, 'lifecycle') and not self.is_use_keyboard.get():
+            self.lifecycle.keyboard_resume = False
         if self.is_use_keyboard.get():
             # enable Keyboard as controller
             if self.keyboard is None:
@@ -1910,7 +1923,7 @@ class PokeControllerApp:
         # enable Keyboard as controller
         if not self.is_use_keyboard.get() or (hasattr(self, 'lifecycle') and (self.lifecycle.closing or self.lifecycle.disconnecting)):
             return
-        if event.widget == self.root and self.keyboard is None:
+        if event.widget == self.root and self.keyboard is None and self.keyPress is not None:
             self.keyboard = SwitchKeyboardController(self.keyPress)
             self.keyboard.listen()
 
@@ -2328,6 +2341,9 @@ class PokeControllerApp:
         self.pause_button["state"] = "normal"
 
     def startShortcutPlay(self, *event, num=0):
+        if hasattr(self, 'lifecycle') and (self.lifecycle.busy() or self.lifecycle.closing or self.lifecycle.disconnecting):
+            print('前の処理の停止が完了するまで待ってください。')
+            return
         if self.cur_command is None:
             print("No commands have been assigned yet.")
             self._logger.info("No commands have been assigned yet.")
@@ -2492,7 +2508,11 @@ class PokeControllerApp:
             self.settings.pos_software_controller = self.pos_software_controller.get()
             self.settings.pos_dialogue_buttons = self.pos_dialogue_buttons.get()
 
-            self.settings.save()
+            try:
+                self.settings.save()
+            except (OSError, ValueError):
+                # Closing must still release the camera and window.
+                self._logger.exception('終了時の設定保存に失敗しました')
 
             self.camera.destroy()
             cv2.destroyAllWindows()

@@ -73,11 +73,17 @@ def browser(endpoint):
     opener = build_opener(ProxyHandler({}), HTTPCookieProcessor(CookieJar()))
 
     def status(url, **kwargs):
-        try:
-            with opener.open(Request(url, **kwargs), timeout=10) as response:
-                return response.status, response.read()
-        except HTTPError as exc:
-            return exc.code, b''
+        for attempt in range(4):
+            try:
+                with opener.open(Request(url, **kwargs), timeout=10) as response:
+                    return response.status, response.read()
+            except HTTPError as exc:
+                return exc.code, b''
+            except (ConnectionError, TimeoutError):
+                # Some PCs drop a few loopback connections (security filters); retry like the clients do.
+                if attempt == 3:
+                    raise
+                time.sleep(.2)
 
     assert status(base)[0] == 403, 'Page must require the token'
     assert status(base + '?token=wrong')[0] == 403
@@ -142,7 +148,7 @@ def main():
             except HTTPError as exc:
                 assert exc.code == 403
             browser(endpoint)
-            asyncio.run(protocol(mcp_command, mcp_args + ['--endpoint', str(endpoint)], endpoint))
+            asyncio.run(protocol(mcp_command, mcp_args, endpoint))  # discovers running apps without --endpoint
             print('PASS: app startup, bundled runtime, authentication, browser UI, ten MCP tools, capture, button input, start/pause/resume/stop, logs, error handling', flush=True)
         finally:
             report.with_suffix('.stop').touch()

@@ -2,9 +2,13 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 class Launcher {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int MessageBoxW(IntPtr owner, string text, string caption, uint type);
+
     static string Quote(string value) {
         var result = new StringBuilder("\"");
         int slashes = 0;
@@ -51,7 +55,12 @@ class Launcher {
                 return process.ExitCode;
             }
         } catch (Exception e) {
-            File.WriteAllText(Path.Combine(root, "launch-error.txt"), e.ToString());
+            string log = Path.Combine(root, "launch-error.txt");
+            File.WriteAllText(log, e.ToString());
+#if !MCP
+            MessageBoxW(IntPtr.Zero, "同梱のPythonを起動できませんでした。ZIP全体を展開したフォルダーから起動してください。\n詳細: " + log,
+                        "Poke-Controller", 0x10);
+#endif
             return 1;
         }
     }

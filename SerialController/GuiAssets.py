@@ -443,6 +443,9 @@ class CaptureArea(tk.Canvas):
         self.touchscreen_end_y = touchscreen_end_y
 
     def mouseCtrlLeftPress(self, event):
+        if self.camera.image_bgr is None:
+            print("カメラ映像がないため座標と色を取得できません")
+            return
         _img = cv2.cvtColor(self.camera.image_bgr, cv2.COLOR_BGR2RGB)
         if self.master.is_use_left_stick_mouse.get():
             self.UnbindLeftClick()

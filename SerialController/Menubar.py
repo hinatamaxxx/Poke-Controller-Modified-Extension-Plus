@@ -8,6 +8,7 @@ from tkinter import messagebox
 import os
 import configparser
 import shutil
+import sys
 
 from KeyConfig import PokeKeycon
 from LineNotify import Line_Notify
@@ -198,8 +199,13 @@ class PokeController_Menubar(tk.Menu):
                 f"ExecutePokeConModified-Extension_{ret[0]}.bat",
             )
             if not os.path.exists(exe_path):
-                txt = f'@echo off\ncd /d "%~dp0"\nstart "" "%~dp0PokeController.exe" --profile "{ret[0]}"\n'
-                with open(exe_path, "w", encoding="utf-8") as file:
+                # cmd reads .bat files in the console code page; switch to UTF-8 for non-ASCII profile names.
+                if os.path.exists(os.path.join(os.path.dirname(exe_path), "PokeController.exe")):
+                    command = f'"%~dp0PokeController.exe" --profile "{ret[0]}"'
+                else:
+                    command = f'"{sys.executable}" "%~dp0app.py" --profile "{ret[0]}"'
+                txt = f'@echo off\nchcp 65001 >nul\ncd /d "%~dp0"\nstart "" {command}\n'
+                with open(exe_path, "w", encoding="utf-8", newline="\r\n") as file:
                     file.write(txt)
             else:
                 pass

@@ -114,10 +114,11 @@ def main():
             webbrowser.open(api.web_url)
     mcp_menu.add_checkbutton(label='MCP・Web操作を有効にする', variable=enabled, command=toggle_mcp)
     mcp_menu.add_command(label='ブラウザで開く', command=open_browser)
+    mcp_menu.add_command(label='MCPクライアントに登録…', command=lambda: app.open_plus_settings('general'))
     mcp_menu.add_command(label='接続方法', command=lambda: os.startfile(ROOT / 'MCP.md'))
     app.menu.add_cascade(label='MCP', menu=mcp_menu)
     from plus_settings import SettingsWindow
-    settings_window = SettingsWindow(app, ROOT, preferences, enabled, toggle_mcp)
+    settings_window = SettingsWindow(app, ROOT, preferences, enabled, toggle_mcp, open_browser)
     app.open_plus_settings = settings_window.show
     toggle_mcp(save=False)
     if args.smoke_test:

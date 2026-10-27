@@ -72,6 +72,24 @@ def run(command, log, progress=None):
     return output
 
 
+def prune_runtimes(root, keep):
+    """Delete prepared runtimes nobody uses. A runtime still loaded by a window cannot be renamed, so it stays."""
+    folder = Path(root) / '.runtime-updates'
+    keep = {Path(path).resolve() for path in keep}
+    for path in folder.iterdir() if folder.is_dir() else ():
+        if not path.is_dir() or path.resolve() in keep:
+            continue
+        if re.fullmatch(r'[a-f0-9]{32}', path.name):
+            trash = path.with_name(path.name + '.delete')
+            try:
+                path.rename(trash)
+            except OSError:
+                continue
+            path = trash
+        if path.name.endswith('.delete'):
+            shutil.rmtree(path, ignore_errors=True)
+
+
 def update_libraries(root, selected, progress=None):
     progress = progress or (lambda message: None)
     root = Path(root).resolve()
@@ -88,6 +106,7 @@ def update_libraries(root, selected, progress=None):
         except OSError:
             raise RuntimeError('別の画面でライブラリを更新中です。')
         current = runtime_path(root)
+        prune_runtimes(root, [current, sys.prefix])
         items = inventory(current)
         specs = requirements(items, selected)
         progress('更新候補と依存関係を確認しています…')
@@ -133,4 +152,5 @@ def reset_libraries(root):
         except OSError:
             raise RuntimeError('別の画面でライブラリを更新中です。完了後に戻してください。')
         write_text(root / 'runtime-choice.txt', 'runtime-python')
+        prune_runtimes(root, [sys.prefix])
     return '次回起動から配布時のライブラリを使用します。全ウィンドウとMCPを終了して起動し直してください。'

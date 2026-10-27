@@ -257,7 +257,10 @@ class GuiSettings:
     def save(self, path=None):
         # Some preparations are needed because tkinter related objects are not serializable.
         # Preserve key mappings changed by a separate settings window.
-        self.load()
+        try:
+            self.load()
+        except (OSError, ValueError):
+            pass  # unreadable file without a valid backup: keep the in-memory settings
 
         self.setting["General Setting"] = {
             "camera_id": self.camera_id.get(),

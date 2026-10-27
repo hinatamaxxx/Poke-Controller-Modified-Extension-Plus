@@ -47,6 +47,31 @@ def contains(items, value):
     return any(type(item) is type(value) and item == value for item in items)
 
 
+def process_alive(pid):
+    """True unless Windows reports the process as gone. os.kill(pid, 0) would terminate it on Windows."""
+    import ctypes
+    kernel = ctypes.windll.kernel32
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return ctypes.GetLastError() == 5  # access denied: exists under another account
+    try:
+        code = ctypes.c_ulong()
+        return not kernel.GetExitCodeProcess(handle, ctypes.byref(code)) or code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def remove_stale_endpoints(runtime):
+    """Delete endpoint files left by apps that crashed or were killed."""
+    for path in Path(runtime).glob('controller-*.json'):
+        try:
+            pid = int(path.stem.split('-', 1)[1])
+        except ValueError:
+            continue
+        if pid != os.getpid() and not process_alive(pid):
+            path.unlink(missing_ok=True)
+
+
 class LocalControl:
     def __init__(self, app, runtime, demo=False):
         self.app = app
@@ -192,6 +217,7 @@ class LocalControl:
         self.web_url = f'http://127.0.0.1:{port}/?token={self.web_token}'
         runtime = Path(runtime)
         runtime.mkdir(parents=True, exist_ok=True)
+        remove_stale_endpoints(runtime)
         self.path = runtime / f'controller-{os.getpid()}.json'
         self.path.write_text(json.dumps({'url': f'http://127.0.0.1:{port}/', 'web_url': self.web_url,
                                         'token': self.token, 'pid': os.getpid(), 'profile': app.profile}),

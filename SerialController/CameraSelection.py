@@ -10,6 +10,8 @@ class CameraSelection:
         self.name = app.settings.camera_name
         self.rows = []
         self.generation = 0
+        self.missing = False
+        self.next_check = 0
         self.state = '未接続'
         self.needs_selection = not self.path and app.camera_id.get() >= 0
         app.camera_name_cb.configure(state='readonly', postcommand=self.refresh)
@@ -41,10 +43,6 @@ class CameraSelection:
             self.path, self.name = '', ''
         elif 1 <= index <= len(self.rows):
             device = self.rows[index - 1]
-            if not device['path']:
-                self.state = '機器を識別できないため接続できません'
-                self.refresh()
-                return
             self.path, self.name = device['path'], device['name']
         self.app.settings.camera_path = self.path
         self.needs_selection = False
@@ -80,7 +78,25 @@ class CameraSelection:
         if camera is not None:
             if camera.error and self.path and self.state != '切り替え中…':
                 self.state = '未接続：' + camera.error
+                self.reconnect_when_plugged(camera)
             elif camera.isOpened() and getattr(camera, 'device_path', '') == self.path:
                 self.state = '接続済み：' + self.name
         self.app.camera_status.configure(text=self.state)
         self.app.root.after(200, self.poll)
+
+    def reconnect_when_plugged(self, camera):
+        """After the device was unplugged, reconnect once it is listed again."""
+        import time
+        if (camera.thread is not None and camera.thread.is_alive()) or time.monotonic() < self.next_check:
+            return
+        self.next_check = time.monotonic() + 3
+        try:
+            present = any(d['path'] == self.path for d in enumerate_cameras())
+        except OSError:
+            return
+        if not present:
+            self.missing = True
+        elif self.missing:
+            self.missing = False
+            print('カメラ: 機器が再接続されたため接続し直します')
+            self.connect()

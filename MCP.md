@@ -2,25 +2,28 @@
 
 MCPは初期状態でOFFです。「メニュー → 設定 → MCP」またはMCPメニューからONにでき、プロファイルごとに保存します。コマンドラインの`PokeController.exe --mcp` / `--no-mcp`は、その起動だけ設定より優先します。
 
-MCPクライアントのstdioサーバー設定に、展開先のexeの絶対パスを指定します。
+## MCPクライアントへの登録
+
+「メニュー → 設定 → MCP」（またはMCPメニュー「MCPクライアントに登録…」）から登録できます。登録は全プロファイル共通で、一度だけで済みます。
+
+- **Claude Desktopに登録**：見つかったClaude Desktopの設定ファイルに`poke-controller`を追加します。ほかの設定は変更せず、変更前の内容を`.bak`に残します。Claude Desktopを起動し直すと使えます。
+- **Claude Code用コマンドをコピー**：`claude mcp add --scope user poke-controller -- ...`をコピーします。ターミナルで実行してください。
+- **設定JSONをコピー**：ほかのMCPクライアント用です。展開先の`PokeControllerMCP.exe`の絶対パスが入っています。
 
 ```json
 {
-  "command": "C:\\Apps\\PokeController\\PokeControllerMCP.exe",
-  "args": []
+  "mcpServers": {
+    "poke-controller": {
+      "command": "C:\\Apps\\PokeController\\PokeControllerMCP.exe",
+      "args": []
+    }
+  }
 }
 ```
 
-有効なアプリが一つの場合は自動選択します。複数起動時は`runtime/controller-PID.json`の対象ファイルを指定します。
+起動中でMCPがONのウィンドウをすべて自動で見つけます。複数のウィンドウを開いている場合は、`list_sessions`のプロファイル名で対象を区別します。1つのウィンドウに限定したいときだけ、`"args": ["--endpoint", "C:\\Apps\\PokeController\\runtime\\controller-1234.json"]`のように指定できます。
 
-```json
-{
-  "command": "C:\\Apps\\PokeController\\PokeControllerMCP.exe",
-  "args": ["--endpoint", "C:\\Apps\\PokeController\\runtime\\controller-1234.json"]
-}
-```
-
-このファイルにはローカル接続用のトークンが含まれます。公開・共有しないでください。アプリ終了時に削除されます。次の起動では新しいファイルが作られます。exeを手動でダブルクリックする必要はなく、MCPクライアントから起動します。
+`runtime/controller-PID.json`にはローカル接続用のトークンが含まれます。公開・共有しないでください。アプリ終了時に削除され、強制終了などで残ったファイルも次の起動時に削除します。exeを手動でダブルクリックする必要はなく、MCPクライアントから起動します。
 
 | ツール | 機能 |
 |---|---|
