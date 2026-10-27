@@ -12,7 +12,6 @@ param(
     [string]$PythonPath,
     [switch]$Update,
     [switch]$DesktopShortcut,
-    [switch]$RegisterClaudeDesktop,
     [switch]$NoFinishScreen,
     [string]$ProgressLog
 )
@@ -285,14 +284,6 @@ try {
     foreach ($name in $values.Keys) { Set-ItemProperty -Path $key -Name $name -Value $values[$name] }
     foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty -Path $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
     New-ItemProperty -Path $key -Name EstimatedSize -Value $size -PropertyType DWord -Force | Out-Null
-
-    if ($RegisterClaudeDesktop) {
-        Step 'Claude Desktop に登録しています'
-        $interpreter = (Get-Content -LiteralPath $record -Raw).Trim()
-        Push-Location $Target
-        try { Invoke-Checked $interpreter @('-c', 'import mcp_setup, sys; [mcp_setup.register_desktop(p, sys.argv[1]) for p in mcp_setup.desktop_configs()]', $Target) }
-        finally { Pop-Location }
-    }
 
     Step "Poke-Controller $version を入れました"
     if ($ProgressLog) { Add-Content -LiteralPath $ProgressLog -Value '#done' -Encoding UTF8 }

@@ -1,6 +1,19 @@
 # MCP
 
-`PokeControllerMCP.exe` を MCP クライアントの stdio サーバーとして登録します（[README](README.md#mcp-の登録)）。本体が動いていなければ、最初の呼び出しで画面なしのまま起動します。セッションは Switch 1 台ずつ（操作画面のタブ）で、`list_sessions` に並びます。複数の本体が動いているときは、すべて見つけて並べます。1つに限定したいときだけ `--endpoint <runtime\controller-PID.json>`、自動起動を止めたいときは `--no-autostart` を付けます。
+Claude Code と Codex では、プラグインを入れると自動でつながります（[README](README.md#claude-codecodex-のプラグイン)）。ほかの MCP クライアントでは、`PokeControllerMCP.exe` を stdio サーバーとして登録します。
+
+```json
+{
+  "mcpServers": {
+    "poke-controller": {
+      "command": "C:\\Users\\<ユーザー名>\\AppData\\Local\\Programs\\PokeController\\PokeControllerMCP.exe",
+      "args": []
+    }
+  }
+}
+```
+
+本体が動いていなければ、最初の呼び出しで画面なしのまま起動します。セッションは Switch 1 台ずつ（操作画面のタブ）で、`list_sessions` に並びます。複数の本体が動いているときは、すべて見つけて並べます。1つに限定したいときだけ `--endpoint <runtime\controller-PID.json>`、自動起動を止めたいときは `--no-autostart` を付けます。
 
 | ツール | 機能 |
 |---|---|

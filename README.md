@@ -35,7 +35,7 @@ Python の扱いはインストール時に選べます（`get.ps1` と `install
 
 ライブラリは元のポケコンと同じ組み合わせ（`requirements-lock.txt`）を PyPI から入れます。Microsoft Store 版の Python はカメラの許可が別に必要になるため、おすすめの方法では使いません。
 
-ほかの引数: `-DesktopShortcut`（デスクトップにも置く）、`-RegisterClaudeDesktop`（Claude Desktop の MCP 設定に登録）。ソースから入れる場合は `python packaging\build.py` の後、`dist\PokeController\install.ps1` を実行します。
+ほかの引数: `-DesktopShortcut`（デスクトップにも置く）。Claude Code・Codex から使うときは、あわせてプラグインを入れます（[Claude Code・Codex のプラグイン](#claude-codecodex-のプラグイン)）。ソースから入れる場合は `python packaging\build.py` の後、`dist\PokeController\install.ps1` を実行します。
 
 署名していないため、SmartScreen の警告が出たら「詳細情報」→「実行」で進めます。
 
@@ -71,22 +71,7 @@ codex plugin add poke-controller@poke-controller
 
 入れたあと、新しいセッションで「ポケコンを開いて」と頼むと、操作画面が開きます。アプリを標準以外の場所に置いているときは、環境変数 `POKECONTROLLER_MCP` に `PokeControllerMCP.exe` のパスを設定します。
 
-### MCP の登録（プラグインを使わないとき）
-
-Claude Desktop: インストール時に `-RegisterClaudeDesktop` を付けるか、設定ファイルに次を追記します。Claude Code: `claude mcp add --scope user poke-controller -- "%LOCALAPPDATA%\Programs\PokeController\PokeControllerMCP.exe"`。
-
-```json
-{
-  "mcpServers": {
-    "poke-controller": {
-      "command": "C:\\Users\\<ユーザー名>\\AppData\\Local\\Programs\\PokeController\\PokeControllerMCP.exe",
-      "args": []
-    }
-  }
-}
-```
-
-ツールの一覧は [MCP.md](MCP.md)、Claude 向けの手順は [CLAUDE.md](CLAUDE.md) にあります。
+プラグインを使わない MCP クライアント（Claude Desktop のチャットなど）では、`PokeControllerMCP.exe` を stdio サーバーとして登録します（[MCP.md](MCP.md)）。
 
 ### メニューと設定
 
