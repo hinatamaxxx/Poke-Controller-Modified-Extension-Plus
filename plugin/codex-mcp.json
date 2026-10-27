@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "poke-controller": {
+      "cwd": ".",
+      "command": "cmd",
+      "args": ["/c", "plugin\\poke-controller-mcp.cmd"],
+      "env_vars": [
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "TEMP",
+        "TMP",
+        "USERPROFILE",
+        "USERNAME",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "PROGRAMFILES",
+        "POKECONTROLLER_MCP"
+      ],
+      "startup_timeout_sec": 120
+    }
+  }
+}

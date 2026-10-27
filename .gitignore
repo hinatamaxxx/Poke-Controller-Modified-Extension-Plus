@@ -10,6 +10,11 @@
 *.eep
 *.exe
 *.json
+# The Claude Code and Codex plugin manifests
+!.claude-plugin/*.json
+!.codex-plugin/*.json
+!.agents/plugins/*.json
+!plugin/*.json
 *.bat
 !ExecutePokeConModified-Extension.bat
 !UpdatePokeConModified-Extension.bat
