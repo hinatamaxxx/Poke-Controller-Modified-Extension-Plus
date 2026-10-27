@@ -18,7 +18,7 @@ Poke-Controller は画面を持たず、ブラウザの操作画面と MCP で�
 1. 目的と、終わりの条件（例: 色違いが出たら止める）を利用者に確かめる。
 2. `start_recording` で録画を始め、`press_buttons` や `run_sequence` で 1 手ずつ実際に操作する。画面が変わるたびに `get_capture` で確かめ、待つべき画面は `save_template` で切り出して `find_template` で照合する（照合も録画に残る）。
 3. 1 回分が通ったら `stop_recording`。`get_recording_overview` で流れを見直し、利用者のやりたいことと合っているか、画面の写真を添えて確認する。
-4. `draft_script_from_recording` で下書きを作る。待ち時間には考えていた時間も含まれるので、画面の照合（`isContainTemplate` を待つループ）に置き換え、終わりの条件、回数の表示、見つけたときの通知（`self.discord_image` など）を足して、`write_script`（`Claude/` の下などに保存）。読み込みエラーが返ったら直す。
+4. `draft_script_from_recording` で下書きを作る。待ち時間には考えていた時間も含まれるので、画面の照合（`isContainTemplate` を待つループ）に置き換え、終わりの条件、回数の表示、見つけたときの通知（`self.discord_image` など。本体の録画と映像の添付は設定「Discord 連携」で行うので書かない）を足して、`write_script`（`Claude/` の下などに保存）。読み込みエラーが返ったら直す。
 5. `start_script` で動かし、1 周を映像で確かめてから利用者に任せる。既存のスクリプト（`list_script_files` / `read_script`）の書き方に合わせる。
 
 長時間の実行を見張るとき（利用者が頼んだときだけ）:

@@ -75,10 +75,6 @@ class Discord_Notify:
             if not os.path.isdir(dirname):
                 os.makedirs(dirname)
                 self._logger.debug(f"mkdir: '{dirname}'")
-            self.setting_file["DISCORD"] = {
-                "channel_id": "",
-                "token": "",
-            }
             self.setting_file["DISCORD_WEBHOOK"] = {
                 "webhook_url": "",
                 "username": "",
@@ -110,74 +106,102 @@ class Discord_Notify:
         self._logger.warning(f"Webhook check was not confirmed: {self.status}")
         return "DISCORD API Check: not confirmed."
 
-    def send_message(self, notification_message=None, image=None, keys="DISCORD_WEBHOOK"):
+    # アプリが設定する: 通知を送ったあとに呼ばれる(直前の映像の添付など)。引数は (この通知, 送れた送り先の一覧)
+    after_send = None
+
+    def resolve_keys(self, keys="DISCORD_WEBHOOK"):
+        """
+        送り先の一覧を返す。設定に無い送り先(DISCORD_WEBHOOK2 など)は、設定画面の Webhook (DISCORD_WEBHOOK) に送る
+        (スクリプトに書かれた送り先が無くても、通知が届くようにする)
+        """
+        if keys == "ALL":
+            keys = list(self.webhook_keys)
+        elif isinstance(keys, str):
+            keys = [keys]
+        elif not isinstance(keys, (list, tuple)):
+            print("keysのフォーマットが間違っています")
+            self._logger.error('Using the wrong "keys" format')
+            keys = ["DISCORD_WEBHOOK"]
+        resolved = []
+        for key in keys:
+            if key not in self.webhook_url_dict or not str(self.webhook_url_dict[key]).strip():
+                key = "DISCORD_WEBHOOK"
+            if key in self.webhook_url_dict and str(self.webhook_url_dict[key]).strip() and key not in resolved:
+                resolved.append(key)
+        return resolved
+
+    def _content(self, key, notification_message):
+        content = {"username": self.username_dict.get(key) or self.default_username}
+        if self.avatar_url_dict.get(key):
+            content["avatar_url"] = self.avatar_url_dict[key]
+        content["content"] = notification_message or ""
+        return content
+
+    def send_message(self, notification_message=None, image=None, keys="DISCORD_WEBHOOK", follow_up=True):
         """
         DISCORDにテキスト/画像を通知する
         imageが設定されていなければテキストのみ、設定されていればテキストと画像を通知する
         imageはBGRを想定する
+        follow_up が真なら、送ったあとにアプリの after_send を呼ぶ(テスト通知では呼ばない)
         """
-        if keys == "ALL":
-            keys = self.webhook_keys
-        elif isinstance(keys, str):
-            keys = [keys]
-        elif isinstance(keys, list):
-            pass
-        else:
-            print("keysのフォーマットが間違っています")
-            self._logger.error('Using the wrong "keys" format')
-
         # 画像の有無判定
-        flag_image = False
-        if isinstance(image, np.ndarray):
-            flag_image = True
+        flag_image = isinstance(image, np.ndarray)
+        if notification_message:
+            send_data_type, send_data_type_eng = ("テキスト・画像", "Text & Image") if flag_image else ("テキスト", "Text")
+        else:
+            send_data_type, send_data_type_eng = ("画像", "Image") if flag_image else ("(empty)", "empty")
 
-        for key in keys:
+        resolved = self.resolve_keys(keys)
+        if not resolved:
+            print("Discord の Webhook URL が設定されていません（設定の「Discord 連携」）。")
+            self._logger.error("No Discord webhook is set")
+        sent = []
+        for key in resolved:
             try:
-                content = {}
-                if self.username_dict[key] != "":
-                    content["username"] = self.username_dict[key]
-                else:
-                    content["username"] = self.default_username
-                if self.avatar_url_dict[key] != "":
-                    content["avatar_url"] = self.avatar_url_dict[key]
-                if notification_message:
-                    content["content"] = notification_message
-                else:
-                    content["content"] = ""
-
-                files = {"payload_json": (None, json.dumps(content))}
-
+                files = {"payload_json": (None, json.dumps(self._content(key, notification_message)))}
                 if flag_image:
                     files["media"] = ("pokecon_image.png", convert_bgr_to_bytes(image))
-                else:
-                    pass
-
-                if notification_message:
-                    if flag_image:
-                        send_data_type = "テキスト・画像"
-                        send_data_type_eng = "Text & Image"
-                    else:
-                        send_data_type = "テキスト"
-                        send_data_type_eng = "Text"
-                else:
-                    if flag_image:
-                        send_data_type = "画像"
-                        send_data_type_eng = "Image"
-                    else:
-                        send_data_type = "(empty)"
-                        send_data_type_eng = "empty"
 
                 self.res = requests.post(self.webhook_url_dict[key], files=files, timeout=(5, 10))
 
                 if self.res.status_code in [200, 204]:
                     print(f"[{key}]{send_data_type}を送信しました。")
                     self._logger.info(f"Send {send_data_type_eng}")
+                    sent.append(key)
                 else:
                     print(f"[{key}]{send_data_type}の送信に失敗しました。({self.res.status_code})")
                     self._logger.error(f"Failed to send {send_data_type_eng}")
-            except Exception:
-                print(f"[{key}]webhook urlを確認してください。")
-                self._logger.error("Using the wrong token")
+            except Exception as exc:
+                print(f"[{key}]{send_data_type}を送れませんでした。webhook urlを確認してください。({exc})")
+                self._logger.error(f"Failed to send {send_data_type_eng}: {exc}")
+        hook = Discord_Notify.after_send
+        if sent and follow_up and hook is not None:
+            try:
+                hook(self, sent)
+            except Exception as exc:
+                self._logger.error(f"after_send failed: {exc}")
+        return sent
+
+    def send_file(self, keys, filename, data, notification_message=""):
+        """ファイル(直前の映像など)を送る。送れた送り先の一覧を返す"""
+        sent = []
+        for key in self.resolve_keys(keys):
+            try:
+                files = {
+                    "payload_json": (None, json.dumps(self._content(key, notification_message))),
+                    "file": (filename, data),
+                }
+                res = requests.post(self.webhook_url_dict[key], files=files, timeout=(5, 60))
+                if res.status_code in [200, 204]:
+                    print(f"[{key}]{filename}を送信しました。")
+                    sent.append(key)
+                else:
+                    print(f"[{key}]{filename}の送信に失敗しました。({res.status_code})")
+                    self._logger.error(f"Failed to send {filename}: {res.status_code}")
+            except Exception as exc:
+                print(f"[{key}]{filename}を送れませんでした: {exc}")
+                self._logger.error(f"Failed to send {filename}: {exc}")
+        return sent
 
     def getRateLimit(self):
         try:

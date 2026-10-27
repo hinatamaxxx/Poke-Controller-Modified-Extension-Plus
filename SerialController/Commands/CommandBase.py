@@ -43,6 +43,7 @@ class Command:
     isLineNotEnd = False
     isDiscordNotStart = False
     isDiscordNotEnd = False
+    isDiscordSwitchCapture = False  # Discord に通知するとき、Switch 本体でも録画する
     app_name = ""
     cur_command_name = ""
     profilename = None
