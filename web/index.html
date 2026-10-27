@@ -2010,13 +2010,9 @@ $('opt-side-pad').checked = options.sidePad;
 const portraitQuery = matchMedia('(orientation: portrait)');
 function placePad() {
   const inTab = narrowQuery.matches && (portraitQuery.matches || !options.sidePad);
-  const wasInTab = document.body.classList.contains('pad-tab');
   document.body.classList.toggle('pad-tab', inTab);
   const home = inTab ? $('pad-slot') : document.querySelector('.area-pad');
   if ($('pad-wrap').parentElement !== home) home.append($('pad-wrap'));
-  const padSelected = $('tab-pad').getAttribute('aria-selected') === 'true';
-  // Show the manual tab on taller layouts; low windows keep the video visible until a tab is opened.
-  if (inTab && !wasInTab && !padSelected && !shortQuery.matches) $('tab-pad').click();
 }
 [portraitQuery, narrowQuery, shortQuery].forEach(query => query.addEventListener('change', placePad));
 $('opt-side-pad').addEventListener('change', () => { options.sidePad = $('opt-side-pad').checked; saveOption('sidePad', options.sidePad); placePad(); });
