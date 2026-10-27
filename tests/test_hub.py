@@ -47,6 +47,18 @@ class RegistryTest(unittest.TestCase):
             self.assertEqual(len(hub.Registry(folder, 'main').entries), 1)
 
 
+class SharedSettingsTest(unittest.TestCase):
+    def test_only_the_shared_part_of_a_command_goes_to_every_switch(self):
+        share = lambda action, values: hub.Hub.shared_command(hub.Hub, {'action': action, 'values': values})
+        self.assertEqual(share('options', {'keyboard': True, 'discord_end': True}), {'action': 'options', 'values': {'discord_end': True}})
+        self.assertIsNone(share('options', {'show_realtime': False}))
+        self.assertIsNotNone(share('choice', {'name': 'stdout_destination', 'value': '2'}))
+        self.assertIsNone(share('choice', {'name': 'fps', 'value': '30'}))
+        self.assertIsNotNone(share('notification', {'discord_username': 'x'}))
+        self.assertIsNotNone(share('watch', {'enabled': True}))
+        self.assertIsNone(share('camera', {'path': 'x'}))
+
+
 class CrashTest(unittest.TestCase):
     def setUp(self):
         self.hub = types.SimpleNamespace(incidents=collections.defaultdict(list), incident_id=iter(range(1, 100)).__next__,

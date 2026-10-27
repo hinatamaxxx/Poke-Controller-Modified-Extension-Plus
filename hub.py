@@ -119,6 +119,10 @@ class Worker:
             if self.process is not None:
                 return
             self.endpoint_path.unlink(missing_ok=True)
+            try:
+                self.hub.copy_shared_files(self)
+            except OSError:
+                pass
             command = [sys.executable]
             if sys.flags.ignore_environment:
                 command.append('-E')
@@ -237,6 +241,7 @@ class Worker:
                 if self.state != 'ready':
                     self.state, self.error = 'ready', ''
                     self.resume = None
+                    threading.Thread(target=self.hub.take_shared_settings, args=(self,), daemon=True).start()
                 if now >= next_frame:
                     next_frame = now + 1 / self.history.fps
                     frame = self.call('frame_raw', {'small': True, 'after': last_frame}, timeout=5)
@@ -375,6 +380,79 @@ class Hub(ApiServer):
             if worker.entry.get('open'):
                 worker.start()
 
+    # ---- settings shared by every Switch ----
+    # Notifications, the watch, the log/dialog layout and the key map are the same on every Switch; the camera, COM
+    # port and what is shown in the tabs stay per Switch. A change made on one Switch is applied to the others, and a
+    # Switch that starts takes them from one that is already running.
+    SHARED_OPTIONS = ('win_start', 'win_end', 'line_start', 'line_end', 'discord_start', 'discord_end')
+    SHARED_CHOICES = ('stdout_destination', 'dialog_buttons')
+    SHARED_FILES = ('discord_token.ini', 'line_token.ini', 'watch.json')
+
+    def shared_command(self, params):
+        """The part of a command that every Switch takes, or None."""
+        action, values = params.get('action'), params.get('values') or {}
+        if action in ('notification', 'watch', 'keymap'):
+            return {'action': action, 'values': values}
+        if action == 'options':
+            shared = {k: v for k, v in values.items() if k in self.SHARED_OPTIONS}
+            return {'action': action, 'values': shared} if shared else None
+        if action == 'choice' and values.get('name') in self.SHARED_CHOICES:
+            return {'action': action, 'values': values}
+        return None
+
+    def share(self, origin, command):
+        for worker in self.open_workers():
+            if worker is not origin and worker.state == 'ready':
+                try:
+                    worker.call('command', command, timeout=10)
+                except Exception:
+                    pass  # it takes the settings again when it starts
+
+    def settings_source(self, worker):
+        """The Switch whose settings the others follow: the first open one (the left tab)."""
+        first = self.open_workers()[:1]
+        return first[0] if first and first[0] is not worker else None
+
+    def copy_shared_files(self, worker):
+        # Before a Switch's process starts: the token files and the watch settings of the first Switch.
+        source = self.settings_source(worker)
+        if source is None:
+            return
+        for name in self.SHARED_FILES:
+            path = self.profiles / source.profile / name
+            if path.is_file():
+                (self.profiles / worker.profile).mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, self.profiles / worker.profile / name)
+
+    def take_shared_settings(self, worker):
+        """Once a Switch is ready: the settings kept in settings.ini, from the first Switch (or, when it is the first
+        one, to the Switches that were ready before it)."""
+        source = self.settings_source(worker)
+        if source is None:
+            for other in self.open_workers()[1:]:
+                if other.state == 'ready':
+                    self.copy_settings(worker, other)
+        elif source.state == 'ready':
+            self.copy_settings(source, worker)
+
+    def copy_settings(self, source, worker):
+        try:
+            theirs = source.call('sessions', timeout=10)[0]
+            mine = worker.call('sessions', timeout=10)[0]
+            options = {k: v for k, v in theirs['options'].items() if k in self.SHARED_OPTIONS}
+            worker.call('command', {'action': 'options', 'values': options}, timeout=10)
+            for name in self.SHARED_CHOICES:
+                if mine['choices'].get(name) != theirs['choices'].get(name):
+                    worker.call('command', {'action': 'choice', 'values': {'name': name, 'value': theirs['choices'][name]}}, timeout=10)
+            wanted = {name: key for key, name in theirs['keymap'].items()}
+            if {name: key for key, name in mine['keymap'].items()} != wanted:
+                mapping = {name: wanted.get(name, '') for name in set(wanted) | set(mine['keymap'].values())}
+                worker.call('command', {'action': 'keymap', 'values': {'mapping': mapping}}, timeout=10)
+            if mine['watch']['settings'] != theirs['watch']['settings']:
+                worker.call('command', {'action': 'watch', 'values': theirs['watch']['settings']}, timeout=10)
+        except Exception:
+            pass
+
     @property
     def id(self):  # the tray's channel addresses the first open Switch
         return next(e['id'] for e in self.registry.entries if e.get('open'))
@@ -478,7 +556,11 @@ class Hub(ApiServer):
         worker = self.worker(params.get('id'))
         if method == 'incidents':
             return self.merged_incidents(worker, params)
-        return worker.call(method, params, request_id=request_id)
+        result = worker.call(method, params, request_id=request_id)
+        shared = self.shared_command(params) if method == 'command' else None
+        if shared:
+            self.share(worker, shared)
+        return result
 
     def merged_incidents(self, worker, params):
         after = params.get('after', 0)
