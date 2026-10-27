@@ -50,7 +50,9 @@ def start_background_app():
 
 def build_server(endpoint_path=None, autostart=True):
     server = MCPServer(NAME, instructions=(
-        'Use list_sessions to identify the exact session before any operation. '
+        'Use list_sessions to identify the exact session before any operation. Each session is one Switch '
+        '(the tabs in the app); every Switch runs in its own process, so one that crashes does not stop the others, '
+        'and the app restarts it by itself. add_switch, close_switch, rename_switch and restart_switch manage them. '
         'Run timing-sensitive work as an existing Python script. '
         'After starting a script, inspect its status and logs; an accepted start is not completion. '
         'For manual play, use press_buttons (or run_sequence for timed series) and check the result with get_capture '
@@ -122,10 +124,47 @@ def build_server(endpoint_path=None, autostart=True):
 
     @server.tool(annotations=read_only)
     def list_sessions() -> list[dict]:
-        """List open controller sessions (one per app window) with IDs and status.
+        """List the Switches (one session each, shown as tabs in the app) with IDs, names and status.
+        switch_state is ready, starting, restarting (after a crash) or crashed (stopped after repeated crashes).
         Starts the app in the background when none is running."""
-        keys = ('id', 'profile', 'ready', 'running', 'paused', 'command', 'camera_live', 'serial_open', 'demo', 'exited')
+        keys = ('id', 'label', 'switch_state', 'profile', 'ready', 'running', 'paused', 'command', 'camera_live',
+                'serial_open', 'demo', 'exited')
         return [{k: s.get(k) for k in keys} for s in sessions()]
+
+    def hub_call(method, params, session_id=None):
+        # Every session of an app routes to the same hub, which manages the Switches.
+        found = sessions()
+        return call(session_id or found[0]['id'], method, params)
+
+    @server.tool(annotations=control)
+    def add_switch(label: str = '') -> dict:
+        """Add a Switch (a new tab with its own camera, COM port and scripts; notification settings are copied from
+        the first). Returns its session ID once listed; connect its camera and COM port in the app (機器接続)."""
+        added = hub_call('switch_add', {'label': label})
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            current = next((s for s in sessions() if s['id'] == added['id']), None)
+            if current and current.get('switch_state') == 'ready':
+                return {'session_id': added['id'], 'label': added['label'], 'ready': True}
+            time.sleep(1)
+        return {'session_id': added['id'], 'label': added['label'], 'ready': False}
+
+    @server.tool(annotations=control)
+    def close_switch(session_id: str) -> dict:
+        """Close a Switch's tab: its script is stopped and its process ends. Settings are kept; the user can reopen
+        it from ＋. The first Switch cannot be closed."""
+        return hub_call('switch_close', {'switch': session_id}, session_id)
+
+    @server.tool(annotations=control)
+    def rename_switch(session_id: str, label: str) -> dict:
+        """Rename a Switch (the tab name, also used in notifications)."""
+        return hub_call('switch_rename', {'switch': session_id, 'label': label}, session_id)
+
+    @server.tool(annotations=control)
+    def restart_switch(session_id: str) -> dict:
+        """Start a Switch's process again, e.g. when it stopped after repeated crashes (switch_state crashed) or
+        does not respond. Its script is not resumed; start it again with start_script."""
+        return hub_call('switch_restart', {'switch': session_id}, session_id)
 
     @server.tool(annotations=read_only)
     def list_scripts(session_id: str) -> dict:

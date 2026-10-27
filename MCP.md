@@ -1,10 +1,11 @@
 # MCP
 
-`PokeControllerMCP.exe` を MCP クライアントの stdio サーバーとして登録します（[README](README.md#mcp-の登録)）。本体が動いていなければ、最初の呼び出しで画面なしのまま起動します。複数の本体が動いているときは、すべて見つけて `list_sessions` に並べます。1つに限定したいときだけ `--endpoint <runtime\controller-PID.json>`、自動起動を止めたいときは `--no-autostart` を付けます。
+`PokeControllerMCP.exe` を MCP クライアントの stdio サーバーとして登録します（[README](README.md#mcp-の登録)）。本体が動いていなければ、最初の呼び出しで画面なしのまま起動します。セッションは Switch 1 台ずつ（操作画面のタブ）で、`list_sessions` に並びます。複数の本体が動いているときは、すべて見つけて並べます。1つに限定したいときだけ `--endpoint <runtime\controller-PID.json>`、自動起動を止めたいときは `--no-autostart` を付けます。
 
 | ツール | 機能 |
 |---|---|
-| `list_sessions` | 起動中の本体と状態（必要なら本体を起動） |
+| `list_sessions` | Switch（タブ）ごとの ID・名前・状態（`switch_state`: ready / starting / restarting / crashed）。必要なら本体を起動 |
+| `add_switch` / `close_switch` / `rename_switch` / `restart_switch` | Switch を増やす／閉じる（設定は残る。最初の台は閉じられない）／名前を変える／プロセスを起動し直す |
 | `list_scripts` | Python / MCU スクリプトの名前 |
 | `start_script` / `stop_script` / `pause_script` / `resume_script` | スクリプトの開始・停止・一時停止・再開 |
 | `get_logs` | 上下のログと状態 |
@@ -23,7 +24,7 @@
 | `draft_script_from_recording` | 録画中の操作から、ループするスクリプトの下書きを作る（保存はしない） |
 | `list_script_files` / `read_script` / `write_script` | `Commands/PythonCommands` のスクリプトを一覧・読む・保存して再読み込み（上書き前に `Backups/scripts` へ控え） |
 | `save_template` | 今の映像の一部を `Template` に PNG で保存 |
-| `get_incidents` / `wait_for_incident` / `set_watch` | 見張りの記録（エラー、映像の停止、機器の切断、終了）を読む／次の記録を待つ（最大900秒）／見張りの設定 |
+| `get_incidents` / `wait_for_incident` / `set_watch` | 見張りの記録（エラー、映像の停止、機器の切断、終了、Switch のプロセスの停止）を読む／次の記録を待つ（最大900秒）／見張りの設定。記録の `clip` は直前 30 秒の映像で、`get_recording_overview` で見られる |
 
 `press_buttons` の名前: `A` `B` `X` `Y` `L` `R` `ZL` `ZR` `PLUS` `MINUS` `HOME` `CAPTURE` `LCLICK` `RCLICK`、十字キー `UP` `DOWN` `LEFT` `RIGHT`、スティック `LS_UP`・`RS_LEFT` など。スクリプト実行中と COM 未接続のときは手動入力を受け付けません。
 

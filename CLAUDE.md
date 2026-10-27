@@ -2,7 +2,7 @@
 
 Poke-Controller は画面を持たず、ブラウザの操作画面と MCP で使う。
 
-1. MCP の `list_sessions` を呼ぶ（本体が動いていなければ自動で起動する）。MCP がないときは `PokeController.exe --background`（ソースなら `python app.py --background`）で起動し、`runtime/controller-*.json`（インストール版は `%LOCALAPPDATA%\PokeController\runtime`）の `web_url` を読む。
+1. MCP の `list_sessions` を呼ぶ（本体が動いていなければ自動で起動する）。セッションは Switch 1 台ずつ（画面のタブ）。利用者が「2号機で」などと言ったら `label` で選ぶ。MCP がないときは `PokeController.exe --background`（ソースなら `python app.py --background`）で起動し、`runtime/controller-*.json`（インストール版は `%LOCALAPPDATA%\PokeController\runtime`）の `web_url` を読む。
 2. `get_web_url` の URL を `mcp__Claude_Browser__preview_start` に `url` として渡して開く。
 3. 操作は要素を aria-label（「A」「十字キー上」「左スティック」など）で `find` してから押す。座標で押すとスクロールでずれる。スティックは JavaScript で要素の中心を求めてからドラッグするか、MCP の `tilt_stick` を使う。
 4. 押した結果は映像で確かめる。カメラや COM は「接続」タブ、通知や更新は「設定」タブ。スクリプトがダイアログを出したら画面に表示されるので、入力して OK を押す。
@@ -26,6 +26,8 @@ Poke-Controller は画面を持たず、ブラウザの操作画面と MCP で�
 - `wait_for_incident` で待ち（`last_id` を次の `after` に渡す）、知らせが来たら `get_capture` で画面を確かめる。
 - エラーの画面なら閉じる、ソフトが止まっていれば HOME からソフトを終了して起動し直す、など、ゲームを元の状態に戻してから `start_script` で再開する。戻せないときは止めたまま、何が起きたかを `add_note` に残す。Discord などへの通知は本体が送る。
 - 映像が止まっても、本当に止まっているとは限らない（長い演出など）。画面を見て判断する。
+- 記録の `clip` は直前 30 秒の録画。`get_recording_overview` で何が起きたかを見てから直す。
+- `kind` が `crash` の記録は、その Switch のプロセスが落ちたもの。本体が自動で起動し直す（`switch_state` が ready に戻るのを待つ）。何度も落ちて `crashed` になったら、原因（記録の `detail`）を利用者に伝え、頼まれたら `restart_switch` で起動し直す。
 
 注意:
 

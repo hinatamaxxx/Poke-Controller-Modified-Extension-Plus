@@ -258,7 +258,7 @@ class Dialogs:
 class Core:
     """Everything the Tk window used to own, driven by the browser UI and MCP."""
 
-    def __init__(self, profile, profile_dir, demo=False, console_mirror=None):
+    def __init__(self, profile, profile_dir, demo=False, console_mirror=None, label=''):
         import os
         import Settings
         import PokeConDialogue
@@ -273,6 +273,7 @@ class Core:
         self._logger = logging.getLogger(__name__)
         self.lock = threading.RLock()
         self.profile, self.demo = profile, demo
+        self.label = label or profile  # the Switch's name, shown in notifications
         self.exit_requested = False
         Settings.GuiSettings.SETTING_PATH = os.path.join(profile_dir, 'settings.ini')
         Line_Notify.LINE_TOKEN_PATH = os.path.join(profile_dir, 'line_token.ini')
@@ -482,7 +483,7 @@ class Core:
 
     def notify_test(self, channel):
         from product import NAME
-        message = f'{NAME} (profile:{self.profile}) のテスト通知です。'
+        message = f'{NAME} ({self.label}) のテスト通知です。'
         if channel == 'win':
             from plyer import notification
             notification.notify(title='Poke-Controller', message=message, timeout=5)
@@ -786,7 +787,7 @@ class Core:
     def snapshot(self):
         from Commands.CommandBase import Command
         keys = self.keys_software_controller
-        return {'profile': self.profile, 'running': self.running, 'paused': bool(Command.isPause),
+        return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},

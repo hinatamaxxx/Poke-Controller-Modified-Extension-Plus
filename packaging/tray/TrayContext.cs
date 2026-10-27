@@ -168,11 +168,23 @@ namespace PokeControllerTray
                 if (generation != pollGeneration) return;
                 polling = false;
                 var list = result as object[];
-                if (ok && list != null && list.Length > 0) session = list[0] as Dictionary<string, object>;
+                if (ok && list != null && list.Length > 0)
+                {
+                    // Switch ごとに 1 つ。実行中の台があればそれを表示する（更新の情報はどれにも入っている）
+                    session = list[0] as Dictionary<string, object>;
+                    foreach (var item in list)
+                    {
+                        var d = item as Dictionary<string, object>;
+                        if (Flag(d, "running")) { session = d; break; }
+                    }
+                    switchCount = list.Length;
+                }
                 UpdateVisuals();
                 CheckUpdateFinished();
             });
         }
+
+        int switchCount = 1;
 
         void Command(string action, string key, object value)
         {
@@ -231,7 +243,8 @@ namespace PokeControllerTray
                 case ServerState.Quitting: return "終了しています…";
             }
             if (Flag(session, "running"))
-                return (Flag(session, "paused") ? "一時停止中: " : "実行中: ") + Str(session, "command");
+                return (Flag(session, "paused") ? "一時停止中: " : "実行中: ") +
+                    (switchCount > 1 ? Str(session, "label") + " " : "") + Str(session, "command");
             return "待機中";
         }
 
