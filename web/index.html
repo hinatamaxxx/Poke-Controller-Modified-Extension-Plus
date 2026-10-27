@@ -72,6 +72,14 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 @keyframes sw-close { to { max-width: 0; min-width: 0; opacity: 0; padding-left: 0; padding-right: 0; } }
 @media (prefers-reduced-motion: reduce) { .sw.opening, .sw.closing { animation-duration: 1ms; } }
 .sw[aria-selected=true] { color: var(--text); background: var(--bg); font-weight: 600; z-index: 1; }
+/* Each Switch's camera and controller (COM), coloured by state: green connected, red set but not connected. */
+.ico { flex: none; width: 15px; height: 15px; background: var(--muted); opacity: .7; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+.ico.ok { background: var(--ok); opacity: 1; }
+.ico.bad { background: var(--danger); opacity: 1; }
+.ico.cam { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 6h12a2 2 0 0 1 2 2v1.6l4.2-2.6c.4-.2.8 0 .8.4v9.2c0 .4-.4.6-.8.4L17 14.4V16a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/></svg>"); }
+.ico.pad, #gamepad-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M7 6h10a5 5 0 0 1 4.9 6l-.9 4.6a2.5 2.5 0 0 1-4.3 1.1L14.4 15H9.6l-2.3 2.7A2.5 2.5 0 0 1 3 16.6L2.1 12A5 5 0 0 1 7 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9zM16.2 9.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM18.4 11.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z'/></svg>"); }
+header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 0; font-size: 0; background: var(--ok); flex: none;
+                        -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 .sw .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .sw .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
 .sw .dot.run { background: var(--ok); }
@@ -175,14 +183,6 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .area-logs { display: none; }
   header h1, header #run-state.idle { display: none; }
   body .tabs button { padding: 2px 5px; font-size: 12px; }
-  /* Camera and COM become coloured dots (name in the tooltip) so the run state and its buttons keep the room. */
-  header #camera-state, header #serial-state, header #gamepad-state { width: 18px; height: 18px; padding: 0; border-radius: 0; font-size: 0; border: 0;
-    background: var(--muted); flex: none; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
-  header #camera-state.ok, header #serial-state.ok, header #gamepad-state.ok { background: var(--ok); }
-  header #camera-state.bad, header #serial-state.bad { background: var(--danger); }
-  #camera-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 6h12a2 2 0 0 1 2 2v1.6l4.2-2.6c.4-.2.8 0 .8.4v9.2c0 .4-.4.6-.8.4L17 14.4V16a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/></svg>"); }
-  #serial-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8 2h2v5h4V2h2v5h2v5a6 6 0 0 1-5 5.9V22h-2v-4.1A6 6 0 0 1 6 12V7h2z'/></svg>"); }
-  #gamepad-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M7 6h10a5 5 0 0 1 4.9 6l-.9 4.6a2.5 2.5 0 0 1-4.3 1.1L14.4 15H9.6l-2.3 2.7A2.5 2.5 0 0 1 3 16.6L2.1 12A5 5 0 0 1 7 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9zM16.2 9.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM18.4 11.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z'/></svg>"); }
   body { font-size: 13px; }
   /* Controller in a tab (portrait, or unless "beside the video" is chosen). body.pad-tab is set by placePad(). */
   body.pad-tab main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "video" "tabs"; }
@@ -199,9 +199,9 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   :root { --head: 30px; }
   header { gap: 5px; }
   .caption button { width: 40px; }
-  header .badge:not(#camera-state):not(#serial-state):not(#gamepad-state) { width: 12px; height: 12px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
-  header .badge.ok:not(#camera-state):not(#serial-state):not(#gamepad-state) { background: var(--ok); }
-  header .badge.bad:not(#camera-state):not(#serial-state):not(#gamepad-state) { background: var(--danger); }
+  header .badge:not(#gamepad-state) { width: 12px; height: 12px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
+  header .badge.ok:not(#gamepad-state) { background: var(--ok); }
+  header .badge.bad:not(#gamepad-state) { background: var(--danger); }
   header #profile { display: none; }
   main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video pad" "bar bar"; padding: var(--gap) 8px 4px; }
   body.pad-tab main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video" "bar"; }
@@ -421,10 +421,8 @@ table.notify input { margin: 1px 0; }
   <nav class="switches" id="switches" role="tablist" aria-label="Switch"></nav>
   <button class="sw-add" id="sw-add" aria-label="Switch を開く" title="Switch を開く（右クリックで選ぶ）">＋</button>
   <span class="badge" id="profile" hidden>デモ</span>
-  <span class="badge" id="camera-state">カメラ: -</span>
-  <span class="badge" id="serial-state">COM: -</span>
   <span class="badge" id="run-state">停止中</span>
-  <span class="badge ok" id="gamepad-state" hidden>🎮</span>
+  <span class="badge ok" id="gamepad-state" hidden>PC のコントローラー</span>
   <button class="head-mark rec" id="rec-mark" aria-label="録画を停止" title="録画を停止" hidden></button>
   <button class="head-mark" id="incident-mark" aria-label="見張りの記録を見る" hidden>⚠</button>
   <span class="assist" id="assist" hidden><span class="mark" aria-hidden="true">✦</span><span class="task" id="assist-task"></span><span class="doing" id="assist-doing"></span></span>
@@ -1114,9 +1112,6 @@ function manualAllowed() { return !!state && !state.running && state.serial_open
 
 function render() {
   $('profile').hidden = !state.demo;
-  setBadge('camera-state', state.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし', state.camera_live);
-  const port = state.serial && state.serial.port ? ` ${state.serial.port}` : '';
-  setBadge('serial-state', state.serial_open ? `COM:${port} 接続中` : 'COM: 未接続', state.serial_open);
   const running = state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中';
   setBadge('run-state', running, state.running ? true : undefined);
   $('run-state').classList.toggle('idle', !state.running);
@@ -1193,7 +1188,7 @@ let switchesKey = '', renaming = null, shownSwitches = null;
 const closingSwitches = new Set();
 function renderSwitches() {
   const open = switches.filter(item => item.open && !closingSwitches.has(item.id));
-  const key = JSON.stringify([open.map(i => [i.id, i.label, switchDot(i), switchTitle(i)]), session, renaming]);
+  const key = JSON.stringify([open.map(i => [i.id, i.label, switchDot(i), switchTitle(i), i.camera_live, i.camera_path, i.serial_open, i.port]), session, renaming]);
   if (key === switchesKey) return;
   switchesKey = key;
   const before = shownSwitches;
@@ -1223,6 +1218,12 @@ function renderSwitches() {
       setTimeout(() => { input.focus(); input.select(); });
     } else {
       tab.append(Object.assign(document.createElement('span'), {className: 'label', textContent: item.label}));
+    }
+    if (item.state === 'ready') {
+      const icon = (kind, live, set, title) => Object.assign(document.createElement('span'),
+        {className: `ico ${kind} ${live ? 'ok' : set ? 'bad' : ''}`, title});
+      tab.append(icon('cam', item.camera_live, item.camera_path, item.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし'),
+                 icon('pad', item.serial_open, item.port, item.serial_open ? `コントローラー: ${item.port ? item.port + " " : ""}接続中` : 'コントローラー: 未接続'));
     }
     if (open.length > 1) {
       const close = Object.assign(document.createElement('button'), {className: 'x', type: 'button', textContent: '×'});
