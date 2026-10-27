@@ -179,6 +179,13 @@ dl.about.libs { grid-template-columns: repeat(3, max-content minmax(0, 1fr)); fo
 /* A Switch whose process is starting or stopped: the video says why, the controls wait. */
 .down { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; justify-items: center; color: #ddd; text-align: center; padding: 16px; }
 .down[hidden] { display: none; }
+#offline { background: #000; z-index: 2; font-size: 15px; }
+#offline .pulse { display: inline-block; width: 10px; height: 10px; margin-right: 10px; border-radius: 50%; background: #e8b84a; vertical-align: 1px;
+                  animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.offline .sw .dot { animation: none; background: var(--line); }
+.offline .sw .ico { background: var(--muted); opacity: .7; }
+.offline .area-pad, .offline .area-tabs .tabpanel, .offline .area-logs { opacity: .45; pointer-events: none; }
 .down .why { font-size: 12px; color: #aaa; max-width: 40em; white-space: pre-wrap; }
 body.switch-down .area-pad, body.switch-down .area-tabs .tabpanel, body.switch-down .area-logs { opacity: .45; pointer-events: none; }
 .badge { padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
@@ -485,6 +492,7 @@ table.notify input { margin: 1px 0; }
       <img id="video-still" alt="" hidden>
       <img id="video" alt="" class="waiting">
       <div class="empty" id="video-empty" hidden>映像がありません</div>
+      <div class="down" id="offline" hidden><div><span class="pulse"></span>アプリに接続できません</div></div>
       <div class="down" id="down" hidden><div id="down-text"></div><div class="why" id="down-why"></div><button class="cmd" id="down-restart" hidden>再起動</button></div>
       <div class="pick-info" id="pick-info" aria-live="polite"></div>
     </div>
@@ -683,6 +691,7 @@ table.notify input { margin: 1px 0; }
     <button type="button" data-page="set-notify" aria-current="page">通知</button>
     <button type="button" data-page="set-watch">見張り</button>
     <button type="button" data-page="set-keys">キー設定</button>
+    <button type="button" data-page="set-log">ログ</button>
     <hr>
     <button type="button" data-page="set-link">連携</button>
     <hr>
@@ -753,6 +762,12 @@ table.notify input { margin: 1px 0; }
           </div>
         </div>
     </section>
+    <section class="settings-page" id="set-log" hidden>
+      <h2>ログ</h2>
+      <div class="row"><button type="button" class="cmd" id="clear-logs">画面のログを消去</button></div>
+      <h3>保存されたログ</h3>
+      <div class="folder-list" id="log-folder" role="list"></div>
+    </section>
     <section class="settings-page" id="set-keys" hidden>
       <h2>キー設定</h2>
       <p class="meta">ボタンを選んでから、割り当てるキーを押します（Esc で取り消し）。</p>
@@ -793,10 +808,6 @@ table.notify input { margin: 1px 0; }
 </div>
 <div class="sw-menu" id="sw-menu" role="menu" hidden></div>
 <div class="sw-menu" id="app-menu" role="menu" aria-label="メニュー" hidden>
-  <button type="button" role="menuitem" data-menu="captures">保存先を開く</button>
-  <hr>
-  <button type="button" role="menuitem" data-menu="clear">ログを消去</button>
-  <hr>
   <button type="button" role="menuitem" data-menu="settings">設定<kbd>Ctrl+,</kbd></button>
   <button type="button" role="menuitem" data-menu="help">ヘルプ</button>
   <hr>
@@ -1202,11 +1213,12 @@ async function refresh() {
     const down = result.result.ready === false;
     document.body.classList.toggle('switch-down', down);
     $('down').hidden = !down;
-    if (down) { renderDown(result.result); return; }
+    if (down) { setOffline(false); renderDown(result.result); return; }
     state = result.result;
     render();
+    setOffline(false);
   } catch (error) {
-    setBadge('run-state', 'アプリに接続できません', false);
+    setOffline(true);
     document.documentElement.classList.add('loaded');
   }
 }
@@ -1343,6 +1355,11 @@ function closeSwitch(item) {
   tab.classList.add('closing');
   tab.addEventListener('animationend', finish, {once: true});
   setTimeout(finish, 400);
+}
+// When the page cannot reach the app, the video area says so with a blinking dot; the tab dots stop.
+function setOffline(offline) {
+  document.body.classList.toggle('offline', offline);
+  $('offline').hidden = !offline;
 }
 function renderDown(item) {
   $('down-text').textContent = `${item.label}: ${(switches.find(s => s.id === item.id) || {}).state_text || ''}`;
@@ -1514,8 +1531,6 @@ function flashDone(button) {
 $('act-capture').addEventListener('click', () => command('capture').then(() => flashDone($('act-capture'))).catch(() => {}).finally(refresh));
 $('act-discord').addEventListener('click', () => command('discord_image').then(() => flashDone($('act-discord'))).catch(() => {}).finally(refresh));
 const menuActions = {
-  captures: () => openFolder('captures'),
-  clear: () => Promise.all([1, 2].map(log => command('clear_log', {log}))).then(() => { localLog.length = 0; }),
   settings: () => openSettings(),
   help: () => openSettings('set-about'),
   question: () => call('about').then(result => {
@@ -2166,7 +2181,7 @@ function renderFolderList(folders) {
   const key = JSON.stringify(folders);
   if (key === folderListKey) return;
   folderListKey = key;
-  $('folder-list').replaceChildren(...FOLDER_NAMES.filter(([id]) => folders[id]).map(([id, name]) => {
+  const rows = FOLDER_NAMES.filter(([id]) => folders[id]).map(([id, name]) => {
     const row = Object.assign(document.createElement('button'), {type: 'button', title: folders[id]});
     row.setAttribute('role', 'listitem');
     // The path as in Explorer's address bar (C: › Users › …); it reads right to left so a long one keeps its end in
@@ -2175,8 +2190,16 @@ function renderFolderList(folders) {
                Object.assign(document.createElement('span'), {className: 'path', textContent: '\u200e' + folders[id].split(/[\\/]+/).filter(Boolean).join(' › ') + '\u200e'}));
     row.addEventListener('click', () => openFolder(id).catch(() => {}));
     return row;
-  }));
+  });
+  $('folder-list').replaceChildren(...rows);
+  // The log page lists the log folder the same way.
+  const logs = rows.find((row, index) => FOLDER_NAMES.filter(([id]) => folders[id])[index][0] === 'logs');
+  $('log-folder').replaceChildren(...(logs ? [logs.cloneNode(true)] : []));
+  $('log-folder').querySelector('button')?.addEventListener('click', () => openFolder('logs').catch(() => {}));
 }
+$('clear-logs').addEventListener('click', () => Promise.all([1, 2].map(log => command('clear_log', {log})))
+  .then(() => { localLog.length = 0; $('clear-logs').textContent = '消去しました'; setTimeout(() => { $('clear-logs').textContent = '画面のログを消去'; }, 1200); })
+  .catch(() => {}).finally(refresh));
 document.querySelectorAll('.link-go').forEach(button => button.addEventListener('click', () => showSettingsPage('set-link')));
 // In the app window, the window lets Explorer come to the front (the app's process opens the folder).
 function openFolder(folder) {
