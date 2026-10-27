@@ -50,7 +50,8 @@ class RegistryTest(unittest.TestCase):
 class SharedSettingsTest(unittest.TestCase):
     def test_only_the_shared_part_of_a_command_goes_to_every_switch(self):
         share = lambda action, values: hub.Hub.shared_command(hub.Hub, {'action': action, 'values': values})
-        self.assertEqual(share('options', {'keyboard': True, 'discord_end': True}), {'action': 'options', 'values': {'discord_end': True}})
+        self.assertEqual(share('options', {'show_value': True, 'discord_end': True}), {'action': 'options', 'values': {'discord_end': True}})
+        self.assertEqual(share('options', {'keyboard': True})['values'], {'keyboard': True})
         self.assertIsNone(share('options', {'show_realtime': False}))
         self.assertIsNotNone(share('choice', {'name': 'stdout_destination', 'value': '2'}))
         self.assertIsNone(share('choice', {'name': 'fps', 'value': '30'}))
