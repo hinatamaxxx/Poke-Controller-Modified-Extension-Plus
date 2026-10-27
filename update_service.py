@@ -102,12 +102,18 @@ def apply_release(release, progress=print):
     if f"VERSION = '{tag.lstrip('v')}'" not in inner:
         raise RuntimeError('リリースの版と中身の版が一致しません。更新を中止しました。')
     progress('更新を適用しています…')
+    # stdin is not inherited: under the tray it is the request pipe, and a child must never read from it.
     result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                              str(source / 'install.ps1'), '-Update', '-Source', str(source)],
-                            capture_output=True, text=True, encoding='utf-8', errors='replace',
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8', errors='replace',
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), timeout=1800)
     if result.returncode:
-        raise RuntimeError('更新に失敗しました。今の版のまま使えます。\n' + (result.stdout + result.stderr)[-1500:])
+        # install.ps1 exits with 1 when the program folder was not changed, and 2 when files may be partly replaced.
+        if result.returncode == 1:
+            summary = '更新に失敗しました。今の版のまま使えます。'
+        else:
+            summary = '更新の途中で失敗しました。アプリのファイルが一部だけ置き換わっている可能性があります。最新版を入れ直してください。'
+        raise RuntimeError(summary + '\n' + (result.stdout + result.stderr)[-1500:])
     shutil.rmtree(folder, ignore_errors=True)
     return f'{tag} に更新しました。次にアプリを起動したときから新しい版になります。'
 
@@ -129,6 +135,8 @@ def run_check(prereleases, progress=print):
     """One update attempt; records the outcome and returns (message, should_notify)."""
     state = read_state()
     state['last_check'] = time.time()
+    state.pop('result', None)
+    state.pop('message', None)
     try:
         release = find_release(prereleases)
         message = apply_release(release, progress) if release else '最新の版です。'
@@ -147,6 +155,25 @@ def run_check(prereleases, progress=print):
         state['notified'] = state.get('notified') or notify
         write_state(state)
         return str(exc), notify
+
+
+def check_portable(prereleases):
+    """A source checkout is never updated in place; it only reports, and records the check so the tray stops waiting."""
+    state = read_state()
+    state['last_check'] = time.time()
+    state['result'] = 'portable'
+    try:
+        release = find_release(prereleases)
+        message = f"新しい版があります：{release['tag_name']}" if release else '最新の版です。'
+        state.update(last_error='', message=message)
+    except Exception as exc:
+        message = str(exc)
+        state.update(last_error=message, message='')
+    try:
+        write_state(state)
+    except Exception:
+        pass
+    return message
 
 
 CHECK_INTERVAL = 24 * 3600
@@ -168,8 +195,7 @@ def check_now(preferences, manual=False):
         return '確認中です。'
     try:
         if app_paths.PORTABLE:
-            release = find_release(preferences.values['prereleases'])
-            return f"新しい版があります：{release['tag_name']}" if release else '最新の版です。'
+            return check_portable(preferences.values['prereleases'])
         message, should_notify = run_check(preferences.values['prereleases'])
         print('アプリの更新: ' + message)
         if should_notify and not manual:

@@ -1,5 +1,6 @@
 """Token-authenticated localhost API and browser UI for the window-less app core."""
 import base64
+import contextlib
 import hmac
 import json
 import os
@@ -282,11 +283,16 @@ class LocalControl:
                     if original != signature:
                         raise ValueError('Request ID reused with different parameters')
                     return result, 200
-                if len(self.cache) >= 4096:
-                    raise ValueError('Too many requests; retry later')
+                while len(self.cache) >= 4096:
+                    # The browser sends many short-lived commands (sticks at 20/s); drop the oldest, never refuse.
+                    self.cache.pop(next(iter(self.cache)))
             try:
-                with self.core.lock:
-                    result = {'ok': True, 'result': self.execute(payload['method'], payload.get('params', {}))}
+                params = payload.get('params', {})
+                unlocked = payload.get('method') in self.UNLOCKED or (
+                    payload.get('method') == 'command' and isinstance(params, dict) and params.get('action') in self.UNLOCKED_ACTIONS)
+                # Slow work that does not touch the controller runs outside core.lock, so button releases are not delayed.
+                with contextlib.nullcontext() if unlocked else self.core.lock:
+                    result = {'ok': True, 'result': self.execute(payload['method'], params)}
             except Exception as exc:
                 result = {'ok': False, 'error': str(exc)}
             if payload.get('method') == 'command':
@@ -389,16 +395,40 @@ class LocalControl:
             self.held_at.pop(repr(b), None)
         keys.holdEnd(held)
 
+    UNLOCKED = {'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
+                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices'}
+    UNLOCKED_ACTIONS = {'notify_test', 'record_stop'}
+
     def neutral(self):
         self.held_at.clear()
+        if self.core.running:  # the script owns the controller
+            return
         keys = self.core.keys_software_controller
         keys.neutral()
         if not self.core.running and self.core.serial_open():
             for which in ('L', 'R'):
                 self.stick({'stick': which, 'x': 128, 'y': 128})
 
+    ACTIVITY = {'start': lambda v: f"スクリプトを開始: {v.get('name')}", 'stop': lambda v: 'スクリプトを停止',
+                'suspend': lambda v: '一時停止', 'resume': lambda v: '再開',
+                'press': lambda v: f"ボタン: {'+'.join(v.get('buttons') or [])} ({v.get('duration', .1)}秒)",
+                'stick': lambda v: f"スティック{v.get('stick')}: {v.get('x')},{v.get('y')}",
+                'sequence': lambda v: f"連続操作: {len(v.get('steps') or [])}手順", 'sequence_cancel': lambda v: '連続操作を中止',
+                'answer': lambda v: 'ダイアログに回答' if v.get('values') is not None else 'ダイアログを閉じる',
+                'camera': lambda v: 'カメラを変更', 'connect': lambda v: f"{v.get('port')} に接続", 'disconnect': lambda v: '切断',
+                'note': lambda v: 'メモを追加', 'record_start': lambda v: '録画を開始', 'record_stop': lambda v: '録画を停止',
+                'write_script': lambda v: f"スクリプトを保存: {v.get('path')}",
+                'save_template': lambda v: f"テンプレート画像を保存: {v.get('name')}", 'watch': lambda v: '見張りの設定を変更'}
+
     def execute(self, method, params):
         core = self.core
+        via_mcp = params.get('via') == 'mcp'
+        if via_mcp and method == 'command' and params.get('action') in self.ACTIVITY:
+            values = params.get('values') if isinstance(params.get('values'), dict) else {}
+            try:
+                core.assist.record('claude', self.ACTIVITY[params['action']](values))
+            except Exception:
+                pass
         if method == 'sessions':
             return [self.snapshot()]
         if params.get('id') != self.id:
@@ -412,6 +442,36 @@ class LocalControl:
             return {'url': self.web_url}
         if method == 'devices':
             return {'cameras': core.cameras(), 'ports': core.ports()}
+        if method == 'templates':
+            return {'templates': core.assist.templates()}
+        if method == 'find_template':
+            result = core.assist.find_template(params.get('name'), params.get('threshold', .85))
+            if via_mcp:
+                core.assist.record('claude', f"画像を照合: {params.get('name')} → {result['similarity']}")
+            return result
+        if method == 'recordings':
+            return {'recordings': core.recorder.list(), 'current': core.recorder.state()}
+        if method == 'recording_overview':
+            image, text = core.recorder.overview(params.get('recording'), params.get('start', 0), params.get('end'),
+                                                 params.get('count', 12))
+            return {'data': base64.b64encode(image).decode(), 'mimeType': 'image/jpeg', 'timeline': text}
+        if method == 'recording_frame':
+            image, at = core.recorder.frame(params.get('recording'), params.get('at', 0))
+            return {'data': base64.b64encode(image).decode(), 'mimeType': 'image/jpeg', 'at': at}
+        if method == 'recording_inputs':
+            return {'inputs': core.recorder.inputs(params.get('recording'), params.get('start', 0), params.get('end'))}
+        if method == 'recording_draft':
+            return {'content': core.recorder.draft_script(params.get('recording'), params.get('name') or 'Draft',
+                                                          bool(params.get('loop', True)), params.get('start', 0),
+                                                          params.get('end'), float(params.get('max_wait', 3)))}
+        if method == 'script_files':
+            import script_files
+            return {'files': script_files.list_files()}
+        if method == 'read_script':
+            import script_files
+            return {'path': params.get('path'), 'content': script_files.read(params.get('path'))}
+        if method == 'incidents':
+            return {'incidents': core.watch.since(params.get('after', 0)), 'watch': core.watch.snapshot()}
         if method != 'command':
             raise ValueError('Unknown method')
         action = params.get('action')
@@ -484,6 +544,36 @@ class LocalControl:
             core.notify_test(values.get('channel'))
         elif action == 'camera_reconnect':
             core.reconnect_camera_now()
+        elif action == 'status':
+            core.assist.set_status(values.get('doing', values.get('text', '')), values.get('task', ''), values.get('progress', ''))
+        elif action == 'note':
+            return core.assist.add_note(values.get('text'), 'claude' if via_mcp else 'user')
+        elif action == 'note_delete':
+            core.assist.delete_note(values.get('id'))
+        elif action == 'sequence':
+            sequence_id = core.assist.run_sequence(values.get('steps'), self.check_manual_input, self.hold,
+                                                   lambda inputs: self.release(inputs), self.neutral)
+            return {'accepted': True, 'sequence': sequence_id}
+        elif action == 'sequence_cancel':
+            core.assist.cancel_sequence()
+        elif action == 'record_start':
+            return {'accepted': True, **core.recorder.start(values.get('seconds', 60), values.get('fps', 5), values.get('label', ''))}
+        elif action == 'record_stop':
+            return {'accepted': True, **core.recorder.stop()}
+        elif action == 'write_script':
+            return {'accepted': True, **core.write_script(values.get('path'), values.get('content', ''), bool(values.get('overwrite')))}
+        elif action == 'save_template':
+            import script_files
+            frame = core.camera.image_bgr if core.camera_live() else None
+            if frame is None:
+                raise ValueError('No live camera frame')
+            name = script_files.save_template(frame, values.get('name'), values.get('x'), values.get('y'),
+                                              values.get('width'), values.get('height'), bool(values.get('overwrite')))
+            x, y = int(values['x']), int(values['y'])
+            core.overlay.ImgRect(x, y, x + int(values['width']), y + int(values['height']), outline='green', tag='assist-template', ms=2500)
+            return {'accepted': True, 'name': name}
+        elif action == 'watch':
+            core.watch.configure(values)
         elif action == 'quit':
             core.exit_requested = True
         else:

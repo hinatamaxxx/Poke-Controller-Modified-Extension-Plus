@@ -30,7 +30,7 @@ async def protocol(command, args, endpoint):
     from mcp.client.stdio import StdioServerParameters
     async with Client(StdioServerParameters(command=command, args=args)) as client:
         tools = await client.list_tools()
-        assert len(tools.tools) == 11
+        assert len(tools.tools) == 36
         session = call(endpoint, 'sessions')[0]
         sid = session['id']
         demo_name = next(name for name in session['catalog']['python'] if name.startswith('PortableDemo /'))
@@ -152,7 +152,7 @@ def main():
                 subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], capture_output=True)
                 raise
         asyncio.run(autostart(mcp_command, mcp_args))
-        print('PASS: window-less startup, authentication, browser UI, 11 MCP tools, capture, button input, '
+        print('PASS: window-less startup, authentication, browser UI, 36 MCP tools, capture, button input, '
               'start/pause/resume/stop, logs, error handling, background autostart', flush=True)
 
 

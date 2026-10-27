@@ -15,6 +15,7 @@
 !UpdatePokeConModified-Extension.bat
 .idea/
 SerialController/Captures/
+SerialController/Backups/
 SerialController/Template/*
 !SerialController/Template/Samples/
 SerialController/profiles/
@@ -61,6 +62,7 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
+!packaging/app.manifest
 *.spec
 
 # Installer logs

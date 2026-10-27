@@ -11,6 +11,12 @@ import Paths
 from PIL import Image
 from logging import getLogger, DEBUG, NullHandler
 
+# ロガーの設定は 1 回だけ行う(作るたびに addHandler すると、ハンドラが増え続ける。フォーク元 0.2.0 の修正)
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 
 def convert_bgr_to_bytes(image_bgr):
     """
@@ -28,10 +34,7 @@ class Line_Notify:
     LINE_TOKEN_PATH = os.path.join(Paths.PROFILES, "default", "line_token.ini")
 
     def __init__(self, token_name="token"):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.res = None
         self.token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True, interpolation=None)
@@ -82,6 +85,9 @@ class Line_Notify:
             elif stat == 200:
                 self._logger.info("Valid token")
                 return "LINE-Token Check OK!"
+        # 401 / 200 以外だけのときに None を返して str() がエラーになっていた(フォーク元 0.2.0 の修正)
+        self._logger.warning(f"Token check was not confirmed: {self.status}")
+        return "LINE Token Check: not confirmed."
 
     def send_message(self, notification_message, image=None, token="token"):
         """
@@ -136,10 +142,12 @@ class Line_Notify:
 
                 self._logger.info(f"LINE API - Limit: {self.res[i].headers['X-RateLimit-Limit']}")
                 self._logger.info(f"LINE API - Remaining: {self.res[i].headers['X-RateLimit-Remaining']}")
-                self._logger.info(f"LINE API - ImageLimit: {self.res[i].headers['X-RateLimit-Limit']}")
+                self._logger.info(f"LINE API - ImageLimit: {self.res[i].headers['X-RateLimit-ImageLimit']}")
                 self._logger.info(f"LINE API - ImageRemaining: {self.res[i].headers['X-RateLimit-ImageRemaining']}")
                 self._logger.info(f"Reset time: {dt}")
-        except AttributeError as e:
+        # send_message の後は self.res が 1 つの応答になり、確認の応答が無いときは空のリストなので、
+        # TypeError / IndexError でも止めない(フォーク元 0.2.0 の修正)
+        except (AttributeError, TypeError, IndexError) as e:
             self._logger.error(e)
             pass
         except KeyError as e:

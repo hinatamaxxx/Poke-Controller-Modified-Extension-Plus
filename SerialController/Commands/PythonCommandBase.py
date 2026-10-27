@@ -15,6 +15,13 @@ import os.path
 import datetime
 import string
 
+# ロガーの設定は 1 回だけ行う(フォーク元 0.2.0 の修正)
+# インスタンスを作るたび(コマンドを開始するたび)に addHandler すると、ハンドラが増え続けてメモリを使う
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 try:
     from plyer import notification
 
@@ -48,10 +55,7 @@ class StopThread(Exception):
 class PythonCommand(CommandBase.Command):
     def __init__(self):
         super(PythonCommand, self).__init__()
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.keys = None
         self.thread = None
@@ -156,6 +160,7 @@ class PythonCommand(CommandBase.Command):
             if self.isDiscordNotEnd:
                 self.discord_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} finished.")
         except Exception as e:
+            self.last_error = e  # read by the app's watcher
             self.print_t(f"スクリプトがエラーで停止しました: {type(e).__name__}: {e}")
             print(e)
             self._logger.warning("Command stopped unexpectedly")
@@ -179,6 +184,7 @@ class PythonCommand(CommandBase.Command):
         自動化スクリプトをスレッドに割り当てて実行します。
         """
         self.alive = True
+        self.last_error = None
         self.socket0.alive = True
         self.mqtt0.alive = True
         self.postProcess = postProcess
@@ -207,7 +213,12 @@ class PythonCommand(CommandBase.Command):
         self.alive = False
         self.socket0.alive = False
         self.mqtt0.alive = False
-        self.end(self.keys.ser)
+        self.end(self.keys.ser if self.keys is not None else None)
+        # スクリプトのスレッドから呼ばれたときは、ここで StopThread を出して終える(元の Modified 版と同じ動き)。
+        # ダイアログのキャンセル・スクリプト内の self.finish() の後の処理を続けず、
+        # 正常に終わったときの "finished successfully" と終了の通知も出す
+        if self.thread is None or threading.current_thread() is self.thread:
+            self.checkIfAlive()
 
     # press button at duration times(s)
     @pausedecorator
@@ -404,10 +415,7 @@ class ImageProcPythonCommand(PythonCommand):
     def __init__(self, cam: Camera, gui: CaptureArea = None):
         super(ImageProcPythonCommand, self).__init__()
 
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.camera = cam
         self.gui = gui
@@ -791,14 +799,13 @@ class ImageProcPythonCommand(PythonCommand):
         # canvasに検出位置を表示
         if show_position:
             tag = str(time.perf_counter()) + str(random.random())
+            # crop_template を省略したとき(スクリーンショットの全体がテンプレート)は、左上の角から表示する
+            # (以前は空の位置を渡してエラーになっていた。フォーク元 0.2.0 の修正)
+            position = crop_template_pillow[0:2] if len(crop_template_pillow) >= 2 else [0, 0]
             if res:
-                self.displayRectangle(
-                    crop_template_pillow[0:2], width, height, tag, ms, color=[color[0], color[2]], crop=[]
-                )
+                self.displayRectangle(position, width, height, tag, ms, color=[color[0], color[2]], crop=[])
             elif not show_only_true_rect:
-                self.displayRectangle(
-                    crop_template_pillow[0:2], width, height, tag, ms, color=[color[1], color[2]], crop=[]
-                )
+                self.displayRectangle(position, width, height, tag, ms, color=[color[1], color[2]], crop=[])
             else:
                 pass
 

@@ -26,6 +26,8 @@ namespace PokeControllerTray
         ServerState state = ServerState.Starting;
         string webUrl;
         bool openWhenReady, polling, exiting;
+        DateTime pollStarted;
+        int pollGeneration;
         Dictionary<string, object> session;   // sessions の結果（1 件目）
         string version;
         // 「今すぐ確認して更新」の終わりは、update-state.json の last_check が変わったことで知る
@@ -39,6 +41,7 @@ namespace PokeControllerTray
             host = new ServerHost(Post);
             host.Ready += OnReady;
             host.Exited += OnServerExited;
+            host.Exiting += OnServerExiting;
 
             int small = Math.Max(16, SystemInformation.SmallIconSize.Width);
             icoNormal = AppIcon.Make(small, false);
@@ -127,6 +130,16 @@ namespace PokeControllerTray
             else if (webUrl != null) AppWindow.Retarget(webUrl);
         }
 
+        // 本体が終了処理を終えた（{"event":"exit"}）。プロセスが消えるまでの間も、もう要求には答えない
+        void OnServerExiting()
+        {
+            if (state == ServerState.Quitting) return;
+            webUrl = null;
+            state = ServerState.Stopped;
+            openWhenReady = false;
+            UpdateVisuals();
+        }
+
         void OnServerExited(int code)
         {
             webUrl = null;
@@ -144,10 +157,15 @@ namespace PokeControllerTray
 
         void Poll()
         {
-            if (state != ServerState.Ready || polling) return;
+            if (state != ServerState.Ready) return;
+            // 返事が失われても状態の更新が止まらないよう、15 秒で待つのをやめる（遅れて届いた古い返事は使わない）
+            if (polling && (DateTime.Now - pollStarted).TotalSeconds < 15) return;
             polling = true;
+            pollStarted = DateTime.Now;
+            int generation = ++pollGeneration;
             host.Request("sessions", null, delegate(bool ok, object result, string error)
             {
+                if (generation != pollGeneration) return;
                 polling = false;
                 var list = result as object[];
                 if (ok && list != null && list.Length > 0) session = list[0] as Dictionary<string, object>;
@@ -283,7 +301,9 @@ namespace PokeControllerTray
             UpdateVisuals();
             string installed = InstalledVersion();
             string error = UpdateError();
+            string portableMessage = Str(UpdateInfo, "result") == "portable" ? Str(UpdateInfo, "message") : null;
             string message = error != "" ? "更新できませんでした。" + error
+                : !string.IsNullOrEmpty(portableMessage) ? portableMessage   // ソースから使っているときは確認だけ
                 : installed != null && installed != version ? "v" + installed + " を入れました。次に起動したときから新しい版になります。"
                 : "最新の版です。";
             ShowBalloon(8000, Program.Title, message.Length > 250 ? message.Substring(0, 250) : message, ToolTipIcon.Info);

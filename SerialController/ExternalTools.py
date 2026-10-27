@@ -50,11 +50,11 @@ class SocketCommunications:
         # SOCKET設定
         self.token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True)
         self.open_file_with_utf8()
-        token_list = {key: self.token_file["SOCKET"][key] for key in self.token_file["SOCKET"]}
-        # token_num = len(token_list)
+        # 設定ファイルが空・[SOCKET] が無い場合は初期値を使う(以前は KeyError で、どのスクリプトも開始できなかった)
+        token_list = dict(self.token_file["SOCKET"]) if self.token_file.has_section("SOCKET") else {}
 
-        self.IPADDR = token_list["addr"]
-        self.PORT = int(token_list["port"])
+        self.IPADDR = token_list.get("addr") or "127.0.0.1"
+        self.PORT = int(token_list.get("port") or 49152)
 
     def open_file_with_utf8(self):  # line_notify.pyからの流用
         """
@@ -77,7 +77,8 @@ class SocketCommunications:
         """
         with open(filename, encoding="utf-8") as stream:
             socket_first = stream.readline()
-        return socket_first[0] == "\ufeff"
+        # 空のファイルでも例外にしない(フォーク元 0.2.0 の修正)
+        return socket_first.startswith("\ufeff")
 
     def change_ipaddr(self, addr):
         """
@@ -93,6 +94,9 @@ class SocketCommunications:
         return:なし
         port|int:ポート番号
         """
+        # 次の sock_connect から使われるように PORT を変える(フォーク元 0.2.0 の修正)。
+        # 以前は self.port にだけ入れていた。参照しているスクリプトに備えて残す
+        self.PORT = int(port)
         self.port = port
 
     def sock_connect(self):
@@ -257,13 +261,13 @@ class MQTTCommunications:
         # MQTT設定
         self.token_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True)
         self.open_file_with_utf8()
-        token_list = {key: self.token_file["MQTT"][key] for key in self.token_file["MQTT"]}
-        # token_num = len(token_list)
+        # 設定ファイルが空・[MQTT] が無い場合は、未設定として扱う(以前は KeyError で、どのスクリプトも開始できなかった)
+        token_list = dict(self.token_file["MQTT"]) if self.token_file.has_section("MQTT") else {}
 
-        self.broker_address = token_list["broker_address"]
-        self.id = token_list["id"]
-        fullaccess_token = token_list["fullaccess_token"]
-        readonly_token = token_list["readonly_token"]
+        self.broker_address = token_list.get("broker_address", "")
+        self.id = token_list.get("id", "")
+        fullaccess_token = token_list.get("fullaccess_token") or ""
+        readonly_token = token_list.get("readonly_token") or ""
 
         if fullaccess_token != "":
             self.pub_token = fullaccess_token
@@ -287,11 +291,24 @@ class MQTTCommunications:
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except Exception:
-                print("paho-mqtt may not be installed. Please make sure paho-mqtt is installed.")
+            except Exception as e:
+                if not isMQTT:
+                    print("paho-mqtt may not be installed. Please make sure paho-mqtt is installed.")
+                else:
+                    # 接続先の間違い・通信の失敗など。原因が分かるように内容を表示する(フォーク元 0.2.0 の修正)
+                    print(f"[mqtt:error]:{type(e).__name__}: {e}")
                 return ""
 
         return wrapper
+
+    def _new_client(self):
+        """
+        broker と通信するためのクライアントを作る(まだ接続はしない)。
+        paho-mqtt 2.x では初めの引数にコールバックの版を渡す必要がある(1.x では接続者名だけを渡す)
+        """
+        if hasattr(mqtt, "CallbackAPIVersion"):
+            return mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, self.clientId)
+        return mqtt.Client(self.clientId)
 
     def open_file_with_utf8(self):  # line_notify.pyからの流用
         """
@@ -314,7 +331,8 @@ class MQTTCommunications:
         """
         with open(filename, encoding="utf-8") as stream:
             mqtt_first = stream.readline()
-        return mqtt_first[0] == "\ufeff"
+        # 空のファイルでも例外にしない(フォーク元 0.2.0 の修正)
+        return mqtt_first.startswith("\ufeff")
 
     def change_broker_address(self, broker_address):
         """
@@ -384,7 +402,7 @@ class MQTTCommunications:
         message = -1
 
         # brokerと接続する
-        self.client = mqtt.Client(self.clientId)
+        self.client = self._new_client()
         self.client.username_pw_set(self.id, self.sub_token)
         self.client.connect(self.broker_address, 1883)
         self.client.subscribe(roomid)
@@ -431,7 +449,7 @@ class MQTTCommunications:
         header0 = ""
         for i in headerlist:
             header0 += i + ","
-        print(f"[socket:wait]:{header0}")
+        print(f"[mqtt:wait]:{header0}")
 
         global receive_msg
         output = None
@@ -439,7 +457,7 @@ class MQTTCommunications:
         message = -1
 
         # brokerと接続する
-        self.client = mqtt.Client(self.clientId)
+        self.client = self._new_client()
         self.client.username_pw_set(self.id, self.sub_token)
         self.client.connect(self.broker_address, 1883)
         self.client.subscribe(roomid)
@@ -486,13 +504,13 @@ class MQTTCommunications:
         # メッセージ更新判定に日時情報を使用する
         header_date = datetime.datetime.today().strftime("[%Y%m%d%H%M%S%f]")
         if self.pub_token:
-            self.client = mqtt.Client(self.clientId)
+            self.client = self._new_client()
             self.client.username_pw_set(self.id, self.pub_token)
             self.client.connect(self.broker_address, 1883)
             message0 = header_date + message
             self.client.publish(roomid, message0)
             print(f"[mqtt:send]:{message}")
+            self.client.disconnect()
         else:
+            # 接続していないので切断もしない(以前は self.client が無くて例外になっていた。フォーク元 0.2.0 の修正)
             print("token error(readonly)")
-
-        self.client.disconnect()

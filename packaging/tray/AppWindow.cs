@@ -90,7 +90,12 @@ namespace PokeControllerTray
                 SystemEvents.UserPreferenceChanged -= themeHandler;
                 if (current == this) current = null;
             };
-            Shown += async delegate { await InitAsync(); };
+            Shown += async delegate
+            {
+                // 初期化の途中でウィンドウを閉じても、例外でアプリを落とさない
+                try { await InitAsync(); }
+                catch (Exception) { if (!IsDisposed) throw; }
+            };
         }
 
         void ApplyTheme()
@@ -109,10 +114,13 @@ namespace PokeControllerTray
             {
                 Directory.CreateDirectory(DataDir);
                 var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(DataDir, "WebView2"));
+                if (IsDisposed) return;   // 待っている間に閉じられた
                 await web.EnsureCoreWebView2Async(env);
+                if (IsDisposed || web.IsDisposed || web.CoreWebView2 == null) return;
             }
             catch (Exception)
             {
+                if (IsDisposed || Disposing) return;   // 閉じたことで失敗した。ブラウザーでは開かない
                 // WebView2 を起動できない場合は既定のブラウザーで開く
                 string url = pendingUrl;
                 Close();

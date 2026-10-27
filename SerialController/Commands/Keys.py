@@ -13,6 +13,14 @@ from logging import getLogger, DEBUG, NullHandler
 if TYPE_CHECKING:
     from Commands.Sender import Sender
 
+# ロガーの設定は 1 回だけ行う(フォーク元 0.2.0 の修正)
+# SendFormat・Direction・Touchscreen は操作のたびに作られるため、
+# 作るたびに addHandler するとハンドラが増え続けてメモリを使い、送信も遅くなる
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 
 class Button(IntFlag):
     Y = auto()  # 1
@@ -120,10 +128,7 @@ max = 255
 # serial format
 class SendFormat:
     def __init__(self):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         # This format structure needs to be the same as the one written in Joystick.c
         self.format = OrderedDict(
@@ -169,20 +174,21 @@ class SendFormat:
 
     def setAnyDirection(self, dirs, x_reverse=False, y_reverse=False):
         for dir in dirs:
+            # 変化の判定は、入れる値(逆にした後の値)で行う(フォーク元 0.2.0 の修正)
+            x = dir.x if not x_reverse else 255 - dir.x
+            y = 255 - dir.y if not y_reverse else dir.y  # NOTE: y axis directs under
             if dir.stick == Stick.LEFT:
-                if self.format["lx"] != dir.x or self.format["ly"] != 255 - dir.y:
+                if self.format["lx"] != x or self.format["ly"] != y:
                     self.L_stick_changed = True
 
-                self.format["lx"] = dir.x if not x_reverse else 255 - dir.x
-                self.format["ly"] = (
-                    255 - dir.y if not y_reverse else dir.y
-                )  # NOTE: y axis directs under
+                self.format["lx"] = x
+                self.format["ly"] = y
             elif dir.stick == Stick.RIGHT:
-                if self.format["rx"] != dir.x or self.format["ry"] != 255 - dir.y:
+                if self.format["rx"] != x or self.format["ry"] != y:
                     self.R_stick_changed = True
 
-                self.format["rx"] = dir.x if not x_reverse else 255 - dir.x
-                self.format["ry"] = 255 - dir.y if not y_reverse else dir.y
+                self.format["rx"] = x
+                self.format["ry"] = y
 
     def unsetDirection(self, dirs):
         if Tilt.UP in dirs or Tilt.DOWN in dirs:
@@ -348,10 +354,7 @@ class SendFormat:
 # This class handle L stick and R stick at any angles
 class Direction:
     def __init__(self, stick, angle, magnification=1.0, isDegree=True, showName=None):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.stick = stick
         self.angle_for_show = angle
@@ -446,13 +449,24 @@ Direction.R_UP_LEFT = Direction(Stick.RIGHT, 135, showName="UP_LEFT")
 
 class Touchscreen:
     def __init__(self, x, y):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.x = x
         self.y = y
+
+
+def _same_input(a, b):
+    """
+    同じ入力か(種類も比べる。フォーク元 0.2.0 の修正)。
+    Button と Hat は数値として比べられるため、Button.B と Hat.RIGHT (どちらも 2) のように、
+    種類が違っても == では等しくなる組み合わせがある
+    """
+    return type(a) is type(b) and a == b
+
+
+def _contains_input(inputs, target):
+    """inputs の中に、target と同じ入力(種類も同じ)があるか"""
+    return any(_same_input(item, target) for item in inputs)
 
 
 # handles serial input to Joystick.c
@@ -462,10 +476,7 @@ class KeyPress:
     serial_data_format_name = "Default"
 
     def __init__(self, ser: Sender):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.q = queue.Queue()
         self.ser = ser
@@ -499,11 +510,12 @@ class KeyPress:
 
     def input(self, btns: Button | Hat | Stick | Direction, ifPrint=True):
         self._pushing = dict(self.format.format)
-        if not isinstance(btns, list):
-            btns = [btns]
+        # ホールド中の入力を足すので、呼び出し元のリストは書き換えずにコピーを使う
+        # (書き換えると、同じリストを渡した inputEnd で、ホールド中の入力まで離してしまう。フォーク元 0.2.0 の修正)
+        btns = list(btns) if isinstance(btns, list) else [btns]
 
         for btn in self.holdButton:
-            if btn not in btns:
+            if not _contains_input(btns, btn):
                 btns.append(btn)
         if "3DS Controller" in self.serial_data_format_name:
             if "x.3" in self.serial_data_format_name:
@@ -558,6 +570,18 @@ class KeyPress:
                 tilts.append(tilting)
         # self._logger.debug(tilts)
 
+        # ホールド中の Hat は、Hat 以外を離す場合(ホールド中の press など)には離さない(フォーク元 0.2.0 の修正)
+        if any(type(btn) is Hat for btn in self.holdButton) and not any(type(btn) is Hat for btn in btns):
+            unset_hat = False
+        # ホールド中のタッチも同様に、タッチ以外を離す場合には離さない
+        if any(type(btn) is Touchscreen for btn in self.holdButton) and not any(
+            type(btn) is Touchscreen for btn in btns
+        ):
+            unset_Touchscreen = False
+        # 離す一覧にタッチがあれば、unset_Touchscreen が False でも離す
+        # (以前は True in [Touchscreen, ...] で判定していて、常に偽になっていた)
+        release_touch = unset_Touchscreen or any(type(btn) is Touchscreen for btn in btns)
+
         if "3DS Controller" in self.serial_data_format_name:
             if "x.3" in self.serial_data_format_name:
                 mode = 0
@@ -570,9 +594,7 @@ class KeyPress:
             if unset_hat:
                 self.format.unsetHat()
             self.format.unsetDirection(tilts)
-            if unset_Touchscreen or (
-                True in [btn for btn in btns if type(btn) is Touchscreen]
-            ):  # Added 2026.05.19
+            if release_touch:  # Added 2026.05.19
                 self.format.unsetTouchscreen()  # Added 2026.05.19
             self.ser.writeList(self.format.convert2list2(mode=mode))
         else:
@@ -581,9 +603,7 @@ class KeyPress:
                 self.format.unsetHat()
             self.format.unsetDirection(tilts)
             if self.serial_data_format_name == "Qingpi":
-                if unset_Touchscreen or (
-                    True in [btn for btn in btns if type(btn) is Touchscreen]
-                ):
+                if release_touch:
                     self.format.unsetTouchscreen()
                 self.ser.writeList(self.format.convert2list())
             else:
@@ -602,10 +622,14 @@ class KeyPress:
                 if type(btn) is Touchscreen:
                     self.holdButton.remove(btn)
         for btn in btns:
-            if btn in self.holdButton:
-                print("Warning: " + btn.name + " is already in holding state")
-                self._logger.warning(f"Warning: {btn.name} is already in holding state")
-                return
+            if _contains_input(self.holdButton, btn):
+                # ホールド済みのものは飛ばし、残りはホールドして送る(フォーク元 0.2.0 の修正)
+                # (以前はここで抜けていて、先に追加した分がホールド扱いのまま送られなかった。
+                #  Button.B と Hat.RIGHT のように値が同じ入力も、ホールド済みと誤って判定していた)
+                name = getattr(btn, "name", btn)
+                print(f"Warning: {name} is already in holding state")
+                self._logger.warning(f"Warning: {name} is already in holding state")
+                continue
 
             self.holdButton.append(btn)
         self.input(btns)
@@ -617,7 +641,15 @@ class KeyPress:
         flag_isTouchscreen = False
         for btn in btns:
             if type(btn) is not Touchscreen:
-                self.holdButton.remove(btn)
+                if not _contains_input(self.holdButton, btn):
+                    # ホールドしていないものは、エラーで止めずに警告し、離す入力だけを送る(フォーク元 0.2.0 の修正)
+                    name = getattr(btn, "name", btn)
+                    print(f"Warning: {name} is not in holding state")
+                    self._logger.warning(f"Warning: {name} is not in holding state")
+                    continue
+                # 種類も同じものを 1 つだけ外す(list.remove は Button.B と Hat.RIGHT を区別しない)
+                index = next(i for i, held in enumerate(self.holdButton) if _same_input(held, btn))
+                del self.holdButton[index]
             else:
                 flag_isTouchscreen = True
         if flag_isTouchscreen:

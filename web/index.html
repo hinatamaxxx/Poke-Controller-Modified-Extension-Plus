@@ -7,7 +7,7 @@
 <style>
 :root {
   --bg: #f0f0f0; --panel: #ffffff; --text: #1d2026; --muted: #5f6672; --line: #d4d7dc;
-  --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #ffffff; --chip: #eef1f5;
+  --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #ffffff; --chip: #eef1f5; --scroll: #c3c8cf; --claude: #c2410c;
   --joy-l: #5bcef2; --joy-r: #e85050; --btn: #343434; --btn-text: #ffffff;
   --btn-on: #ffd800; --btn-on-text: #343434; --well: rgba(0, 0, 0, .22); --focus: #1d2026;
   --shade: rgba(0, 0, 0, .35);
@@ -18,12 +18,16 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #15171b; --panel: #1f2228; --text: #e8eaee; --muted: #9aa1ad; --line: #343840;
-    --accent: #5b8def; --danger: #ef5350; --ok: #66bb6a; --log: #181a1e; --chip: #2a2e35;
+    --accent: #5b8def; --danger: #ef5350; --ok: #66bb6a; --log: #181a1e; --chip: #2a2e35; --scroll: #4a505a; --claude: #f59e5b;
     --joy-l: #3fa8cc; --joy-r: #c94545; --well: rgba(0, 0, 0, .3); --focus: #ffffff;
     --shade: rgba(0, 0, 0, .6);
   }
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
 html, body { height: 100%; overflow: hidden; }
 body { margin: 0; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", "Yu Gothic UI", sans-serif; }
 header { flex: none; display: flex; gap: 6px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); background: var(--panel); overflow: hidden; white-space: nowrap; min-height: 30px; }
@@ -33,6 +37,14 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 .badge.bad { color: var(--danger); border-color: var(--danger); }
 .run-controls { display: flex; gap: 4px; flex: none; margin-left: auto; }
 .run-controls[hidden] { display: none; }
+/* Header marks: recording (click stops it) and a recent watch incident (click shows it). */
+.head-mark { flex: none; font: inherit; font-size: 12px; background: none; border: 0; padding: 0 2px; cursor: pointer; color: var(--danger); font-variant-numeric: tabular-nums; }
+.head-mark[hidden] { display: none; }
+.head-mark.rec::before { content: "●"; margin-right: 3px; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+input[type=number] { width: 6em; }
+.watch-fields { display: flex; flex-direction: column; gap: 6px; padding-left: 1.4em; }
+.checks:has(input[type=number]) { align-items: center; gap: 4px 12px; }
 
 main { flex: 1; min-height: 0; display: grid; gap: var(--gap); padding: var(--gap) 12px; width: 100%; max-width: 1500px; margin: 0 auto; }
 .panel { min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: 6px 10px 10px; display: flex; flex-direction: column; }
@@ -55,7 +67,12 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .area-pad { padding: 0; border: 0; background: none; justify-content: center; }
   .area-logs { display: none; }
   .tab-logs { display: block; }
-  header h1 { display: none; }
+  header h1, header #profile, header #run-state.idle { display: none; }
+  body .tabs button { padding: 2px 5px; font-size: 12px; }
+  /* Camera and COM become coloured dots (name in the tooltip) so the run state and its buttons keep the room. */
+  header #camera-state, header #serial-state { width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
+  header #camera-state.ok, header #serial-state.ok { background: var(--ok); }
+  header #camera-state.bad, header #serial-state.bad { background: var(--danger); }
   body { font-size: 13px; }
   /* Controller in a tab (portrait, or unless "beside the video" is chosen). body.pad-tab is set by placePad(). */
   body.pad-tab main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "video" "tabs"; }
@@ -82,8 +99,8 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .area-tabs { position: relative; grid-row: 1 / 3; grid-column: 1 / -1; z-index: 1; padding: 0; border: 0; background: none;
                display: flex; flex-direction: column-reverse; pointer-events: none; }
   .area-tabs > * { pointer-events: auto; }
-  .area-tabs .tabs { height: 26px; margin: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg); gap: 4px; align-items: stretch; }
-  .area-tabs .tabs button { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 4px 4px; margin: -1px 0 0; padding: 0 8px; }
+  .area-tabs .tabs { height: 26px; flex-wrap: nowrap; margin: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg); gap: 3px; align-items: stretch; }
+  body .area-tabs .tabs button { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 4px 4px; margin: -1px 0 0; padding: 0 5px; font-size: 11px; }
   .area-tabs:not(.open) .tabs button[aria-selected=true] { color: var(--muted); background: none; }
   .area-tabs.open .tabs button[aria-selected=true] { color: var(--text); background: var(--panel); border-top: 1px solid var(--panel); }
   .area-tabs:not(.open) .tabpanel, .area-tabs:not(.open) #message { display: none; }
@@ -93,7 +110,7 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .panel-close { display: block; }
   .area-tabs:not(.open) .panel-close { display: none; }
   body .row { gap: 4px; }
-  body button.cmd, body select, body input[type=search], body input[type=text], body input[type=password], body input[type=url] { min-height: 22px; padding: 0 6px; }
+  body button.cmd, body select, body input[type=search], body input[type=text], body input[type=password], body input[type=url], body input[type=number] { min-height: 22px; padding: 0 6px; }
   body .modal { padding: 6px; }
   body .modal .box { padding: 10px; max-height: calc(100dvh - 12px); }
   body .modal h2 { font-size: 14px; margin-bottom: 2px; }
@@ -102,8 +119,9 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   body .modal .actions { margin: 6px 0; }
 }
 
-button.cmd, select, input[type=search], input[type=text], input[type=password], input[type=url] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; min-width: 0; min-height: 26px; }
+button.cmd, select, input[type=search], input[type=text], input[type=password], input[type=url], input[type=number] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; min-width: 0; min-height: 26px; }
 button.cmd { cursor: pointer; white-space: nowrap; }
+button.cmd.icon { padding: 0 8px; min-width: 28px; font-size: 15px; line-height: 1; }
 button.cmd.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.cmd.danger { border-color: var(--danger); color: var(--danger); }
 button.cmd:disabled { opacity: .5; cursor: not-allowed; }
@@ -123,8 +141,8 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .tabpanel .logs .log { border: 0; padding: 0; background: none; }
 pre { flex: 1; min-height: 24px; margin: 0; overflow: auto; background: var(--log); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font: 12px/1.4 Consolas, "BIZ UDGothic", monospace; white-space: pre-wrap; word-break: break-all; }
 
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 6px; flex: none; }
-.tabs button { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: inherit; color: var(--muted); background: none; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; padding: 2px 10px; cursor: pointer; margin-bottom: -1px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 6px; flex: none; }
+.tabs button { flex: none; white-space: nowrap; font: inherit; color: var(--muted); background: none; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; padding: 2px 10px; cursor: pointer; margin-bottom: -1px; }
 .tabs button[aria-selected=true] { color: var(--text); background: var(--panel); border-color: var(--line); }
 .tabpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; font-size: 13px; }
 .tabpanel[hidden] { display: none; }
@@ -138,11 +156,24 @@ pre { flex: 1; min-height: 24px; margin: 0; overflow: auto; background: var(--lo
 .seg button:last-child { border-radius: 0 4px 4px 0; }
 .seg button + button { border-left: 0; }
 .seg button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
-#script { width: 100%; flex: 1; min-height: 0; }
-.chips { display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: thin; flex: none; }
-.chips button { font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 999px; padding: 0 10px; cursor: pointer; white-space: nowrap; }
-.chips button[aria-pressed=true] { background: var(--accent); color: #fff; }
-.chips:empty { display: none; }
+/* Script list: name first, folder small and faint, grouped by folder. */
+.script-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--line); border-radius: 4px; background: var(--log); padding: 2px 0; outline: none; }
+.script-list:focus-visible { border-color: var(--accent); }
+.script-list .group { font-size: 11px; color: var(--muted); padding: 4px 8px 1px; border-top: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.script-list .group:first-child { border-top: 0; }
+.script-list .item { display: flex; align-items: baseline; gap: 8px; padding: 1px 8px; cursor: pointer; min-width: 0; }
+.script-list .item:hover { background: var(--chip); }
+.script-list .item[aria-selected=true] { background: var(--accent); color: #fff; }
+.script-list .item[aria-selected=true] .where { color: rgba(255, 255, 255, .8); }
+.script-list .name, .shortcut .name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.script-list .where, .shortcut .where { flex: 0 1 auto; max-width: 45%; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.script-list .item.running .name::before, .shortcut .go.running .name::before { content: "● "; color: var(--ok); }
+.script-list .item.running:not([aria-selected=true]) { color: var(--ok); }
+.script-list .empty-list { padding: 6px 8px; color: var(--muted); }
+#script-main > .row:first-child { flex-wrap: nowrap; }
+#script-main #filter { flex: 1 1 60px; min-width: 0; }
+#folder { flex: 0 1 auto; max-width: 40%; min-width: 0; }
+.selected-name { flex: 1 1 120px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
 #message { color: var(--danger); font-size: 12px; margin-top: 4px; flex: none; }
 #message:empty { display: none; }
 .form { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
@@ -150,16 +181,19 @@ pre { flex: 1; min-height: 24px; margin: 0; overflow: auto; background: var(--lo
 .form .inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .form select { max-width: 100%; }
 .form .full { grid-column: 1 / -1; }
+.form3 { grid-template-columns: max-content minmax(0, 1fr) max-content; }
 .error { color: var(--danger); font-size: 12px; }
 .error:empty { display: none; }
 .checks { display: flex; flex-wrap: wrap; gap: 0 12px; flex: none; }
 .checks label, .radios label { white-space: nowrap; }
+.checks input, .radios input { margin-left: 0; }
 .radios { display: flex; flex-wrap: wrap; gap: 0 10px; }
 .sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 14px; align-content: start; line-height: 1.3; }
 .sections h3 { font-size: 12px; font-weight: 600; margin: 0 0 2px; color: var(--muted); }
 .sections .row button.cmd { padding: 1px 8px; min-height: 22px; }
 table.notify { border-collapse: collapse; flex: none; }
-table.notify th, table.notify td { padding: 1px 12px 1px 0; text-align: left; font-weight: normal; }
+table.notify th, table.notify td { padding: 1px 6px; text-align: center; font-weight: normal; }
+table.notify tbody th { text-align: left; padding-left: 0; padding-right: 14px; }
 table.notify thead th { color: var(--muted); font-size: 12px; }
 table.notify input { margin: 1px 0; }
 .meta { color: var(--muted); font-size: 12px; }
@@ -172,7 +206,7 @@ table.notify input { margin: 1px 0; }
 .keys button[aria-pressed=true] kbd { color: var(--accent); }
 .shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 10px; flex: none; }
 .shortcut { display: flex; gap: 3px; min-width: 0; }
-.shortcut .go { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; white-space: nowrap; }
+.shortcut .go { display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0; text-align: left; overflow: hidden; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; white-space: nowrap; }
 .shortcut .go:disabled { color: var(--muted); cursor: default; }
 
 /* Flat pad like the original Tk window: blue left board, red right board, dark square keys. */
@@ -199,7 +233,52 @@ table.notify input { margin: 1px 0; }
                       --key-w: calc(var(--key-h) * 1.45); --stick: calc(var(--key-h) * 2.2); --key-gap: clamp(3px, calc(var(--key-h) / 7), 6px); }
 .pad-slot .ctl { font-size: clamp(10px, calc(var(--key-h) * .42), 15px); }
 .pad .ctl[data-btn=HOME] { font-size: clamp(8px, calc(var(--key-h) * .34), 13px); letter-spacing: -.02em; }
-.manual-options { justify-content: center; }
+.manual-options { justify-content: center; font-size: 12px; }
+
+/* Claude: what it is doing now (header and tab), notes, and what it did. */
+.assist { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 6px; overflow: hidden; font-size: 12px; }
+.assist[hidden] { display: none; }
+.assist .mark, .note .mark { color: var(--claude); flex: none; }
+.assist .task { flex: 0 3 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.assist .doing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.assist .task:empty, .assist .doing:empty { display: none; }
+.assist .task:not(:empty) + .doing::before { content: "／ "; }
+.seq { flex: none; display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+.seq[hidden] { display: none; }
+.tab-unread::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%; background: var(--claude); vertical-align: middle; }
+#panel-claude { container-type: inline-size; }
+.claude-now { flex: none; border-left: 3px solid var(--claude); padding: 0 8px; }
+.claude-now[hidden] { display: none; }
+.claude-now .task { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.claude-now .doing { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.claude-now .task:empty, .claude-now .doing:empty { display: none; }
+.claude-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+               grid-template-areas: "notes notes" "act act"; gap: 6px 12px; }
+.claude-cols.incidents { grid-template-areas: "notes notes" "inc act"; }
+@container (min-width: 560px) {
+  .claude-cols { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "notes act" "notes act"; }
+  .claude-cols.incidents { grid-template-areas: "notes inc" "notes act"; }
+}
+#col-notes { grid-area: notes; } #col-act { grid-area: act; } #col-inc { grid-area: inc; }
+#col-inc[hidden] { display: none; }
+.incident .warn { color: var(--danger); flex: none; }
+.incident .script { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.incident .restarted { flex: none; color: var(--ok); }
+.claude-col { min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.claude-col h3 { font-size: 12px; font-weight: 600; margin: 0; color: var(--muted); flex: none; }
+.feed { flex: 1; min-height: 24px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--line); border-radius: 4px; background: var(--log); padding: 2px 8px; font-size: 12px; }
+.feed:empty::after { content: "—"; color: var(--muted); }
+.note { padding: 3px 0; border-bottom: 1px solid var(--line); }
+.note:last-child { border-bottom: 0; }
+.note .meta { display: flex; gap: 6px; align-items: center; }
+.note .meta .when { flex: 1; }
+.incident .meta .when { flex: none; }
+.note .text { white-space: pre-wrap; word-break: break-word; }
+.act { display: flex; gap: 8px; white-space: nowrap; }
+.act .when { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.act .what { overflow: hidden; text-overflow: ellipsis; }
+.note-add { display: flex; gap: 4px; flex: none; }
+.note-add input { flex: 1; min-width: 0; }
 
 /* Script dialog */
 .modal { position: fixed; inset: 0; background: var(--shade); display: grid; place-items: center; padding: 12px; z-index: 10; }
@@ -225,6 +304,10 @@ table.notify input { margin: 1px 0; }
   <span class="badge" id="camera-state">カメラ: -</span>
   <span class="badge" id="serial-state">COM: -</span>
   <span class="badge" id="run-state">停止中</span>
+  <button class="head-mark rec" id="rec-mark" aria-label="録画を停止" title="録画を停止" hidden></button>
+  <button class="head-mark" id="incident-mark" aria-label="見張りの記録を見る" hidden>⚠</button>
+  <span class="assist" id="assist" hidden><span class="mark" aria-hidden="true">✦</span><span class="task" id="assist-task"></span><span class="doing" id="assist-doing"></span></span>
+  <span class="seq" id="seq" hidden><span id="seq-progress"></span><button class="mini" id="seq-cancel" aria-label="連続操作を中止">中止</button></span>
   <span class="run-controls" id="run-controls" hidden>
     <button class="mini danger" id="head-stop">停止</button>
     <button class="mini" id="head-pause">一時停止</button>
@@ -261,6 +344,7 @@ table.notify input { margin: 1px 0; }
       <button role="tab" id="tab-script" aria-controls="panel-script" aria-selected="true">スクリプト</button>
       <button role="tab" id="tab-notify" aria-controls="panel-notify" aria-selected="false">通知</button>
       <button role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false">その他</button>
+      <button role="tab" id="tab-claude" aria-controls="panel-claude" aria-selected="false">Claude</button>
       <button role="tab" id="tab-logs" class="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
     </div>
 
@@ -279,6 +363,7 @@ table.notify input { margin: 1px 0; }
       </div>
       <div class="row">
         <button class="cmd" id="capture">スクリーンショット</button>
+        <button class="cmd" id="record">録画</button>
         <button class="cmd" data-folder="captures">保存先を開く</button>
       </div>
     </div>
@@ -330,16 +415,17 @@ table.notify input { margin: 1px 0; }
             <option value="mcu">MCU</option>
           </select>
           <input type="search" class="grow" id="filter" placeholder="名前で絞り込み" aria-label="スクリプトの絞り込み">
-          <button class="cmd" id="reload">再読み込み</button>
-          <button class="cmd" data-folder="scripts">フォルダー</button>
+          <select id="folder" aria-label="フォルダーで絞り込み"></select>
+          <button class="cmd icon" id="reload" aria-label="スクリプトを再読み込み" title="再読み込み">↻</button>
         </div>
-        <div class="chips" id="tags" aria-label="タグで絞り込み"></div>
-        <select id="script" size="4" aria-label="スクリプト一覧"></select>
+        <div class="script-list" id="script-list" role="listbox" tabindex="0" aria-label="スクリプト一覧"></div>
         <div class="row">
           <button class="cmd primary" id="start">開始</button>
           <button class="cmd danger" id="stop">停止</button>
           <button class="cmd" id="pause">一時停止</button>
           <button class="cmd" id="resume">再開</button>
+          <span class="selected-name" id="selected-name"></span>
+          <button class="cmd" data-folder="scripts">フォルダー</button>
         </div>
       </div>
       <div class="view" id="script-shortcuts" hidden>
@@ -351,6 +437,7 @@ table.notify input { margin: 1px 0; }
       <div class="seg" role="group" aria-label="通知の表示">
         <button data-view="notify-when" aria-pressed="true">通知する時</button>
         <button data-view="notify-where" aria-pressed="false">送り先</button>
+        <button data-view="notify-watch" aria-pressed="false">見張り</button>
       </div>
       <div class="view" id="notify-when">
         <table class="notify">
@@ -372,13 +459,29 @@ table.notify input { margin: 1px 0; }
         </table>
       </div>
       <div class="view" id="notify-where" hidden>
-        <div class="form">
+        <div class="form form3">
           <label for="line-token">LINE <span class="set" id="line-set" hidden>✓</span></label>
-          <div class="inline"><input type="password" id="line-token" class="grow" autocomplete="off" placeholder="トークン" aria-label="LINEのトークン"><button class="cmd" id="save-line">保存</button></div>
+          <input type="password" id="line-token" autocomplete="off" placeholder="トークン" aria-label="LINEのトークン">
+          <button class="cmd" id="save-line">保存</button>
           <label for="discord-url">Discord <span class="set" id="discord-set" hidden>✓</span></label>
-          <div class="inline"><input type="password" id="discord-url" class="grow" autocomplete="off" placeholder="Webhook URL" aria-label="DiscordのWebhook URL"></div>
+          <input type="password" id="discord-url" autocomplete="off" placeholder="Webhook URL" aria-label="DiscordのWebhook URL">
+          <button class="cmd" id="save-discord" style="grid-row: span 2; align-self: stretch">保存</button>
           <label for="discord-name">ユーザー名</label>
-          <div class="inline"><input type="text" id="discord-name" class="grow" autocomplete="off" aria-label="Discordのユーザー名"><button class="cmd" id="save-discord">保存</button></div>
+          <input type="text" id="discord-name" autocomplete="off" aria-label="Discordのユーザー名">
+        </div>
+      </div>
+      <div class="view" id="notify-watch" hidden>
+        <div class="checks"><label><input type="checkbox" id="watch-enabled"> 有効</label></div>
+        <div class="watch-fields">
+          <div class="form">
+            <label for="watch-freeze">映像が止まったとみなす秒数</label>
+            <div class="inline"><input type="number" id="watch-freeze" min="0" max="3600" step="10" title="0で使わない"></div>
+          </div>
+          <div class="checks"><label><input type="checkbox" id="watch-notify"> 通知する</label></div>
+          <div class="checks">
+            <label><input type="checkbox" id="watch-restart"> エラーや停止のあとスクリプトを開始し直す</label>
+            <label>回数 <input type="number" id="watch-limit" min="0" max="100" aria-label="開始し直す回数"></label>
+          </div>
         </div>
       </div>
     </div>
@@ -432,6 +535,30 @@ table.notify input { margin: 1px 0; }
       </div>
     </div>
 
+    <div class="tabpanel" role="tabpanel" id="panel-claude" aria-labelledby="tab-claude" hidden>
+      <div class="claude-now" id="claude-now" hidden>
+        <div class="task" id="now-task"></div>
+        <div class="doing" id="now-doing"></div>
+      </div>
+      <div class="claude-cols">
+        <div class="claude-col" id="col-notes">
+          <h3>メモ</h3>
+          <div class="feed" id="notes" aria-label="メモ" aria-live="polite"></div>
+          <div class="note-add">
+            <input type="text" id="note-text" autocomplete="off" maxlength="500" aria-label="メモを書く">
+            <button class="cmd" id="note-add">追加</button>
+          </div>
+        </div>
+        <div class="claude-col" id="col-inc" hidden>
+          <h3>見張り</h3>
+          <div class="feed" id="incidents" aria-label="見張りの記録"></div>
+        </div>
+        <div class="claude-col" id="col-act">
+          <h3>操作の記録</h3>
+          <div class="feed" id="activity" aria-label="Claudeの操作の記録"></div>
+        </div>
+      </div>
+    </div>
     <div class="tabpanel" role="tabpanel" id="panel-logs" aria-labelledby="tab-logs" hidden></div>
     <div id="message" role="status"></div>
     <button class="mini panel-close" id="panel-close" aria-label="パネルを閉じる" title="閉じる">✕</button>
@@ -494,7 +621,7 @@ table.notify input { margin: 1px 0; }
 
 <script>
 const $ = id => document.getElementById(id);
-let state = null, catalogKey = '', tagKey = '', activeTag = '';
+let state = null, catalogKey = '', folderKey = '', selectedScript = '';
 const STREAM = '/stream.mjpg';
 
 async function call(method, params = {}) {
@@ -556,52 +683,94 @@ function fillSelect(select, items, value) {
 
 // Scripts
 function scriptItems() { return (state && state.tags && state.tags[$('kind').value]) || []; }
-function renderTags() {
-  const tags = [...new Set(scriptItems().flatMap(item => item.tags || []))].sort();
-  if (!tags.includes(activeTag)) activeTag = '';
-  const key = tags.join('\n') + '\n' + activeTag;
-  if (key === tagKey) return;
-  tagKey = key;
-  const chip = (tag, label) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.setAttribute('aria-pressed', String(activeTag === tag));
-    button.setAttribute('aria-label', tag ? `タグ「${tag}」で絞り込み` : 'タグの絞り込みを解除');
-    button.addEventListener('click', () => { activeTag = tag; renderTags(); renderScripts(); });
-    return button;
-  };
-  $('tags').replaceChildren(...(tags.length ? [chip('', 'すべて'), ...tags.map(tag => chip(tag, tag))] : []));
+// Script names look like "名前 (Folder/Sub/module)"; show the name and the folder separately.
+function splitName(full) {
+  const match = /^(.*\S)\s*\(([^()]*)\)\s*$/.exec(full || '');
+  if (!match) return {name: full || '', folder: '', path: ''};
+  const parts = match[2].split('/');
+  return {name: match[1], folder: parts.slice(0, -1).join('/') || parts[0], path: match[2]};
+}
+// Folder filter: folders from the module paths, plus "@" tags and other tags so nothing is lost.
+function folderOf(item) { return splitName(item.name).folder; }
+function renderFolders() {
+  const items = scriptItems();
+  const folders = [...new Set(items.map(folderOf).filter(Boolean))].sort();
+  // "@" tags name the same folders; only other tags get their own entry (all tags stay searchable).
+  const tags = [...new Set(items.flatMap(item => item.tags || []))].filter(tag => !tag.startsWith('@')).sort();
+  const options = [['', 'すべて'], ...folders.map(f => [f, f]), ...tags.map(t => ['tag:' + t, t])];
+  const key = JSON.stringify(options);
+  if (key === folderKey) return;
+  folderKey = key;
+  fillSelect($('folder'), options, options.some(([v]) => v === $('folder').value) ? $('folder').value : '');
+}
+function visibleScripts() {
+  const filter = $('filter').value.trim().toLowerCase();
+  const folder = $('folder').value;
+  return scriptItems().filter(item => {
+    const parts = splitName(item.name);
+    if (folder.startsWith('tag:') ? !(item.tags || []).includes(folder.slice(4)) : folder && parts.folder !== folder) return false;
+    const text = [item.name, ...(item.tags || [])].join(' ').toLowerCase();
+    return !filter || text.includes(filter);
+  });
 }
 function renderScripts() {
   if (!state) return;
-  const filter = $('filter').value.trim().toLowerCase();
-  const names = scriptItems().filter(item => item.name.toLowerCase().includes(filter)
-    && (!activeTag || (item.tags || []).includes(activeTag))).map(item => item.name);
-  const key = $('kind').value + '\n' + names.join('\n');
+  const items = visibleScripts();
+  const running = state.running ? state.command : '';
+  const key = JSON.stringify([$('kind').value, items.map(i => i.name), selectedScript, running]);
   if (key === catalogKey) return;
   catalogKey = key;
-  const selected = $('script').value;
-  $('script').replaceChildren(...names.map(name => {
-    const option = document.createElement('option');
-    option.value = option.textContent = name;
-    option.selected = name === selected;
-    return option;
-  }));
+  const list = $('script-list');
+  const nodes = [];
+  let lastFolder = null;
+  const sorted = items.map((item, index) => ({item, index, parts: splitName(item.name)}))
+    .sort((a, b) => a.parts.folder.localeCompare(b.parts.folder, 'ja') || a.index - b.index);
+  sorted.forEach(({item, parts}, index) => {
+    if (parts.folder !== lastFolder) {
+      lastFolder = parts.folder;
+      nodes.push(Object.assign(document.createElement('div'), {className: 'group', textContent: parts.folder || 'その他', role: 'presentation'}));
+    }
+    const row = document.createElement('div');
+    row.className = 'item' + (item.name === running ? ' running' : '');
+    row.id = 'script-option-' + index;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(item.name === selectedScript));
+    row.dataset.name = item.name;
+    row.title = item.name;
+    row.append(Object.assign(document.createElement('span'), {className: 'name', textContent: parts.name}));
+    nodes.push(row);
+  });
+  if (!items.length) nodes.push(Object.assign(document.createElement('div'), {className: 'empty-list', textContent: '該当なし'}));
+  const scroll = list.scrollTop;
+  list.replaceChildren(...nodes);
+  list.scrollTop = scroll;
+  const selectedRow = list.querySelector('[aria-selected=true]');
+  if (selectedRow) list.setAttribute('aria-activedescendant', selectedRow.id); else list.removeAttribute('aria-activedescendant');
+  const chosen = splitName(selectedScript);
+  $('selected-name').textContent = selectedScript ? chosen.name : '';
+  $('selected-name').title = selectedScript;
+}
+function selectScript(name, reveal) {
+  selectedScript = name;
+  renderScripts();
+  const row = $('script-list').querySelector('[aria-selected=true]');
+  if (row && reveal) row.scrollIntoView({block: 'nearest'});
 }
 
 // Shortcuts 1-10: the name button starts it, 登録 stores the script selected in the list.
 let shortcutKey = '';
 function renderShortcuts() {
   const items = state.shortcuts || [];
-  const key = JSON.stringify([items, state.running]);
+  const key = JSON.stringify([items, state.running, state.command]);
   if (key === shortcutKey) return;
   shortcutKey = key;
   $('shortcuts').replaceChildren(...items.map(item => {
     const row = document.createElement('div');
     row.className = 'shortcut';
-    const go = Object.assign(document.createElement('button'), {className: 'go', type: 'button'});
-    go.textContent = `${item.slot}. ${item.kind ? item.name : '空き'}`;
+    const go = Object.assign(document.createElement('button'), {className: 'go' + (state.running && item.kind && state.command === item.name ? ' running' : ''), type: 'button'});
+    const parts = splitName(item.name);
+    go.append(Object.assign(document.createElement('span'), {className: 'name', textContent: `${item.slot}. ${item.kind ? parts.name : '空き'}`}),
+              Object.assign(document.createElement('span'), {className: 'where', textContent: item.kind ? parts.folder : ''}));
     go.title = item.kind ? item.name : '';
     go.setAttribute('aria-label', item.kind ? `ショートカット${item.slot}を開始: ${item.name}` : `ショートカット${item.slot}（空き）`);
     go.disabled = !item.kind || state.running;
@@ -609,8 +778,8 @@ function renderShortcuts() {
     const save = Object.assign(document.createElement('button'), {className: 'mini', type: 'button', textContent: '登録'});
     save.setAttribute('aria-label', `選んでいるスクリプトをショートカット${item.slot}に登録`);
     save.addEventListener('click', () => {
-      if (!$('script').value) { $('message').textContent = 'スクリプトを一覧で選んでください'; return; }
-      quiet(command('shortcut', {slot: item.slot, kind: $('kind').value, name: $('script').value}));
+      if (!selectedScript) { $('message').textContent = 'スクリプトを一覧で選んでください'; return; }
+      quiet(command('shortcut', {slot: item.slot, kind: $('kind').value, name: selectedScript}));
     });
     const clear = Object.assign(document.createElement('button'), {className: 'mini', type: 'button', textContent: '解除'});
     clear.setAttribute('aria-label', `ショートカット${item.slot}を解除`);
@@ -733,6 +902,7 @@ function render() {
   setBadge('serial-state', state.serial_open ? `COM:${port} 接続中` : 'COM: 未接続', state.serial_open);
   const running = state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中';
   setBadge('run-state', running, state.running ? true : undefined);
+  $('run-state').classList.toggle('idle', !state.running);
   $('run-controls').hidden = !state.running;
   $('head-pause').hidden = !state.running || state.paused;
   $('head-resume').hidden = !state.running || !state.paused;
@@ -752,13 +922,16 @@ function render() {
   $('pause').disabled = !state.running || state.paused;
   $('resume').disabled = !state.running || !state.paused;
   $('reload').disabled = state.running;
-  renderTags();
+  renderFolders();
   renderScripts();
   renderShortcuts();
   renderConnection();
   renderVideo();
   renderSettings();
   renderKeymap();
+  renderAssist();
+  renderRecording();
+  renderWatch();
   renderDialog();
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
@@ -776,6 +949,126 @@ async function refresh() {
   } catch (error) {
     setBadge('run-state', 'アプリに接続できません', false);
   }
+}
+
+// Claude: status in the header and tab, notes (newest first), activity, and an unread dot for new activity.
+function ago(at) {
+  const seconds = Math.max(0, Date.now() / 1000 - at);
+  if (seconds < 60) return 'たった今';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}分前`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}時間前`;
+  return new Date(at * 1000).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'});
+}
+let notesKey = '', activityKey = '', seenActivity = null;
+function claudeTabOpen() {
+  const selected = $('tab-claude').getAttribute('aria-selected') === 'true';
+  return selected && (!shortQuery.matches || tabArea.classList.contains('open'));
+}
+function renderAssist() {
+  const assist = state.assist || {};
+  const status = assist.status;
+  const progress = status && status.progress ? `（${status.progress}）` : '';
+  $('assist').hidden = !status;
+  $('assist').title = status ? status.text : '';
+  $('assist-task').textContent = status ? status.task : '';
+  $('assist-doing').textContent = status ? (status.doing || '') + progress : '';
+  $('claude-now').hidden = !status;
+  $('now-task').textContent = status ? status.task : '';
+  $('now-doing').textContent = status ? (status.doing || '') + progress : '';
+  $('claude-now').title = status ? status.text : '';
+  const sequence = assist.sequence;
+  $('seq').hidden = !(sequence && sequence.running);
+  $('seq-progress').textContent = sequence ? `${sequence.done}/${sequence.total}` : '';
+  const notes = (assist.notes || []).slice().reverse();
+  const nKey = JSON.stringify([notes, Math.floor(Date.now() / 60000)]);
+  if (nKey !== notesKey) {
+    notesKey = nKey;
+    $('notes').replaceChildren(...notes.map(note => {
+      const item = Object.assign(document.createElement('div'), {className: 'note'});
+      const meta = Object.assign(document.createElement('div'), {className: 'meta'});
+      if (note.author === 'claude') meta.append(Object.assign(document.createElement('span'), {className: 'mark', textContent: '✦', title: 'Claude'}));
+      meta.append(Object.assign(document.createElement('span'), {className: 'when meta', textContent: ago(note.at), title: new Date(note.at * 1000).toLocaleString('ja-JP')}));
+      const remove = Object.assign(document.createElement('button'), {className: 'mini', type: 'button', textContent: '削除'});
+      remove.setAttribute('aria-label', 'このメモを削除');
+      remove.addEventListener('click', () => quiet(command('note_delete', {id: note.id})));
+      meta.append(remove);
+      item.append(meta, Object.assign(document.createElement('div'), {className: 'text', textContent: note.text}));
+      return item;
+    }));
+  }
+  const activity = (assist.activity || []).slice().reverse();
+  const latest = activity.length ? activity[0].at : 0;
+  const aKey = JSON.stringify(activity);
+  if (aKey !== activityKey) {
+    activityKey = aKey;
+    $('activity').replaceChildren(...activity.map(entry => {
+      const row = Object.assign(document.createElement('div'), {className: 'act'});
+      row.append(Object.assign(document.createElement('span'), {className: 'when', textContent: new Date(entry.at * 1000).toLocaleTimeString('ja-JP')}),
+                 Object.assign(document.createElement('span'), {className: 'what', textContent: entry.text, title: entry.text}));
+      return row;
+    }));
+  }
+  if (seenActivity === null || claudeTabOpen()) seenActivity = latest;
+  $('tab-claude').classList.toggle('tab-unread', latest > seenActivity);
+}
+
+// Recording: the camera tab button and a header mark while it runs; both stop it.
+function renderRecording() {
+  const rec = state.recording;
+  const on = !!(rec && rec.recording);
+  const elapsed = on ? `${Math.floor(rec.elapsed || 0)}秒` : '';
+  $('record').textContent = on ? `停止 ${elapsed}` : '録画';
+  $('record').classList.toggle('danger', on);
+  $('record').setAttribute('aria-label', on ? '録画を停止' : '録画');
+  $('record').disabled = !on && !state.camera_live;
+  $('rec-mark').hidden = !on;
+  $('rec-mark').textContent = elapsed;
+}
+
+// Watch: settings in the notify tab, incidents in the Claude tab, and a header mark for a recent problem.
+const INCIDENT_RECENT = 600;
+let incidentsKey = '';
+function incidentTime(at) {
+  const date = new Date(at * 1000);
+  const today = date.toDateString() === new Date().toDateString();
+  return today ? date.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'})
+               : date.toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'});
+}
+function renderWatch() {
+  const watch = state.watch || {};
+  const settings = watch.settings || {};
+  const keep = id => document.activeElement === $(id);
+  if (!keep('watch-enabled')) $('watch-enabled').checked = !!settings.enabled;
+  if (!keep('watch-freeze')) $('watch-freeze').value = settings.freeze_seconds ?? '';
+  if (!keep('watch-notify')) $('watch-notify').checked = !!settings.notify;
+  if (!keep('watch-restart')) $('watch-restart').checked = !!settings.auto_restart;
+  if (!keep('watch-limit')) $('watch-limit').value = settings.restart_limit ?? '';
+  ['watch-freeze', 'watch-notify', 'watch-restart'].forEach(id => $(id).disabled = !settings.enabled);
+  $('watch-limit').disabled = !settings.enabled || !settings.auto_restart;
+
+  const incidents = (watch.incidents || []).slice().reverse();
+  const now = Date.now() / 1000;
+  const alarm = incidents.find(i => i.kind !== 'finished' && now - i.at < INCIDENT_RECENT);
+  $('incident-mark').hidden = !alarm;
+  $('incident-mark').title = alarm ? `${incidentTime(alarm.at)} ${alarm.message}` : '';
+  $('col-inc').hidden = !incidents.length;
+  document.querySelector('.claude-cols').classList.toggle('incidents', incidents.length > 0);
+  const key = JSON.stringify(incidents.map(i => [i.id, i.restarted]));
+  if (key === incidentsKey) return;
+  incidentsKey = key;
+  $('incidents').replaceChildren(...incidents.map(incident => {
+    const item = Object.assign(document.createElement('div'), {className: 'note incident'});
+    const meta = Object.assign(document.createElement('div'), {className: 'meta'});
+    if (incident.kind !== 'finished') meta.append(Object.assign(document.createElement('span'), {className: 'warn', textContent: '⚠'}));
+    meta.append(Object.assign(document.createElement('span'), {className: 'when', textContent: incidentTime(incident.at),
+                                                               title: new Date(incident.at * 1000).toLocaleString('ja-JP')}));
+    if (incident.script) meta.append(Object.assign(document.createElement('span'), {className: 'script', textContent: splitName(incident.script).name, title: incident.script}));
+    if (incident.restarted) meta.append(Object.assign(document.createElement('span'), {className: 'restarted', textContent: '開始し直した'}));
+    const text = Object.assign(document.createElement('div'), {className: 'text', textContent: incident.message});
+    if (incident.detail) text.title = incident.detail;
+    item.append(meta, text);
+    return item;
+  }));
 }
 
 // Coordinates and colour (show_value): like the original preview, log the clicked point in preview and capture pixels.
@@ -1046,6 +1339,18 @@ const shortQuery = matchMedia('(max-height: 459px)');
 const tabArea = document.querySelector('.area-tabs');
 function closePanel() { tabArea.classList.remove('open'); }
 $('panel-close').addEventListener('click', closePanel);
+$('seq-cancel').addEventListener('click', () => quiet(command('sequence_cancel')));
+$('incident-mark').addEventListener('click', () => {
+  $('tab-claude').click();
+  if (shortQuery.matches) tabArea.classList.add('open');
+});
+function addNote() {
+  const text = $('note-text').value.trim();
+  if (!text) return;
+  quiet(command('note', {text}).then(() => { $('note-text').value = ''; }));
+}
+$('note-add').addEventListener('click', addNote);
+$('note-text').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); addNote(); } });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && shortQuery.matches && $('dialog').hidden && !assigning) closePanel(); });
 shortQuery.addEventListener('change', closePanel);
 document.querySelectorAll('[role=tab]').forEach(tab => tab.addEventListener('click', event => {
@@ -1070,15 +1375,38 @@ document.querySelectorAll('.seg').forEach(group => group.querySelectorAll('butto
 })));
 
 // Scripts
-$('kind').addEventListener('change', () => { activeTag = ''; renderTags(); renderScripts(); });
+$('kind').addEventListener('change', () => { selectedScript = ''; renderFolders(); renderScripts(); });
+$('folder').addEventListener('change', renderScripts);
 $('filter').addEventListener('input', renderScripts);
 $('reload').addEventListener('click', () => quiet(command('reload')));
 $('start').addEventListener('click', () => {
-  const name = $('script').value;
+  const name = selectedScript;
   if (!name) { $('message').textContent = 'スクリプトを選んでください'; return; }
   quiet(command('start', {kind: $('kind').value, name}));
 });
-$('script').addEventListener('dblclick', () => { if (state && !state.running && $('script').value) $('start').click(); });
+// List: click selects, double click or Enter starts, arrow keys move.
+$('script-list').addEventListener('click', event => {
+  const row = event.target.closest('.item');
+  if (row) { selectScript(row.dataset.name); $('script-list').focus({preventScroll: true}); }
+});
+$('script-list').addEventListener('dblclick', event => {
+  const row = event.target.closest('.item');
+  if (row && state && !state.running) { selectScript(row.dataset.name); $('start').click(); }
+});
+$('script-list').addEventListener('keydown', event => {
+  const rows = [...$('script-list').querySelectorAll('.item')];
+  if (!rows.length) return;
+  const current = rows.findIndex(row => row.dataset.name === selectedScript);
+  let next = null;
+  if (event.key === 'ArrowDown') next = Math.min(rows.length - 1, current + 1);
+  else if (event.key === 'ArrowUp') next = Math.max(0, current < 0 ? 0 : current - 1);
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = rows.length - 1;
+  else if (event.key === 'Enter') { event.preventDefault(); if (selectedScript && state && !state.running) $('start').click(); return; }
+  if (next === null) return;
+  event.preventDefault();
+  selectScript(rows[next].dataset.name, true);
+});
 ['stop', 'head-stop'].forEach(id => $(id).addEventListener('click', () => quiet(command('stop'))));
 ['pause', 'head-pause'].forEach(id => $(id).addEventListener('click', () => quiet(command('suspend'))));
 ['resume', 'head-resume'].forEach(id => $(id).addEventListener('click', () => quiet(command('resume'))));
@@ -1094,6 +1422,12 @@ $('camera').addEventListener('change', () => quiet(command('camera', {path: $('c
 $('fps').addEventListener('change', () => quiet(command('choice', {name: 'fps', value: $('fps').value}).then(() => $('fps').blur())));
 $('camera-reconnect').addEventListener('click', () => quiet(command('camera_reconnect')));
 $('capture').addEventListener('click', () => quiet(command('capture')));
+function toggleRecording() {
+  const on = !!(state && state.recording && state.recording.recording);
+  quiet(command(on ? 'record_stop' : 'record_start', on ? {} : {seconds: 600}));
+}
+$('record').addEventListener('click', toggleRecording);
+$('rec-mark').addEventListener('click', toggleRecording);
 $('rescan').addEventListener('click', () => loadDevices(true));
 $('connect').addEventListener('click', () => {
   if (!$('port').value) { $('message').textContent = 'COMポートを選んでください'; return; }
@@ -1115,6 +1449,20 @@ document.querySelectorAll('input[name=dialog-buttons]').forEach(radio => radio.a
 $('auto-update').addEventListener('change', () => quiet(command('app_options', {auto_update: $('auto-update').checked})));
 $('prereleases').addEventListener('change', () => quiet(command('app_options', {prereleases: $('prereleases').checked})));
 $('update-now').addEventListener('click', () => quiet(command('update_now')));
+// Watch settings are saved on change; numbers are kept inside the ranges the app accepts.
+[['watch-enabled', 'enabled'], ['watch-notify', 'notify'], ['watch-restart', 'auto_restart']].forEach(([id, key]) =>
+  $(id).addEventListener('change', () => quiet(command('watch', {[key]: $(id).checked}))));
+$('watch-freeze').addEventListener('change', () => {
+  const value = Math.round(Number($('watch-freeze').value) || 0);
+  const seconds = value <= 0 ? 0 : Math.min(3600, Math.max(30, value));
+  $('watch-freeze').value = seconds;
+  quiet(command('watch', {freeze_seconds: seconds}));
+});
+$('watch-limit').addEventListener('change', () => {
+  const limit = Math.min(100, Math.max(0, Math.round(Number($('watch-limit').value) || 0)));
+  $('watch-limit').value = limit;
+  quiet(command('watch', {restart_limit: limit}));
+});
 document.querySelectorAll('[data-folder]').forEach(button => button.addEventListener('click', () =>
   command('open_folder', {folder: button.dataset.folder}).catch(() => {})));
 document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
@@ -1175,7 +1523,8 @@ $('opt-side-pad').addEventListener('change', () => { options.sidePad = $('opt-si
 const keyHeld = new Map(), keyNames = new Set();
 function keyName(event) { return event.key.length === 1 ? event.key.toLowerCase() : event.key; }
 function typingTarget(target) {
-  return !$('dialog').hidden || (target && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)));
+  return !$('dialog').hidden || (target && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+    || target.getAttribute('role') === 'listbox'));
 }
 function releaseKeys() {
   const names = [...keyHeld.values()];

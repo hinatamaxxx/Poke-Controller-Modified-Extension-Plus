@@ -12,6 +12,8 @@ namespace PokeControllerTray
         [DllImport("dwmapi.dll")]
         static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
         const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        [DllImport("user32.dll")]
+        static extern bool DestroyIcon(IntPtr handle);
 
         // アプリのモード（設定 → 個人用設定 → 色 →「既定のアプリ モード」）
         public static bool IsDark
@@ -64,7 +66,11 @@ namespace PokeControllerTray
                         g.DrawImageUnscaled(mark, off, off + ((size - glyph) % 2));
                     }
                     IntPtr h = bmp.GetHicon();
-                    return (Icon)Icon.FromHandle(h).Clone();
+                    try
+                    {
+                        using (var temp = Icon.FromHandle(h)) return (Icon)temp.Clone();
+                    }
+                    finally { DestroyIcon(h); }   // FromHandle はハンドルを解放しない
                 }
             }
             catch

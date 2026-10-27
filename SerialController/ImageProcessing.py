@@ -9,6 +9,13 @@ import os
 from typing import List, Tuple, Optional
 from logging import getLogger, DEBUG, NullHandler
 
+# ロガーの設定は 1 回だけ行う(フォーク元 0.2.0 の修正)
+# 以前は「1 回だけ」の印が立たず、画像認識のたびにハンドラが増え続けてメモリを使っていた
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 
 def crop_image(image: ndarray, crop: List[int] = None) -> ndarray:
     """
@@ -156,8 +163,7 @@ class ImageProcessing:
     画像に関する処理を行う。
     """
 
-    __logger = None
-    __activate_logger = False
+    __logger = _logger
     __gsrc = None
     __gtmpl = None
     __gresult = None
@@ -165,12 +171,6 @@ class ImageProcessing:
     image_type = ndarray
 
     def __init__(self, use_gpu: bool = False):
-        # ロガーを起動する(1回だけ)
-        if not self.__activate_logger:
-            self.__logger = getLogger(__name__)
-            self.__logger.addHandler(NullHandler())
-            self.__logger.setLevel(DEBUG)
-            self.__logger.propagate = True
         # GUP使用時、デバイスのメモリを確保する(1回だけ)
         if use_gpu:
             """
@@ -236,7 +236,7 @@ class ImageProcessing:
             self.__gtmpl.upload(template_image)
             matcher = cv2.cuda.createTemplateMatching(cv2.CV_8UC1, method)
             self.__gresult = matcher.match(self.__gsrc, self.__gtmpl)
-            res = self.gresult.download()
+            res = self.__gresult.download()  # 以前は self.gresult でエラーになっていた(フォーク元 0.2.0 の修正)
         else:
             res = cv2.matchTemplate(image, template_image, method, mask=mask_image)
         _, max_val, _, max_loc = cv2.minMaxLoc(res)  # 結果から類似度と類似度が最大となる場所を抽出
@@ -301,10 +301,11 @@ class ImageProcessing:
         複数のテンプレート画像を用いてそれぞれテンプレートマッチングを行い類似度が最も大きい画像のindexを返す
         """
         # パラメータチェックを行う
-        if len(template_image_list) == len(mask_image_list):
-            mask_image_list_temp = mask_image_list
+        # (以前は、マスク画像のリストを渡すと、数が合っていても -1 を返していた。フォーク元 0.2.0 の修正)
         if len(mask_image_list) == 0:
             mask_image_list_temp = [None for i in range(len(template_image_list))]
+        elif len(template_image_list) == len(mask_image_list):
+            mask_image_list_temp = mask_image_list
         else:
             print("The number of template images and mask images don't match. ")
             return -1, [], [], [], [], []
@@ -348,6 +349,12 @@ class ImageProcessing:
         """
         画像を保存する。
         """
+        if not filename:
+            # 以前は os.path.dirname(None) でエラーになっていた(フォーク元 0.2.0 の修正)
+            print("Capture Failed: 保存するファイル名が指定されていません。")
+            self.__logger.error("Capture Failed: filename is not specified")
+            return
+
         # トリミングを行う
         cropped_image = crop_image(image, crop=crop)
 
@@ -355,18 +362,24 @@ class ImageProcessing:
         capture_dir = os.path.dirname(filename)
 
         # 画像保存用ディレクトリの存在を確認し、なかったら作成する。
-        if not os.path.exists(capture_dir):
+        # (フォルダーの部分がない名前は、今のフォルダーに保存する)
+        if capture_dir and not os.path.exists(capture_dir):
             os.makedirs(capture_dir)
             self.__logger.debug("Created Capture folder")
 
-        # 画像を保存する
+        # 画像を保存する(imwrite は失敗しても例外を出さずに False を返すので、戻り値で判定する。
+        # 以前は失敗しても "capture succeeded" と表示していた。フォーク元 0.2.0 の修正)
         try:
-            self.imwrite(filename, cropped_image)
+            saved = self.imwrite(filename, cropped_image)
+        except cv2.error as e:
+            saved = False
+            self.__logger.error(f"Capture Failed :{e}")
+        if saved:
             self.__logger.debug(f"Capture succeeded: {filename}")
             print("capture succeeded: " + filename)
-        except cv2.error as e:
+        else:
             print("Capture Failed")
-            self.__logger.error(f"Capture Failed :{e}")
+            self.__logger.error(f"Capture Failed: {filename}")
 
 
 if __name__ == "__main__":

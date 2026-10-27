@@ -234,6 +234,12 @@ class Dialogs:
             expected = sum(1 for f in entry['fields'] if f['type'] != 'next')
             if not isinstance(values, list) or len(values) != expected:
                 raise ValueError(f'Expected {expected} values')
+            for field, value in zip([f for f in entry['fields'] if f['type'] != 'next'], values):
+                if field['type'] == 'scale':
+                    try:
+                        float(value)
+                    except (TypeError, ValueError):
+                        raise ValueError(f"{field['label']}: a number is required") from None
         entry['answer'] = values
         entry['event'].set()
 
@@ -291,6 +297,12 @@ class Core:
         self.keys_software_controller = KeyPress(self.ser)
         self.cur_command, self.running = None, False
         self.reported_error = ''
+        from assist import Assist
+        self.assist = Assist(self, profile_dir)
+        from watch import Watch
+        from recorder import Recorder
+        self.watch = Watch(self, profile_dir)
+        self.recorder = Recorder(self)
         self.load_scripts()
         self.open_camera()
         self.open_serial()
@@ -515,12 +527,42 @@ class Core:
             self.mcu_classes = self.mcu_loader.reload()
             print('スクリプトを再読み込みしました。')
 
+    def write_script(self, path, content, overwrite=False):
+        """Save a script, reload, and report the script names it defines or why it could not be loaded."""
+        import importlib
+        import os
+        import sys
+        import traceback
+        import script_files
+        with self.lock:
+            backup = script_files.write(path, content, overwrite)
+            module = script_files.module_name(path)
+            result = {'path': str(path), 'backup': backup, 'names': [], 'error': ''}
+            if self.running:
+                result['error'] = 'スクリプトの実行中なので、再読み込みしていません。止めてから reload してください。'
+                return result
+            # Forget the old module so nothing of the previous version stays when the new one fails to load.
+            self.py_loader.modules = [m for m in self.py_loader.modules if m.__name__ != module]
+            sys.modules.pop(module, None)
+            importlib.invalidate_caches()
+            self.reload_scripts()
+            result['names'] = [c.NAME for c in self.py_classes if c.__module__ == module]
+            if not result['names']:
+                try:
+                    importlib.import_module(module)
+                    result['error'] = 'NAME を持つ PythonCommand（または ImageProcPythonCommand）のクラスがありません。'
+                except Exception:
+                    lines = traceback.format_exc().splitlines(True)
+                    first = next((n for n, line in enumerate(lines) if script_files.ROOT.replace(os.sep, '') in line.replace(os.sep, '').replace('/', '')), 0)
+                    result['error'] = ''.join(lines[first:][-12:])
+            return result
+
     def catalog(self):
         def describe(classes):
             return [{'name': c.NAME, 'tags': list(getattr(c, 'TAGS', []) or [])} for c in classes]
         return {'python': describe(self.py_classes), 'mcu': describe(self.mcu_classes)}
 
-    def start_script(self, kind, name):
+    def start_script(self, kind, name, restart=False):
         from Commands.CommandBase import Command
         from Commands import PythonCommandBase
         with self.lock:
@@ -549,6 +591,7 @@ class Core:
             self.cur_command, self.running = command, True
             print('開始 ' + command.NAME)
             command.start(self.ser, self._finished)
+            self.watch.script_started(kind, name, restart)
 
     def _finished(self):
         self.running = False
@@ -557,7 +600,9 @@ class Core:
     def stop_script(self):
         from Commands.CommandBase import Command
         with self.lock:
+            self.assist.cancel_sequence()
             if self.running and self.cur_command is not None:
+                self.watch.expect_stop()
                 print('停止 ' + self.cur_command.NAME)
                 Command.isPause = False
                 self.dialogs.cancel_all()
@@ -687,12 +732,14 @@ class Core:
                 self.reported_error = error
                 print(error)
                 if self.running and self.cur_command is not None:
+                    self.watch.serial_lost(error)
                     self.dialogs.cancel_all()
                     self.cur_command.end(self.ser)
             if not error:
                 self.reported_error = ''
             if self.running and not self.script_alive():
                 self.running = False
+            self.watch.tick()
             self.reconnect_camera()
 
     def reconnect_camera(self):
@@ -750,11 +797,14 @@ class Core:
                 'held': [getattr(b, 'showName', None) or b.name for b in keys.holdButton],
                 'options': self.options(), 'dialogs': self.dialogs.current(), 'keymap': self.keymap(),
                 'choices': self.choices(), 'shortcuts': self.shortcuts(), 'notification': self.notification_settings(),
+                'assist': self.assist.snapshot(), 'watch': self.watch.snapshot(), 'recording': self.recorder.state(),
                 'log': self.log1.tail(), 'log2': self.log2.tail()}
 
     def close(self):
         """Stop the script, release the port and camera, and save settings."""
         self.stop_script()
+        if self.recorder.current and self.recorder.current['thread'].is_alive():
+            self.recorder.stop()
         deadline = time.monotonic() + 5
         while self.script_alive() and time.monotonic() < deadline:
             time.sleep(.05)

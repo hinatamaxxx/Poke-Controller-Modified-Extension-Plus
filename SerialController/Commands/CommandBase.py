@@ -65,6 +65,14 @@ class Command:
     def checkIfAlive(self):
         pass
 
+    def finish(self):
+        """
+        コマンドを終える(ダイアログをキャンセルしたときに呼ばれる)。
+        PythonCommand は入力を離して StopThread を出す。ここでは何もしない
+        (以前は Mcu コマンドなどでダイアログをキャンセルするとエラーになっていた。フォーク元 0.2.0 の修正)
+        """
+        pass
+
     ############### print functions ###############
     def print_s(self, *objects: object, sep: str = " ", end: str = "\n"):
         print(*objects, sep=sep, end=end)
