@@ -227,7 +227,8 @@ def build_server(endpoint_path=None, autostart=True):
 
     @server.tool(annotations=read_only)
     def list_templates(session_id: str) -> dict:
-        """List template image paths (relative to the Template folder) that find_template can use."""
+        """List template image paths that find_template can use: relative to the Template folder, or "スクリプト/..." for
+        images kept with the scripts (each script's 画像 folder and スクリプト/共通/画像)."""
         return call(session_id, 'templates')
 
     @server.tool(annotations=read_only)
@@ -354,17 +355,20 @@ def build_server(endpoint_path=None, autostart=True):
     # ---- scripts and templates ----
     @server.tool(annotations=read_only)
     def list_script_files(session_id: str) -> dict:
-        """Python script files under Commands/PythonCommands (paths relative to it)."""
+        """Python script files: the user's ones in スクリプト (paths relative to it, one folder per script) and the
+        bundled samples and older scripts as "Commands/PythonCommands/..."."""
         return call(session_id, 'script_files')
 
     @server.tool(annotations=read_only)
     def read_script(session_id: str, path: str) -> dict:
-        """Read a script file (path relative to Commands/PythonCommands), e.g. to follow an existing one's style."""
+        """Read a script file (a path from list_script_files), e.g. to follow an existing one's style."""
         return call(session_id, 'read_script', {'path': path})
 
     @server.tool(annotations=control)
     def write_script(session_id: str, path: str, content: str, overwrite: bool = False) -> dict:
-        """Save a Python script under Commands/PythonCommands (e.g. "Claude/ShinyReset.py") and reload scripts.
+        """Save a Python script in スクリプト, one folder per script (e.g. "SV/ShinyReset/ShinyReset.py"), and reload.
+        Put its images in that folder's 画像 (save_template "スクリプト/SV/ShinyReset/画像/x.png"); isContainTemplate("x.png")
+        looks there first, then in the 画像 of the folders above it, スクリプト/共通/画像 (images several scripts use) and Template.
         Write a class deriving from ImageProcPythonCommand (or PythonCommand) with a NAME and do(); use
         self.press(Button.A, duration, wait), self.wait(s), self.isContainTemplate("name.png", threshold) and
         print() for progress. Existing files are backed up to Backups/scripts and replaced only with overwrite.
@@ -374,8 +378,9 @@ def build_server(endpoint_path=None, autostart=True):
 
     @server.tool(annotations=control)
     def save_template(session_id: str, name: str, x: int, y: int, width: int, height: int, overwrite: bool = False) -> dict:
-        """Cut an area of the current capture (pixels of get_capture's image) into Template/<name>.png for
-        isContainTemplate. Pick a part that only appears on the screen you want to detect."""
+        """Cut an area of the current capture (pixels of get_capture's image) into an image for isContainTemplate:
+        "スクリプト/<script folder>/画像/<name>.png" for one script, "スクリプト/共通/画像/<name>.png" for several, or a
+        name relative to Template. Pick a part that only appears on the screen you want to detect."""
         return call(session_id, 'command', {'action': 'save_template', 'values': {
             'name': name, 'x': x, 'y': y, 'width': width, 'height': height, 'overwrite': overwrite}})
 

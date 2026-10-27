@@ -562,7 +562,8 @@ class Core:
         import Utility as util
         from CommandLoader import CommandLoader
         from Commands import PythonCommandBase, McuCommandBase
-        self.py_loader = CommandLoader(util.ospath('Commands/PythonCommands'), PythonCommandBase.PythonCommand)
+        import Paths
+        self.py_loader = CommandLoader([util.ospath('Commands/PythonCommands'), Paths.SCRIPTS], PythonCommandBase.PythonCommand)
         self.mcu_loader = CommandLoader(util.ospath('Commands/McuCommands'), McuCommandBase.McuCommand)
         self.py_classes = self.py_loader.load()
         self.mcu_classes = self.mcu_loader.load()
@@ -601,7 +602,7 @@ class Core:
                     result['error'] = 'NAME を持つ PythonCommand（または ImageProcPythonCommand）のクラスがありません。'
                 except Exception:
                     lines = traceback.format_exc().splitlines(True)
-                    first = next((n for n, line in enumerate(lines) if script_files.ROOT.replace(os.sep, '') in line.replace(os.sep, '').replace('/', '')), 0)
+                    first = next((n for n, line in enumerate(lines) if script_files.resolve(path) in line), 0)
                     result['error'] = ''.join(lines[first:][-12:])
             return result
 

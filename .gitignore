@@ -21,6 +21,7 @@
 .idea/
 SerialController/Captures/
 SerialController/Backups/
+SerialController/スクリプト/
 SerialController/Template/*
 !SerialController/Template/Samples/
 SerialController/profiles/
