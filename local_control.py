@@ -462,7 +462,7 @@ class LocalControl(ApiServer):
         keys.holdEnd(held)
 
     UNLOCKED = {'frame', 'frame_raw', 'summary', 'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
-                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices'}
+                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices', 'about'}
     UNLOCKED_ACTIONS = {'notify_test', 'record_stop'}
 
     def neutral(self):
@@ -510,6 +510,8 @@ class LocalControl(ApiServer):
             if params.get('after') == at:
                 return {'jpeg': None, 'at': at}
             return {'jpeg': self.encode_frame(width=640 if params.get('small') else None), 'at': at}
+        if method == 'about':
+            return self.core.about()
         if method == 'summary':
             return self.summary()
         if method == 'web_url':
@@ -585,6 +587,8 @@ class LocalControl(ApiServer):
             core.dialogs.answer(values.get('dialog'), values.get('values'))
         elif action == 'capture':
             core.save_capture()
+        elif action == 'discord_image':
+            core.send_discord_image()
         elif action == 'clear_log':
             core.clear_log(1 if values.get('log') == 1 else 2)
         elif action == 'app_options':
