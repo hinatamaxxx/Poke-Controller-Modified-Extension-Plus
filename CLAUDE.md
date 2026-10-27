@@ -3,7 +3,7 @@
 Poke-Controller は画面を持たず、ブラウザの操作画面と MCP で使う。
 
 1. MCP の `list_sessions` を呼ぶ（本体が動いていなければ自動で起動する）。セッションは Switch 1 台ずつ（画面のタブ）。利用者が「2号機で」などと言ったら `label` で選ぶ。MCP がないときは `PokeController.exe --background`（ソースなら `python app.py --background`）で起動し、`runtime/controller-*.json`（インストール版は `%LOCALAPPDATA%\PokeController\runtime`）の `web_url` を読む。
-2. `get_web_url` の URL を `mcp__Claude_Browser__preview_start` に `url` として渡して開く。
+2. `get_web_url` の URL を `mcp__Claude_Browser__preview_start` に `url` として渡して開く。利用者が「ポケコンを開いて」と頼んだときも同じ。
 3. 操作は要素を aria-label（「A」「十字キー上」「左スティック」など）で `find` してから押す。座標で押すとスクロールでずれる。スティックは JavaScript で要素の中心を求めてからドラッグするか、MCP の `tilt_stick` を使う。
 4. 押した結果は映像で確かめる。カメラや COM は「接続」タブ、通知や更新は「設定」タブ。スクリプトがダイアログを出したら画面に表示されるので、入力して OK を押す。
 

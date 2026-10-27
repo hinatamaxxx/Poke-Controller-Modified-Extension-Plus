@@ -152,7 +152,7 @@ def build_server(endpoint_path=None, autostart=True):
     @server.tool(annotations=control)
     def close_switch(session_id: str) -> dict:
         """Close a Switch's tab: its script is stopped and its process ends. Settings are kept; the user can reopen
-        it from ＋. The first Switch cannot be closed."""
+        it from ＋. The last open Switch cannot be closed."""
         return hub_call('switch_close', {'switch': session_id}, session_id)
 
     @server.tool(annotations=control)

@@ -43,7 +43,9 @@ class Registry:
         if not any(e['profile'] == primary for e in self.entries):
             self.entries.insert(0, {'id': uuid.uuid4().hex, 'profile': primary, 'label': 'Switch 1', 'open': True})
         for entry in self.entries:
-            entry['open'] = bool(entry.get('open', True)) or entry['profile'] == primary
+            entry['open'] = bool(entry.get('open', True))
+        if not any(e['open'] for e in self.entries):  # one Switch is always open
+            self.entries[0]['open'] = True
         self.save()
 
     def save(self):
@@ -374,8 +376,8 @@ class Hub(ApiServer):
                 worker.start()
 
     @property
-    def id(self):  # the tray's channel addresses the first Switch
-        return self.registry.entries[0]['id']
+    def id(self):  # the tray's channel addresses the first open Switch
+        return next(e['id'] for e in self.registry.entries if e.get('open'))
 
     def incident_id(self):
         self._incident_id = max(self._incident_id + 1, int(time.time() * 1000))
@@ -451,8 +453,8 @@ class Hub(ApiServer):
         if method in ('switch_close', 'switch_open', 'switch_rename', 'switch_restart'):
             worker = self.worker(params.get('switch') or params.get('id'))
             if method == 'switch_close':
-                if worker.profile == self.registry.primary:
-                    raise ValueError('最初の Switch は閉じられません')
+                if [w.id for w in self.open_workers()] == [worker.id]:
+                    raise ValueError('最後の Switch は閉じられません')
                 self.registry.update(worker.id, open=False)
                 threading.Thread(target=worker.stop, daemon=True).start()
             elif method == 'switch_open':

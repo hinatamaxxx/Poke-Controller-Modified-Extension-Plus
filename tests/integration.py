@@ -85,7 +85,7 @@ async def switches(client, endpoint, first, demo_name):
     assert not result.is_error, result
     until(lambda: len(call(endpoint, 'sessions')) == 1, timeout=30)
     result = await client.call_tool('close_switch', {'session_id': first})
-    assert result.is_error, 'the first Switch cannot be closed'
+    assert result.is_error, 'the last open Switch cannot be closed'
 
 
 def browser(endpoint):

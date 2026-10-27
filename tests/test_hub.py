@@ -30,6 +30,16 @@ class RegistryTest(unittest.TestCase):
             self.assertEqual([e['open'] for e in again.entries], [True, False, True])
             self.assertEqual(again.add()['profile'], 'main-4')
 
+    def test_the_first_switch_can_be_closed_but_one_stays_open(self):
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / 'main').mkdir()
+            registry = hub.Registry(folder, 'main')
+            second = registry.add()
+            registry.update(registry.entries[0]['id'], open=False)
+            self.assertEqual([e['open'] for e in hub.Registry(folder, 'main').entries], [False, True])
+            registry.update(second['id'], open=False)
+            self.assertEqual([e['open'] for e in hub.Registry(folder, 'main').entries], [True, False])
+
     def test_broken_list_starts_over_with_the_first_switch(self):
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder) / 'main').mkdir()
