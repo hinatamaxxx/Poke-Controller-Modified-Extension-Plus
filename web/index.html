@@ -351,7 +351,8 @@ table.notify input { margin: 1px 0; }
                       --key-w: calc(var(--key-h) * 1.45); --stick: calc(var(--key-h) * 2.2); --key-gap: clamp(3px, calc(var(--key-h) / 7), 6px); }
 .pad-slot .ctl { font-size: clamp(10px, calc(var(--key-h) * .42), 15px); }
 .pad .ctl[data-btn=HOME] { font-size: clamp(8px, calc(var(--key-h) * .34), 13px); letter-spacing: -.02em; }
-.manual-options { justify-content: center; font-size: 12px; }
+.manual-options { justify-content: center; font-size: 12px; margin-top: 6px; }
+#side-pad-option[hidden] { display: none; }
 
 /* Claude: what it is doing now (header and tab), notes, and what it did. */
 .assist { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 6px; overflow: hidden; font-size: 12px; }
@@ -518,10 +519,6 @@ table.notify input { margin: 1px 0; }
     <div class="tabpanel" role="tabpanel" id="panel-pad" aria-labelledby="tab-pad" hidden>
       <div class="view" id="pad-main">
         <div class="pad-slot" id="pad-slot"></div>
-        <div class="checks manual-options">
-          <label><input type="checkbox" data-option="keyboard"> キーボードで操作</label>
-          <label><input type="checkbox" id="opt-side-pad"> コントローラーを映像の横に並べる</label>
-        </div>
       </div>
     </div>
 
@@ -615,6 +612,10 @@ table.notify input { margin: 1px 0; }
                aria-label="右スティック" title="軽くタップで押し込み" aria-valuetext="中央"><div class="knob"></div></div>
         </div>
       </div>
+    </div>
+    <div class="checks manual-options">
+      <label><input type="checkbox" data-option="keyboard"> キーボードで操作</label>
+      <label id="side-pad-option"><input type="checkbox" id="opt-side-pad"> コントローラーを映像の横に並べる</label>
     </div>
     </div>
   </section>
@@ -2119,6 +2120,10 @@ function placePad() {
   document.body.classList.toggle('pad-tab', inTab);
   const home = inTab ? $('pad-slot') : document.querySelector('.area-pad');
   if ($('pad-wrap').parentElement !== home) home.append($('pad-wrap'));
+  // The manual tab exists only while the controller is in it; placing it beside the video only matters when narrow.
+  $('tab-pad').hidden = !inTab;
+  if (!inTab && $('tab-pad').getAttribute('aria-selected') === 'true') $('tab-script').click();
+  $('side-pad-option').hidden = !narrowQuery.matches || portraitQuery.matches;
 }
 [portraitQuery, narrowQuery, shortQuery].forEach(query => query.addEventListener('change', placePad));
 $('opt-side-pad').addEventListener('change', () => { options.sidePad = $('opt-side-pad').checked; saveOption('sidePad', options.sidePad); placePad(); });
