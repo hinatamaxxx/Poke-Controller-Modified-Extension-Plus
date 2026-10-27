@@ -86,11 +86,17 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 .menu-button:hover, .menu-button[aria-expanded=true] { background: var(--chip); color: var(--text); }
 .sw-menu button kbd { float: right; margin-left: 16px; font: 11px system-ui, sans-serif; color: var(--muted); }
 /* Settings: a page under the title bar, sections on the left as in Chrome's settings. */
-.settings { position: fixed; left: 0; right: 0; bottom: 0; top: var(--head); z-index: 9; background: var(--bg); display: flex; gap: 0; }
+.settings { position: fixed; left: 0; right: 0; bottom: 0; top: var(--head); z-index: 9; background: var(--shade); display: grid; place-items: center; padding: 16px;
+            animation: fade-in .12s ease-out; }
 .settings[hidden] { display: none; }
-.settings-nav { flex: none; width: 200px; display: flex; flex-direction: column; gap: 1px; padding: 14px 8px; overflow-y: auto; }
-.settings-nav .group { font-size: 11px; color: var(--muted); padding: 10px 12px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.settings-nav .group:first-child { padding-top: 0; }
+.settings-window { width: min(880px, 100%); height: min(600px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+                   box-shadow: 0 16px 48px rgba(0, 0, 0, .35); overflow: hidden; animation: pop-in .14s ease-out; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .settings, .settings-window { animation: none; } }
+.settings-nav { flex: none; width: 190px; display: flex; flex-direction: column; gap: 1px; padding: 14px 8px; overflow-y: auto; background: var(--strip); }
+.settings-title { font-size: 15px; margin: 0 0 8px; padding: 2px 12px; }
+.settings-nav hr { border: 0; border-top: 1px solid var(--line); margin: 6px 10px; }
 .settings-nav button { font: inherit; text-align: left; color: var(--text); background: none; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
 .settings-nav button:hover { background: var(--chip); }
 .settings-nav button[aria-current=page] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
@@ -104,13 +110,24 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 .settings-close { position: absolute; right: 14px; top: 10px; font: inherit; font-size: 15px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .settings-close:hover { background: var(--chip); color: var(--text); }
 @media (max-width: 700px) {
-  .settings { flex-direction: column; }
+  .settings { padding: 8px; }
+  .settings-window { flex-direction: column; height: 100%; }
   .settings-nav { width: auto; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-  .settings-nav .group { display: none; }
+  .settings-title, .settings-nav hr { display: none; }
   .settings-nav button { padding: 3px 10px; }
   .settings-main { padding: 8px; }
   .settings-close { top: 4px; right: 6px; }
 }
+.dest-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; max-width: 420px; }
+.dest { display: flex; align-items: center; gap: 10px; font: inherit; color: var(--text); background: none; border: 0; padding: 8px 12px; cursor: pointer; text-align: left; }
+.dest + .dest { border-top: 1px solid var(--line); }
+.dest:hover { background: var(--chip); }
+.dest .name { flex: 1; }
+.dest .state { color: var(--ok); font-size: 12px; }
+.dest .go { color: var(--muted); font-size: 16px; }
+.modal .actions .grow { flex: 1; }
+#dest .fields input { min-width: 0; }
+#dest .fields[hidden], .modal .actions button[hidden] { display: none; }
 .modal .box.wide { width: min(720px, 100%); display: flex; flex-direction: column; }
 .modal .box pre { max-height: 60dvh; min-height: 6em; }
 .modal textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; resize: vertical; min-height: 5em; }
@@ -614,13 +631,14 @@ table.notify input { margin: 1px 0; }
 </div>
 
 <div class="settings" id="settings" role="dialog" aria-modal="true" aria-label="設定" hidden>
+ <div class="settings-window">
   <nav class="settings-nav" aria-label="設定の項目">
-    <div class="group" id="settings-switch"></div>
+    <h2 class="settings-title">設定</h2>
     <button type="button" data-page="set-notify" aria-current="page">通知</button>
     <button type="button" data-page="set-watch">見張り</button>
     <button type="button" data-page="set-view">表示</button>
     <button type="button" data-page="set-keys">キー設定</button>
-    <div class="group">アプリ</div>
+    <hr>
     <button type="button" data-page="set-update">更新</button>
     <button type="button" data-page="set-folders">フォルダー</button>
     <button type="button" data-page="set-about">このアプリについて</button>
@@ -649,17 +667,10 @@ table.notify input { margin: 1px 0; }
           </tbody>
         </table>
       <h3>送り先</h3>
-
-        <div class="form form3">
-          <label for="line-token">LINE <span class="set" id="line-set" hidden>✓</span></label>
-          <input type="password" id="line-token" autocomplete="off" placeholder="トークン" aria-label="LINEのトークン">
-          <button class="cmd" id="save-line">保存</button>
-          <label for="discord-url">Discord <span class="set" id="discord-set" hidden>✓</span></label>
-          <input type="password" id="discord-url" autocomplete="off" placeholder="Webhook URL" aria-label="DiscordのWebhook URL">
-          <button class="cmd" id="save-discord" style="grid-row: span 2; align-self: stretch">保存</button>
-          <label for="discord-name">ユーザー名</label>
-          <input type="text" id="discord-name" autocomplete="off" aria-label="Discordのユーザー名">
-        </div>
+      <div class="dest-list">
+        <button type="button" class="dest" data-dest="discord"><span class="name">Discord</span><span class="state" id="discord-set" hidden>設定済み</span><span class="go" aria-hidden="true">›</span></button>
+        <button type="button" class="dest" data-dest="line"><span class="name">LINE</span><span class="state" id="line-set" hidden>設定済み</span><span class="go" aria-hidden="true">›</span></button>
+      </div>
     </section>
     <section class="settings-page" id="set-watch" hidden>
       <h2>見張り</h2>
@@ -729,6 +740,7 @@ table.notify input { margin: 1px 0; }
       <div class="row"><button class="cmd danger" id="quit">アプリを終了</button></div>
     </section>
   </div>
+ </div>
 </div>
 <div class="sw-menu" id="sw-menu" role="menu" hidden></div>
 <div class="sw-menu" id="app-menu" role="menu" aria-label="メニュー" hidden>
@@ -742,6 +754,28 @@ table.notify input { margin: 1px 0; }
   <button type="button" role="menuitem" data-menu="help">ヘルプ</button>
   <hr>
   <button type="button" role="menuitem" data-menu="quit">アプリを終了</button>
+</div>
+<div class="modal" id="dest" role="dialog" aria-modal="true" aria-labelledby="dest-title" hidden>
+  <div class="box">
+    <h2 id="dest-title"></h2>
+    <div class="fields" id="dest-discord">
+      <label for="discord-url">Webhook URL</label>
+      <input type="password" id="discord-url" autocomplete="off" placeholder="変えるときだけ入力" aria-label="DiscordのWebhook URL">
+      <label for="discord-name">ユーザー名</label>
+      <input type="text" id="discord-name" autocomplete="off" aria-label="Discordのユーザー名">
+    </div>
+    <div class="fields" id="dest-line">
+      <label for="line-token">トークン</label>
+      <input type="password" id="line-token" autocomplete="off" placeholder="変えるときだけ入力" aria-label="LINEのトークン">
+    </div>
+    <div class="actions">
+      <button type="button" class="cmd" id="dest-test">テスト通知</button>
+      <span class="grow"></span>
+      <button type="button" class="cmd" id="dest-close">閉じる</button>
+      <button type="button" class="cmd primary" id="save-discord">保存</button>
+      <button type="button" class="cmd primary" id="save-line">保存</button>
+    </div>
+  </div>
 </div>
 <div class="modal" id="info" role="dialog" aria-modal="true" aria-labelledby="info-title" hidden>
   <form class="box wide" id="info-form">
@@ -1295,8 +1329,6 @@ function showSettingsPage(page) {
   document.querySelector('.settings-main').scrollTo(0, 0);
 }
 function openSettings(page) {
-  const current = switches.find(item => item.id === session);
-  $('settings-switch').textContent = current ? current.label : 'Switch';
   $('settings').hidden = false;
   showSettingsPage(page || settingsPage);
   document.querySelector('.settings-nav [aria-current=page]').focus();
@@ -1307,9 +1339,34 @@ function closeSettings() {
 }
 document.querySelectorAll('.settings-nav [data-page]').forEach(button => button.addEventListener('click', () => showSettingsPage(button.dataset.page)));
 $('settings-close').addEventListener('click', closeSettings);
+$('settings').addEventListener('click', event => { if (event.target === $('settings')) closeSettings(); });
+// Where notifications go: one small window per service. Saved secrets are never shown again.
+let destKind = '';
+function openDest(kind) {
+  destKind = kind;
+  $('dest-title').textContent = kind === 'discord' ? 'Discord' : 'LINE';
+  $('dest-discord').hidden = kind !== 'discord';
+  $('dest-line').hidden = kind !== 'line';
+  $('save-discord').hidden = kind !== 'discord';
+  $('save-line').hidden = kind !== 'line';
+  $('dest').hidden = false;
+  (kind === 'discord' ? $('discord-url') : $('line-token')).focus();
+}
+function closeDest() {
+  $('dest').hidden = true;
+  $('discord-url').value = $('line-token').value = '';
+  document.querySelector(`.dest[data-dest="${destKind}"]`)?.focus();
+}
+document.querySelectorAll('.dest[data-dest]').forEach(button => button.addEventListener('click', () => openDest(button.dataset.dest)));
+$('dest-close').addEventListener('click', closeDest);
+$('dest-test').addEventListener('click', () => quiet(command('notify_test', {channel: destKind})));
+$('dest').addEventListener('keydown', event => {
+  if (event.key === 'Escape') { event.stopPropagation(); closeDest(); }
+  if (event.key === 'Enter' && event.target.tagName === 'INPUT') (destKind === 'discord' ? $('save-discord') : $('save-line')).click();
+});
 document.addEventListener('keydown', event => {
   if (event.key === ',' && event.ctrlKey) { event.preventDefault(); if ($('settings').hidden) openSettings(); else closeSettings(); }
-  else if (event.key === 'Escape' && !$('settings').hidden && $('info').hidden && $('app-menu').hidden) closeSettings();
+  else if (event.key === 'Escape' && !$('settings').hidden && $('info').hidden && $('dest').hidden && $('app-menu').hidden) closeSettings();
 });
 
 // In the app window the page draws the title bar; the window says whether it is framed and maximized.
@@ -1947,13 +2004,13 @@ document.querySelectorAll('[data-test]').forEach(button => button.addEventListen
 $('save-line').addEventListener('click', () => {
   const token = $('line-token').value.trim();
   if (!token) return;
-  quiet(command('notification', {line_token: token}).then(() => { $('line-token').value = ''; }));
+  quiet(command('notification', {line_token: token}).then(closeDest));
 });
 $('discord-name').addEventListener('input', () => { $('discord-name').dataset.edited = '1'; });
 $('save-discord').addEventListener('click', () => {
   const values = {discord_username: $('discord-name').value.trim()};
   if ($('discord-url').value.trim()) values.discord_webhook_url = $('discord-url').value.trim();
-  quiet(command('notification', values).then(() => { $('discord-url').value = ''; delete $('discord-name').dataset.edited; }));
+  quiet(command('notification', values).then(() => { delete $('discord-name').dataset.edited; closeDest(); }));
 });
 // Quitting stops the app for every viewer; the button asks for a second press instead of a pop-up.
 let quitArmed = null;
@@ -1999,7 +2056,7 @@ $('opt-side-pad').addEventListener('change', () => { options.sidePad = $('opt-si
 const keyHeld = new Map(), keyNames = new Set();
 function keyName(event) { return event.key.length === 1 ? event.key.toLowerCase() : event.key; }
 function typingTarget(target) {
-  return !$('dialog').hidden || !$('settings').hidden || !$('info').hidden || (target && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+  return !$('dialog').hidden || !$('settings').hidden || !$('info').hidden || !$('dest').hidden || (target && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
     || target.getAttribute('role') === 'listbox'));
 }
 function releaseKeys() {
