@@ -18,7 +18,7 @@ namespace PokeControllerTray
         readonly NotifyIcon tray;
         readonly ContextMenu menu;
         readonly MenuItem miTitle, miState, miOpen, miRestart, miUpdate, miVersion, miUpdateNow, miAutoUpdate;
-        readonly MenuItem miMore, miFolder, miRegister, miCopyCommand, miExit;
+        readonly MenuItem miFolder, miExit;
         readonly System.Windows.Forms.Timer pollTimer;
         readonly ServerHost host;
         readonly Icon icoNormal, icoStopped;
@@ -61,15 +61,11 @@ namespace PokeControllerTray
             miUpdate.MenuItems.AddRange(new MenuItem[] { miVersion, new MenuItem("-"), miUpdateNow, miAutoUpdate });
 
             miFolder = new MenuItem("作業フォルダーを開く", delegate { Command("open_folder", "folder", "workspace"); });
-            miRegister = new MenuItem("Claude Desktop に登録", delegate { RegisterClaudeDesktop(); });
-            miCopyCommand = new MenuItem("Claude Code 用コマンドをコピー", delegate { CopyClaudeCodeCommand(); });
-            miMore = new MenuItem("その他");
-            miMore.MenuItems.AddRange(new MenuItem[] { miFolder, new MenuItem("-"), miRegister, miCopyCommand });
 
             miExit = new MenuItem("アプリを終了する", delegate { ConfirmExit(); });
             menu.MenuItems.AddRange(new MenuItem[] {
                 miTitle, miState, new MenuItem("-"),
-                miOpen, miRestart, miUpdate, miMore, new MenuItem("-"), miExit });
+                miOpen, miRestart, miUpdate, miFolder, new MenuItem("-"), miExit });
             menu.Popup += delegate { Theme.RefreshMenus(); UpdateVisuals(); Poll(); };
 
             tray = new NotifyIcon { Icon = icoNormal, Text = Program.Title, ContextMenu = menu };
@@ -79,8 +75,6 @@ namespace PokeControllerTray
             InitMenuHover();
             InitSubmenuUp();
             SetHover(miVersion, delegate { string e = UpdateError(); return e == "" ? null : e; });
-            SetHover(miRegister, delegate { return "Claude Desktop の設定に MCP サーバーとして追加します。\nClaude Desktop を再起動すると使えます。"; });
-            SetHover(miCopyCommand, delegate { return "ターミナルに貼り付けて実行すると、Claude Code に登録されます。"; });
 
             pollTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             pollTimer.Tick += delegate { Poll(); };
@@ -326,59 +320,6 @@ namespace PokeControllerTray
         {
             if (state != ServerState.Ready) return;
             Command("app_options", "auto_update", !Flag(AppInfo, "auto_update"));
-        }
-
-        void CopyClaudeCodeCommand()
-        {
-            string exe = Path.Combine(Program.Root, "PokeControllerMCP.exe");
-            string text = "claude mcp add --scope user poke-controller -- " + (exe.IndexOf(' ') >= 0 ? "\"" + exe + "\"" : exe);
-            try
-            {
-                Clipboard.SetText(text);
-                ShowBalloon(4000, Program.Title, "Claude Code 用のコマンドをコピーしました", ToolTipIcon.Info);
-            }
-            catch (Exception ex) { MessageBox.Show(ex.Message, Program.Title, MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        }
-
-        // mcp_setup.py（設定ファイルを .bak を残して書き換える）を、記録した Python で実行する
-        void RegisterClaudeDesktop()
-        {
-            string python = ServerHost.FindPython();
-            if (python == null) { MessageBox.Show("Python の実行環境が見つかりません。", Program.Title, MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
-            const string code = "import sys; sys.path.insert(0, sys.argv[1]); import mcp_setup; " +
-                "paths = mcp_setup.desktop_configs(); [mcp_setup.register_desktop(p, sys.argv[1]) for p in paths]; print(len(paths))";
-            var psi = ServerHost.PythonStartInfo(python, "-c " + ServerHost.Quote(code) + " " + ServerHost.Quote(Program.Root.TrimEnd('\\')));
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string output = "", errors = "";
-                int exit = -1;
-                try
-                {
-                    using (var p = Process.Start(psi))
-                    {
-                        var err = p.StandardError.ReadToEndAsync();
-                        output = p.StandardOutput.ReadToEnd().Trim();
-                        errors = err.Result.Trim();
-                        p.WaitForExit();
-                        exit = p.ExitCode;
-                    }
-                }
-                catch (Exception ex) { errors = ex.Message; }
-                Post(delegate
-                {
-                    if (exit != 0)
-                    {
-                        string[] lines = errors.Split('\n');
-                        MessageBox.Show("Claude Desktop に登録できませんでした。\n" + lines[lines.Length - 1].Trim(), Program.Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                    else if (output == "0")
-                        MessageBox.Show("Claude Desktop の設定ファイルが見つかりません。Claude Desktop を一度起動してから、もう一度試してください。", Program.Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    else
-                        ShowBalloon(5000, Program.Title, "Claude Desktop に登録しました。Claude Desktop を再起動すると使えます。", ToolTipIcon.Info);
-                });
-            });
         }
 
         void ConfirmExit()
