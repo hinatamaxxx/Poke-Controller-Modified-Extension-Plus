@@ -179,7 +179,7 @@ class GuiSettings:
             "is_show_value": False,
             "is_show_guide": False,
             "is_show_serial": False,
-            "is_use_keyboard": False,
+            "is_use_keyboard": True,
             "serial_data_format_name": "Default",
             "touchscreen_start_x": 1,
             "touchscreen_start_y": 1,

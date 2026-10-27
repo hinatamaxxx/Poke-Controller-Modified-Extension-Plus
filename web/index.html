@@ -196,7 +196,6 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video pad" "bar bar"; padding: var(--gap) 8px 4px; }
   body.pad-tab main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video" "bar"; }
   body.pad-tab .video { height: 100%; }
-  .pad-options { margin-top: 2px; font-size: 11px; }
   /* The tab area spans the middle and bottom rows; only the strip shows until a panel is opened. */
   .area-tabs { position: relative; grid-row: 1 / 3; grid-column: 1 / -1; z-index: 1; padding: 0; border: 0; background: none;
                display: flex; flex-direction: column-reverse; pointer-events: none; }
@@ -329,7 +328,6 @@ table.notify input { margin: 1px 0; }
 .stick.dragging { cursor: grabbing; }
 .stick.dragging .knob { transition: none; }
 .stick.on .knob { background: var(--btn-on); }
-.pad-options { display: flex; justify-content: center; margin-top: 4px; font-size: 12px; flex: none; }
 .pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
 .pad-slot:empty { display: none; }
 .pad-slot .pad-wrap { --key-h: clamp(14px, min(calc((100cqh - 28px) / 8.2), calc((100cqw - 12px) / 10)), 46px);
@@ -409,6 +407,7 @@ table.notify input { margin: 1px 0; }
   <span class="badge" id="camera-state">カメラ: -</span>
   <span class="badge" id="serial-state">COM: -</span>
   <span class="badge" id="run-state">停止中</span>
+  <span class="badge ok" id="gamepad-state" hidden>🎮</span>
   <button class="head-mark rec" id="rec-mark" aria-label="録画を停止" title="録画を停止" hidden></button>
   <button class="head-mark" id="incident-mark" aria-label="見張りの記録を見る" hidden>⚠</button>
   <span class="assist" id="assist" hidden><span class="mark" aria-hidden="true">✦</span><span class="task" id="assist-task"></span><span class="doing" id="assist-doing"></span></span>
@@ -603,7 +602,6 @@ table.notify input { margin: 1px 0; }
         </div>
       </div>
     </div>
-    <div class="pad-options"><label><input type="checkbox" id="latch"> 押しっぱなし</label></div>
     </div>
   </section>
 </main>
@@ -1226,6 +1224,7 @@ function selectSwitch(id) {
   document.querySelectorAll('.ctl').forEach(release);
   document.querySelectorAll('.stick').forEach(stick => stick.releaseAll());
   releaseKeys();
+  padReleaseAll();
   forgetSwitch();
   session = id;
   try { localStorage.setItem('pokecon.session', id); } catch (error) { /* not persisted */ }
@@ -1677,7 +1676,7 @@ function answer(id, values) {
 }
 $('dialog').addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelector('[data-dialog=cancel]').click(); });
 
-// Buttons: press while the pointer is down; latch mode toggles instead.
+// Buttons: press while the pointer is down.
 const pressed = new Set();
 function release(key) {
   if (!pressed.delete(key.dataset.btn)) return;
@@ -1689,25 +1688,18 @@ document.querySelectorAll('.ctl').forEach(key => {
     if (key.disabled) return;
     event.preventDefault();
     const name = key.dataset.btn;
-    if ($('latch').checked && state && state.held.includes(name)) {
-      command('release', {buttons: [name]}).catch(() => {}).finally(refresh);
-      return;
-    }
     try { key.setPointerCapture(event.pointerId); } catch (error) { /* synthetic or already released pointer */ }
     pressed.add(name);
     key.classList.add('on');
     command('hold', {buttons: [name]}).catch(() => { pressed.delete(name); key.classList.remove('on'); });
   });
-  const end = () => { if (!$('latch').checked) release(key); else { pressed.delete(key.dataset.btn); refresh(); } };
-  key.addEventListener('pointerup', end);
+  key.addEventListener('pointerup', () => release(key));
   key.addEventListener('pointercancel', () => release(key));
   // Keyboard activation (Enter/Space) sends a short press.
   key.addEventListener('click', event => {
     if (event.detail === 0 && !key.disabled) command('press', {buttons: [key.dataset.btn], duration: .1}).catch(() => {});
   });
 });
-// Turning latch mode off lets go of everything it was holding.
-$('latch').addEventListener('change', () => { if (!$('latch').checked) quiet(command('neutral')); });
 
 // Sticks: drag inside a circle; values are sent at about 20 Hz and return to center on release.
 const SEND_INTERVAL = 50, TAP_DISTANCE = .12, TAP_TIME = 300;
@@ -1810,12 +1802,69 @@ function setupStick(stick) {
 }
 document.querySelectorAll('.stick').forEach(setupStick);
 
+// A game controller connected to this PC plays like the on-screen pad (Gamepad API, standard layout).
+// Buttons follow their position, as on a Switch controller: bottom B, right A, left Y, top X.
+const PAD_BUTTONS = ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', 'MINUS', 'PLUS', 'LCLICK', 'RCLICK', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME', 'CAPTURE'];
+const PAD_DEAD_ZONE = .15;
+const padHeld = new Set();
+const padSent = {L: [128, 128], R: [128, 128]};
+let padQueue = Promise.resolve(), padStickAt = 0, padTimer = null;
+function padSend(action, values) {
+  // One queue, so a release never overtakes its press.
+  padQueue = padQueue.then(() => call('command', {action, values})).catch(() => {});
+}
+function padAxis(value) {
+  const v = Math.abs(value) < PAD_DEAD_ZONE ? 0 : value;
+  return Math.max(0, Math.min(255, Math.round(128 + v * 127)));
+}
+function padReleaseAll() {
+  if (padHeld.size) padSend('release', {buttons: [...padHeld]});
+  padHeld.clear();
+  for (const which of ['L', 'R']) {
+    if (padSent[which][0] !== 128 || padSent[which][1] !== 128) padSend('stick', {stick: which, x: 128, y: 128});
+    padSent[which] = [128, 128];
+  }
+}
+function pollGamepads() {
+  const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(pad => pad && pad.connected);
+  $('gamepad-state').hidden = !pads.length;
+  $('gamepad-state').title = pads.map(pad => pad.id).join('\n');
+  if (!pads.length) { padReleaseAll(); clearInterval(padTimer); padTimer = null; return; }
+  if (document.hidden || !manualAllowed() || document.body.classList.contains('switch-down')) { padReleaseAll(); return; }
+  const down = new Set();
+  const axes = [0, 0, 0, 0];
+  for (const pad of pads) {
+    pad.buttons.forEach((button, index) => { if (PAD_BUTTONS[index] && (button.pressed || button.value > .5)) down.add(PAD_BUTTONS[index]); });
+    pad.axes.slice(0, 4).forEach((value, index) => { if (Math.abs(value) > Math.abs(axes[index])) axes[index] = value; });
+  }
+  const press = [...down].filter(name => !padHeld.has(name));
+  const lift = [...padHeld].filter(name => !down.has(name));
+  if (lift.length) { lift.forEach(name => padHeld.delete(name)); padSend('release', {buttons: lift}); }
+  if (press.length) { press.forEach(name => padHeld.add(name)); padSend('hold', {buttons: press}); }
+  const now = performance.now();
+  for (const [which, x, y] of [['L', axes[0], axes[1]], ['R', axes[2], axes[3]]]) {
+    const value = [padAxis(x), padAxis(y)];
+    if (value[0] === padSent[which][0] && value[1] === padSent[which][1]) continue;
+    // Moves go out at most every 50 ms; returning to the centre goes out at once.
+    const centre = value[0] === 128 && value[1] === 128;
+    if (!centre && now - padStickAt < SEND_INTERVAL) continue;
+    padStickAt = now;
+    padSent[which] = value;
+    padSend('stick', {stick: which, x: value[0], y: value[1]});
+  }
+}
+function watchGamepads() { if (!padTimer) padTimer = setInterval(pollGamepads, 16); }
+window.addEventListener('gamepadconnected', watchGamepads);
+window.addEventListener('gamepaddisconnected', pollGamepads);
+document.addEventListener('visibilitychange', () => { if (document.hidden) padReleaseAll(); });
+if ([...(navigator.getGamepads ? navigator.getGamepads() : [])].some(pad => pad)) watchGamepads();
+
 window.addEventListener('blur', () => {
   document.querySelectorAll('.ctl').forEach(release);
   document.querySelectorAll('.stick').forEach(stick => stick.releaseAll());
 });
 window.addEventListener('pagehide', () => {
-  if (pressed.size || keyHeld.size || $('latch').checked) fetch('/api/call', {method: 'POST', keepalive: true,
+  if (pressed.size || keyHeld.size || padHeld.size) fetch('/api/call', {method: 'POST', keepalive: true,
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral', session}})});
 });
 

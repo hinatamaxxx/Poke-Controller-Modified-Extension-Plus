@@ -384,7 +384,7 @@ class Hub(ApiServer):
     # Notifications, the watch, the log/dialog layout and the key map are the same on every Switch; the camera, COM
     # port and what is shown in the tabs stay per Switch. A change made on one Switch is applied to the others, and a
     # Switch that starts takes them from one that is already running.
-    SHARED_OPTIONS = ('win_start', 'win_end', 'line_start', 'line_end', 'discord_start', 'discord_end')
+    SHARED_OPTIONS = ('win_start', 'win_end', 'line_start', 'line_end', 'discord_start', 'discord_end', 'keyboard')
     SHARED_CHOICES = ('stdout_destination', 'dialog_buttons')
     SHARED_FILES = ('discord_token.ini', 'line_token.ini', 'watch.json')
 
