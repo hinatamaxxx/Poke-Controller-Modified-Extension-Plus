@@ -1081,8 +1081,6 @@ function selectSwitch(id) {
   refresh().then(() => loadDevices(true));
 }
 function closeSwitch(item) {
-  const running = item.running ? `\n実行中のスクリプト（${item.command}）は止まります。` : '';
-  if (!confirm(`${item.label} を閉じますか？${running}\n設定は残り、＋からまた開けます。`)) return;
   if (item.id === session) selectSwitch(switches.find(other => other.open && other.primary).id);
   quiet(call('switch_close', {switch: item.id}).catch(error => { $('message').textContent = error.message; }));
 }
