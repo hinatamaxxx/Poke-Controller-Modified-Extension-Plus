@@ -233,6 +233,7 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .video .frame { position: relative; width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
 .video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .video img[hidden] { display: none; }
+.video img.waiting { visibility: hidden; }
 .video .frame.pick img { cursor: crosshair; }
 .video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
 .video .empty[hidden] { display: none; }
@@ -426,8 +427,8 @@ table.notify input { margin: 1px 0; }
 </header>
 <main>
   <div class="video" aria-label="映像">
-    <div class="frame" id="frame">
-      <img id="video" alt="キャプチャ映像" src="/stream.mjpg">
+    <div class="frame" id="frame" role="img" aria-label="キャプチャ映像">
+      <img id="video" alt="" class="waiting">
       <div class="empty" id="video-empty" hidden>映像がありません</div>
       <div class="down" id="down" hidden><div id="down-text"></div><div class="why" id="down-why"></div><button class="cmd" id="down-restart" hidden>再起動</button></div>
       <div class="pick-info" id="pick-info" aria-live="polite"></div>
@@ -993,12 +994,21 @@ function renderConnection() {
   $('disconnect').disabled = busy || !state.serial_open;
 }
 
+// The stream of the shown Switch; the image stays hidden until its first frame arrives.
+function connectStream() {
+  $('video').classList.add('waiting');
+  $('video').src = `${STREAM}?session=${encodeURIComponent(session)}&t=${Date.now()}`;
+}
+function stopStream() {
+  $('video').classList.add('waiting');
+  $('video').removeAttribute('src');
+}
 // Live video can be switched off (show_realtime); the stream is dropped, not just hidden.
 function renderVideo() {
   const show = !state.options || state.options.show_realtime !== false;
   const img = $('video');
-  if (show && !img.getAttribute('src')) img.src = `${STREAM}?session=${encodeURIComponent(session)}&t=${Date.now()}`;
-  if (!show && img.getAttribute('src')) img.removeAttribute('src');
+  if (show && !img.getAttribute('src')) connectStream();
+  if (!show && img.getAttribute('src')) stopStream();
   img.hidden = !show;
   $('video-empty').hidden = !show || state.camera_live;
   $('frame').classList.toggle('pick', !!(state.options && state.options.show_value));
@@ -1208,7 +1218,7 @@ function forgetSwitch() {
   dialogShown = null;
   $('dialog').hidden = true;
   devicesAt = 0;
-  $('video').removeAttribute('src');
+  stopStream();
 }
 function selectSwitch(id) {
   if (id === session) return;
@@ -1251,7 +1261,7 @@ function renderDown(item) {
   $('down-restart').hidden = item.switch_state !== 'crashed';
   setBadge('run-state', '停止中');
   ['video-empty', 'video', 'run-controls', 'seq', 'assist', 'rec-mark'].forEach(id => $(id).hidden = true);
-  $('video').removeAttribute('src');
+  stopStream();
 }
 $('down-restart').addEventListener('click', () => quiet(call('switch_restart', {switch: session})));
 function hideSwitchMenu() { $('sw-menu').hidden = true; }
@@ -1937,10 +1947,12 @@ $('connect').addEventListener('click', () => {
   quiet(command('connect', {port: $('port').value, baud: Number($('baud').value), format: $('format').value}));
 });
 $('disconnect').addEventListener('click', () => quiet(command('disconnect')));
-$('video').addEventListener('error', () => setTimeout(() => {
+$('video').addEventListener('load', () => $('video').classList.remove('waiting'));
+$('video').addEventListener('error', () => {
   // Reconnect the MJPEG stream if it drops (camera change, app busy), unless the video is switched off.
-  if ($('video').getAttribute('src')) $('video').src = STREAM + '?' + Date.now();
-}, 1000));
+  $('video').classList.add('waiting');
+  setTimeout(() => { if ($('video').getAttribute('src')) connectStream(); }, 1000);
+});
 
 // Settings
 document.querySelectorAll('[data-option]').forEach(box => box.addEventListener('change', () =>
