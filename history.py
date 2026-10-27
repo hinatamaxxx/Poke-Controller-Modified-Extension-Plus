@@ -19,6 +19,14 @@ class FrameHistory:
         self.lock = threading.Lock()
         self._next = 0
 
+    def set_fps(self, fps):
+        """Keep `fps` frames a second from now on (the clip sent to Discord needs more than the default)."""
+        if fps == self.fps:
+            return
+        with self.lock:
+            self.fps = fps
+            self.frames = collections.deque(self.frames, maxlen=int(self.seconds * fps))
+
     def due(self):
         return time.monotonic() >= self._next
 
@@ -63,3 +71,44 @@ class FrameHistory:
         with open(os.path.join(folder, 'timeline.json'), 'w', encoding='utf-8') as stream:
             json.dump(data, stream, ensure_ascii=False)
         return rec_id
+
+    def encode_mp4(self, since=None):
+        """The kept frames (from `since`, a time.time()) as an MP4 file's bytes, H.264 so Discord plays it in the
+        chat; b'' when there is nothing to encode."""
+        import cv2
+        import numpy as np
+        import tempfile
+        with self.lock:
+            frames = [f for f in self.frames if since is None or f[0] >= since]
+        if len(frames) < 2:
+            return b''
+        first = cv2.imdecode(np.frombuffer(frames[0][1], np.uint8), cv2.IMREAD_COLOR)
+        height, width = first.shape[:2]
+        size = (width - width % 2, height - height % 2)  # H.264 needs even sizes
+        fps = max(1.0, (len(frames) - 1) / max(.1, frames[-1][0] - frames[0][0]))
+        handle, path = tempfile.mkstemp(suffix='.mp4')
+        os.close(handle)
+        try:
+            # Windows' own encoder (Media Foundation) makes H.264; the plain MPEG-4 one is the fallback.
+            writer = cv2.VideoWriter(path, cv2.CAP_MSMF, cv2.VideoWriter_fourcc(*'H264'), fps, size)
+            if not writer.isOpened():
+                writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+            if not writer.isOpened():
+                return b''
+            try:
+                for _at, data in frames:
+                    image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+                    if image is None:
+                        continue
+                    if image.shape[1::-1] != size:
+                        image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+                    writer.write(image)
+            finally:
+                writer.release()
+            with open(path, 'rb') as stream:
+                return stream.read()
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass

@@ -130,6 +130,12 @@ class GuiSettings:
             )
         except Exception:
             self.is_discord_notification_end = Var(value=False)
+        # Discord に通知するとき: Switch 本体の録画(キャプチャーボタン長押し)と、アプリの直前の映像の添付
+        for name in ("is_discord_switch_capture", "is_discord_clip"):
+            try:
+                setattr(self, name, Var(value=bool(self.setting["Notification"].getboolean(name, fallback=False))))
+            except Exception:
+                setattr(self, name, Var(value=False))
         # Output Area用の設定
         self.area_size = self.setting["Output"]["area_size"]
         self.stdout_destination = self.setting["Output"]["stdout_destination"]
@@ -259,6 +265,8 @@ class GuiSettings:
             "is_line_notification_end": False,
             "is_discord_notification_start": False,
             "is_discord_notification_end": False,
+            "is_discord_switch_capture": False,
+            "is_discord_clip": False,
         }
         self.setting["Output"] = {
             "area_size": "20",
@@ -335,6 +343,8 @@ class GuiSettings:
             "is_line_notification_end": self.is_line_notification_end.get(),
             "is_discord_notification_start": self.is_discord_notification_start.get(),
             "is_discord_notification_end": self.is_discord_notification_end.get(),
+            "is_discord_switch_capture": self.is_discord_switch_capture.get(),
+            "is_discord_clip": self.is_discord_clip.get(),
         }
 
         self.setting["Output"] = {

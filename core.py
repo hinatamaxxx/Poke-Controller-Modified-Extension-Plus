@@ -309,6 +309,9 @@ class Core:
         from watch import Watch
         from recorder import Recorder
         self.watch = Watch(self, profile_dir)
+        self.watch.history.set_fps(self.clip_fps())
+        self._clip_pending = False
+        Discord_Notify.after_send = self.discord_after_send
         self.recorder = Recorder(self)
         self.load_scripts()
         self.open_camera()
@@ -326,6 +329,9 @@ class Core:
         Command.isLineNotEnd = bool(s.is_line_notification_end.get())
         Command.isDiscordNotStart = bool(s.is_discord_notification_start.get())
         Command.isDiscordNotEnd = bool(s.is_discord_notification_end.get())
+        Command.isDiscordSwitchCapture = bool(s.is_discord_switch_capture.get())
+        if getattr(self, 'watch', None) is not None:
+            self.watch.history.set_fps(self.clip_fps())
         Command.stdout_destination = str(s.stdout_destination or '1')
         Command.pos_dialogue_buttons = str(getattr(s, 'pos_dialogue_buttons', '2') or '2')
         sys.stdout = Console(self.log1 if Command.stdout_destination == '1' else self.log2, self.console_mirror)
@@ -334,7 +340,8 @@ class Core:
                'show_serial': 'is_show_serial', 'keyboard': 'is_use_keyboard',
                'win_start': 'is_win_notification_start', 'win_end': 'is_win_notification_end',
                'line_start': 'is_line_notification_start', 'line_end': 'is_line_notification_end',
-               'discord_start': 'is_discord_notification_start', 'discord_end': 'is_discord_notification_end'}
+               'discord_start': 'is_discord_notification_start', 'discord_end': 'is_discord_notification_end',
+               'discord_capture': 'is_discord_switch_capture', 'discord_clip': 'is_discord_clip'}
 
     def options(self):
         return {key: bool(getattr(self.settings, name).get()) for key, name in self.OPTIONS.items()}
@@ -498,7 +505,7 @@ class Core:
             Line_Notify().send_message(message)
         elif channel == 'discord':
             from DiscordNotify import Discord_Notify
-            Discord_Notify().send_message(message)
+            Discord_Notify().send_message(message, follow_up=False)
         else:
             raise ValueError('Unknown channel')
 
@@ -510,8 +517,62 @@ class Core:
         if frame is None:
             raise ValueError('送る映像がありません')
         if not self.notification_settings()['discord_webhook_set']:
-            raise ValueError('Discord の Webhook URL が設定されていません（通知タブの送り先）')
-        Discord_Notify().send_message(f'{NAME} ({self.label}) の画面', image=frame.copy())
+            raise ValueError('Discord の Webhook URL が設定されていません（設定の「Discord 連携」）')
+        frame = frame.copy()
+        self.switch_capture()
+        Discord_Notify().send_message(f'{NAME} ({self.label}) の画面', image=frame)
+
+    # ---- Discord 連携: Switch 本体の録画と、直前の映像の添付 ----
+    CLIP_FPS = 10  # frames a second kept for the clip while attaching it is on (the watch's own clips use 4)
+    CLIP_AFTER = 3  # seconds of video after the notification that go into the clip too
+    CLIP_MAX_BYTES = 9_500_000  # Discord takes files up to 10 MB without Nitro
+
+    def clip_fps(self):
+        return self.CLIP_FPS if self.settings.is_discord_clip.get() else 4
+
+    def switch_capture(self):
+        """For the page's send-to-Discord button: record on the Switch when that is turned on and no script runs (a
+        running script records from its own thread, keeping what it holds)."""
+        from Commands.Keys import Button
+        from Commands import PythonCommandBase
+        if not self.settings.is_discord_switch_capture.get():
+            return False
+        with self.lock:
+            if self.running or not self.serial_open():
+                return False
+            self.keys_software_controller.hold(Button.CAPTURE)
+        try:
+            time.sleep(PythonCommandBase.PythonCommand.SWITCH_CAPTURE_SECONDS)
+        finally:
+            with self.lock:
+                self.keys_software_controller.holdEnd(Button.CAPTURE)
+        PythonCommandBase.PythonCommand._last_switch_capture = time.monotonic()
+        print('Switch 本体で直前の映像を録画しました。')
+        return True
+
+    def discord_after_send(self, notify, keys):
+        """After a Discord notification: attach the app's video of the last 30 seconds, when that is turned on."""
+        if not self.settings.is_discord_clip.get() or self._clip_pending:
+            return
+        self._clip_pending = True
+        started = time.time() - self.watch.history.seconds
+
+        def send():
+            try:
+                time.sleep(self.CLIP_AFTER)
+                data = self.watch.history.encode_mp4(since=started)
+                if not data:
+                    print('Discord: 添付する映像がありません。')
+                elif len(data) > self.CLIP_MAX_BYTES:
+                    print(f'Discord: 映像が大きすぎるため添付しませんでした（{len(data) // 1_000_000}MB）。')
+                else:
+                    notify.send_file(keys, f"pokecon_{time.strftime('%Y%m%d-%H%M%S')}.mp4", data)
+            except Exception as exc:
+                print(f'Discord: 映像を添付できませんでした: {exc}')
+            finally:
+                self._clip_pending = False
+
+        threading.Thread(target=send, daemon=True).start()
 
     def about(self):
         """Versions for the version window and the question template (the original help menu)."""

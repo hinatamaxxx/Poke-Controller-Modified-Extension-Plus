@@ -54,6 +54,12 @@ class StopThread(Exception):
 
 
 class PythonCommand(CommandBase.Command):
+    # Switch 本体の録画: キャプチャーボタンを押す長さ(短いとスクリーンショットになる)。Pokémon Automation と同じ 2 秒
+    SWITCH_CAPTURE_SECONDS = 2.0
+    # 本体の録画は直前およそ 30 秒なので、それより短い間隔の通知では録画し直さない
+    SWITCH_CAPTURE_INTERVAL = 30.0
+    _last_switch_capture = None
+
     def __init__(self):
         super(PythonCommand, self).__init__()
         self._logger = _logger
@@ -62,6 +68,7 @@ class PythonCommand(CommandBase.Command):
         self.thread = None
         self.alive = True
         self.postProcess = None
+        self.finished_itself = False
         try:
             self.Line = Line_Notify()
         except Exception:
@@ -141,7 +148,10 @@ class PythonCommand(CommandBase.Command):
                 if self.isLineNotStart:
                     self.LINE_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} started.")
                 if self.isDiscordNotStart:
-                    self.discord_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} started.")
+                    self.discord_text(
+                        f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} started.",
+                        switch_capture=False,
+                    )
                 self.do()
                 self.finish()
         except StopThread:
@@ -159,7 +169,11 @@ class PythonCommand(CommandBase.Command):
             if self.isLineNotEnd:
                 self.LINE_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} finished.")
             if self.isDiscordNotEnd:
-                self.discord_text(f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} finished.")
+                # 本体の録画は、スクリプトが自分で終えたとき(色違いが出たなど)だけ。停止ボタンで止めたときは録らない
+                self.discord_text(
+                    f"{self.app_name} (profile:{self.profilename})\n{self.cur_command_name} finished.",
+                    switch_capture=None if self.finished_itself else False,
+                )
         except Exception as e:
             self.last_error = e  # read by the app's watcher
             self.print_t(f"スクリプトがエラーで停止しました: {type(e).__name__}: {e}")
@@ -186,6 +200,7 @@ class PythonCommand(CommandBase.Command):
         """
         self.alive = True
         self.last_error = None
+        self.finished_itself = False
         self.socket0.alive = True
         self.mqtt0.alive = True
         self.postProcess = postProcess
@@ -219,6 +234,7 @@ class PythonCommand(CommandBase.Command):
         # ダイアログのキャンセル・スクリプト内の self.finish() の後の処理を続けず、
         # 正常に終わったときの "finished successfully" と終了の通知も出す
         if self.thread is None or threading.current_thread() is self.thread:
+            self.finished_itself = True
             self.checkIfAlive()
 
     # press button at duration times(s)
@@ -337,7 +353,44 @@ class PythonCommand(CommandBase.Command):
         except Exception:
             pass
 
-    def discord_text(self, content: str = "", index: int = 0, keys: str = "DISCORD_WEBHOOK"):
+    def switch_capture(self, force: bool = False):
+        """
+        Switch 本体で録画する。キャプチャーボタンを長押しすると、直前およそ 30 秒が本体に保存される(録画できるソフトのみ)。
+        スクリプトのスレッドで、ホールド中の入力を保ったまま押す。30 秒以内に録画したばかりなら押さない(force で押す)。
+        """
+        if self.keys is None:
+            return False
+        now = time.monotonic()
+        last = PythonCommand._last_switch_capture
+        if not force and last is not None and now - last < self.SWITCH_CAPTURE_INTERVAL:
+            return False
+        PythonCommand._last_switch_capture = now
+        from Commands.Keys import Button
+
+        self.keys.hold(Button.CAPTURE)
+        try:
+            sleep(self.SWITCH_CAPTURE_SECONDS)
+        finally:
+            self.keys.holdEnd(Button.CAPTURE)
+        print("Switch 本体で直前の映像を録画しました。")
+        self._logger.info("Switch capture (video)")
+        return True
+
+    def _switch_capture_before_discord(self, switch_capture, keys):
+        """Discord に通知する前に、設定(または引数)に従って本体で録画する"""
+        if switch_capture is None:
+            switch_capture = self.isDiscordSwitchCapture
+        if not switch_capture:
+            return
+        try:
+            if self.Discord.resolve_keys(keys):
+                self.switch_capture()
+        except Exception as exc:
+            self._logger.error(f"Switch capture failed: {exc}")
+
+    def discord_text(
+        self, content: str = "", index: int = 0, keys: str = "DISCORD_WEBHOOK", switch_capture: bool | None = None
+    ):
         # webhook_urlのindex指定とkey設定
         if index != 0 and keys == "DISCORD_WEBHOOK":
             keys = f"DISCORD_WEBHOOK{index}"
@@ -348,6 +401,7 @@ class PythonCommand(CommandBase.Command):
         else:
             pass
 
+        self._switch_capture_before_discord(switch_capture, keys)
         # 送信
         try:
             self.Discord.send_message(notification_message=content, keys=keys)
@@ -939,9 +993,11 @@ class ImageProcPythonCommand(PythonCommand):
         crop_fmt: int | str = "",
         crop: List[int] = [],
         keys: str | list = "DISCORD_WEBHOOK",
+        switch_capture: bool | None = None,
     ):
         """
         Discordにテキストと画像を通知します。
+        switch_capture: Switch 本体でも録画する(None なら設定「Discord 連携」に従う)
         """
         # crop_fmtに応じてcropの中身を並び替える
         crop_cv2, _ = convertCv2Format(crop_fmt=crop_fmt, crop=crop)
@@ -962,6 +1018,7 @@ class ImageProcPythonCommand(PythonCommand):
         else:
             pass
 
+        self._switch_capture_before_discord(switch_capture, keys)
         # 送信
         try:
             self.Discord.send_message(notification_message=content, image=cropped_image, keys=keys)

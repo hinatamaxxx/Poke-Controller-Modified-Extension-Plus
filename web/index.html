@@ -135,6 +135,9 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings-page h2 { font-size: 16px; margin: 0 0 2px; }
 table.notify tr.off th, table.notify tr.off td { color: var(--muted); }
 table.notify tr.off input, table.notify tr.off button { opacity: .4; cursor: default; }
+.notify-extras { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.notify-extras.off label { color: var(--muted); }
+.notify-extras.off input { opacity: .4; cursor: default; }
 table.notify th, table.notify td { padding: 4px 10px; }
 /* Folders as in Explorer: icon, name and where it is; a row opens the folder. */
 .folder-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -728,6 +731,10 @@ table.notify input { margin: 1px 0; }
               <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button></td></tr>
           </tbody>
         </table>
+        <div class="checks notify-extras" data-service="discord">
+          <label title="Discord に通知する直前にキャプチャーボタンを長押しして、直前およそ30秒を Switch に保存します（録画できるソフトのみ）"><input type="checkbox" data-option="discord_capture"> Switch 本体でも録画する</label>
+          <label title="アプリが覚えている直前30秒の映像を、通知のあとに動画で送ります"><input type="checkbox" data-option="discord_clip"> 直前30秒の映像を添付する</label>
+        </div>
       <h3>Discord <span class="state" id="discord-set" hidden>連携済み</span></h3>
       <div class="form">
         <label for="discord-url">Webhook URL</label>
@@ -1093,10 +1100,10 @@ function renderSettings() {
   $('discord-set').hidden = !note.discord_webhook_set;
   // A service that is not linked yet is grey in 通知, with a button to its settings instead of a test.
   for (const [service, linked] of [['discord', note.discord_webhook_set]]) {
-    const row = document.querySelector(`tr[data-service="${service}"]`);
-    row.classList.toggle('off', !linked);
-    row.querySelectorAll('input').forEach(box => { box.disabled = !linked; });
-    row.querySelector('[data-test]').disabled = !linked;
+    document.querySelectorAll(`[data-service="${service}"]`).forEach(group => {
+      group.classList.toggle('off', !linked);
+      group.querySelectorAll('input, button').forEach(control => { control.disabled = !linked; });
+    });
   }
   if (document.activeElement !== $('discord-name') && !$('discord-name').dataset.edited) $('discord-name').value = note.discord_username || '';
 }
