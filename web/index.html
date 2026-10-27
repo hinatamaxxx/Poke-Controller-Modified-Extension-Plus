@@ -78,9 +78,10 @@ main { flex: 1; min-height: 0; display: grid; gap: var(--gap); padding: var(--ga
 /* Wide: the original four areas, log boxes take the remaining height. */
 main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "video logs" "tabs pad"; }
 .video { grid-area: video; } .area-logs { grid-area: logs; } .area-tabs { grid-area: tabs; } .area-pad { grid-area: pad; }
-.area-logs { display: flex; flex-direction: column; gap: var(--gap); }
+.area-logs { display: flex; flex-direction: column; }
 .area-logs .panel { flex: 1; }
-.tab-logs { display: none; }
+/* The script list scrolls inside the row the controller sets, instead of pushing the video away. */
+.script-list { contain: size; }
 .panel-close { display: none; position: absolute; right: 6px; top: 4px; z-index: 2; }
 
 /* Narrow (built-in browser, small windows): video beside the controller, the rest in tabs. */
@@ -91,7 +92,6 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .video { height: 100%; min-height: 60px; }
   .area-pad { padding: 0; border: 0; background: none; justify-content: center; }
   .area-logs { display: none; }
-  .tab-logs { display: block; }
   header h1, header #run-state.idle { display: none; }
   body .tabs button { padding: 2px 5px; font-size: 12px; }
   /* Camera and COM become coloured dots (name in the tooltip) so the run state and its buttons keep the room. */
@@ -325,7 +325,7 @@ table.notify input { margin: 1px 0; }
 <body>
 <header>
   <nav class="switches" id="switches" role="tablist" aria-label="Switch"></nav>
-  <button class="sw-add" id="sw-add" aria-label="Switch を追加" aria-haspopup="menu">＋</button>
+  <button class="sw-add" id="sw-add" aria-label="Switch を開く" title="Switch を開く（右クリックで選ぶ）">＋</button>
   <span class="badge" id="profile" hidden>デモ</span>
   <span class="badge" id="camera-state">カメラ: -</span>
   <span class="badge" id="serial-state">COM: -</span>
@@ -350,7 +350,12 @@ table.notify input { margin: 1px 0; }
     </div>
   </div>
 
-  <div class="area-logs" id="logs-home">
+  <div class="area-logs">
+    <section class="panel" aria-label="Claude とログ">
+      <div class="tabs" id="side-tabs" role="tablist"></div>
+    </section>
+  </div>
+  <div hidden>
     <div class="logs" id="logs">
       <section class="panel log" aria-label="ログ1">
         <div class="panel-title"><span id="log1-title">ログ1</span><button class="mini" id="clear-log1" aria-label="ログ1を消去">消去</button></div>
@@ -372,7 +377,7 @@ table.notify input { margin: 1px 0; }
       <button role="tab" id="tab-notify" aria-controls="panel-notify" aria-selected="false">通知</button>
       <button role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false">その他</button>
       <button role="tab" id="tab-claude" aria-controls="panel-claude" aria-selected="false">Claude</button>
-      <button role="tab" id="tab-logs" class="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
+      <button role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
     </div>
 
     <div class="tabpanel" role="tabpanel" id="panel-camera" aria-labelledby="tab-camera" hidden>
@@ -1094,11 +1099,22 @@ function renderDown(item) {
 }
 $('down-restart').addEventListener('click', () => quiet(call('switch_restart', {switch: session})));
 function hideSwitchMenu() { $('sw-menu').hidden = true; }
-$('sw-add').addEventListener('click', event => {
-  const closed = switches.filter(item => !item.open);
-  const add = () => call('switch_add', {}).then(item => { hideSwitchMenu(); selectSwitch(item.id); })
+function addSwitch() {
+  call('switch_add', {}).then(item => { hideSwitchMenu(); selectSwitch(item.id); })
     .catch(error => { $('message').textContent = error.message; });
-  if (!closed.length) { add(); return; }
+}
+function reopenSwitch(entry) {
+  call('switch_open', {switch: entry.id}).then(() => { hideSwitchMenu(); selectSwitch(entry.id); })
+    .catch(error => { $('message').textContent = error.message; });
+}
+$('sw-add').addEventListener('click', () => {
+  const closed = switches.find(item => !item.open);
+  if (closed) reopenSwitch(closed); else addSwitch();
+});
+$('sw-add').addEventListener('contextmenu', event => {
+  event.preventDefault();
+  const closed = switches.filter(item => !item.open);
+  if (!closed.length) { addSwitch(); return; }
   const menu = $('sw-menu');
   const item = (text, action) => {
     const button = Object.assign(document.createElement('button'), {type: 'button', textContent: text});
@@ -1106,9 +1122,8 @@ $('sw-add').addEventListener('click', event => {
     button.addEventListener('click', action);
     return button;
   };
-  menu.replaceChildren(item('新しい Switch', add), document.createElement('hr'),
-    ...closed.map(entry => item(entry.label, () => call('switch_open', {switch: entry.id})
-      .then(() => { hideSwitchMenu(); selectSwitch(entry.id); }).catch(error => { $('message').textContent = error.message; }))));
+  menu.replaceChildren(item('新しい Switch', addSwitch), document.createElement('hr'),
+    ...closed.map(entry => item(entry.label, () => reopenSwitch(entry))));
   const box = event.currentTarget.getBoundingClientRect();
   menu.style.left = `${Math.min(box.left, innerWidth - 200)}px`;
   menu.style.top = `${box.bottom + 4}px`;
@@ -1493,12 +1508,30 @@ window.addEventListener('pagehide', () => {
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral', session}})});
 });
 
-// Narrow windows show the logs as a tab; wide ones keep them beside the video.
+// Claude and the logs: tabs beside the video in wide windows, the last two bottom tabs in narrow ones.
 const narrowQuery = matchMedia('(max-width: 900px), (max-height: 520px)');
 function placeLogs() {
-  const home = narrowQuery.matches ? $('panel-logs') : $('logs-home');
-  if ($('logs').parentElement !== home) home.append($('logs'));
-  if (!narrowQuery.matches && $('tab-logs').getAttribute('aria-selected') === 'true') $('tab-script').click();
+  if ($('logs').parentElement !== $('panel-logs')) $('panel-logs').append($('logs'));
+  const pairs = [['tab-claude', 'panel-claude'], ['tab-logs', 'panel-logs']];
+  const wide = !narrowQuery.matches;
+  const list = wide ? $('side-tabs') : document.querySelector('.area-tabs .tabs');
+  if ($('tab-claude').parentElement === list) return;
+  const leaving = pairs.some(([tab]) => $(tab).getAttribute('aria-selected') === 'true');
+  pairs.forEach(([tab, panel]) => {
+    list.append($(tab));
+    if (wide) list.parentElement.append($(panel));
+    else $('message').before($(panel));
+    $(tab).setAttribute('aria-selected', 'false');
+    $(panel).hidden = true;
+  });
+  if (wide) {
+    let side = 'tab-claude';
+    try { side = localStorage.getItem('pokecon.side') === 'tab-logs' ? 'tab-logs' : side; } catch (error) { /* default */ }
+    $(side).click();
+    if (leaving) $('tab-script').click();
+  } else if (leaving || !document.querySelector('.area-tabs .tabs [aria-selected=true]')) {
+    $('tab-script').click();
+  }
 }
 narrowQuery.addEventListener('change', placeLogs);
 
@@ -1526,12 +1559,13 @@ document.querySelectorAll('.tabs [role=tab]').forEach(tab => tab.addEventListene
     const reopen = tab.getAttribute('aria-selected') === 'true' && tabArea.classList.contains('open');
     tabArea.classList.toggle('open', !reopen);
   }
-  document.querySelectorAll('.tabs [role=tab]').forEach(other => {
+  tab.parentElement.querySelectorAll('[role=tab]').forEach(other => {
     const selected = other === tab;
     other.setAttribute('aria-selected', String(selected));
     $(other.getAttribute('aria-controls')).hidden = !selected;
   });
   if (tab.id === 'tab-device' || tab.id === 'tab-camera') loadDevices(true);
+  if (tab.parentElement.id === 'side-tabs') try { localStorage.setItem('pokecon.side', tab.id); } catch (error) { /* not kept */ }
 }));
 // Small view switches inside a tab.
 document.querySelectorAll('.seg').forEach(group => group.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
