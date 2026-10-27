@@ -117,7 +117,42 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings-main { flex: 1; min-width: 0; position: relative; overflow-y: auto; padding: 18px 24px 20px; background: var(--panel); }
 .settings-page { display: flex; flex-direction: column; gap: 8px; }
 .settings-page[hidden] { display: none; }
-.settings-page h2 { font-size: 16px; margin: 0 0 2px; }
+.settings-window { font-size: 15px; }
+/* Key settings: the Pro Controller, each button showing its key; the chosen one waits for the next key. */
+.keymap-pad { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: repeat(6, 38px); gap: 4px; padding: 10px;
+              max-width: 480px; border-radius: 16px; background: linear-gradient(90deg, var(--joy-l) 50%, var(--joy-r) 50%); }
+.keymap-pad .well { border-radius: 50%; background: var(--well); align-self: center; justify-self: center; height: 100%; aspect-ratio: 1; }
+.keymap-pad button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; padding: 0;
+                     border: 0; border-radius: 3px; background: var(--btn); color: var(--btn-text); font: 600 11px/1 system-ui, "Segoe UI", sans-serif; cursor: pointer; }
+.keymap-pad button kbd { font: 12px/1 Consolas, monospace; color: #ffe066; }
+.keymap-pad button.click { align-self: center; justify-self: center; width: calc(100% / 3); height: 38px; border-radius: 50%; }
+.keymap-pad button[aria-pressed=true] { background: var(--btn-on); color: var(--btn-on-text); }
+.keymap-pad button[aria-pressed=true] kbd { color: var(--btn-on-text); }
+/* Hover text above the element (the browser's own tooltip shows under the pointer). */
+.tip { position: fixed; z-index: 60; max-width: 320px; padding: 4px 8px; border-radius: 6px; background: #2b2f36; color: #f2f3f5; font-size: 12px;
+       line-height: 1.4; white-space: pre-line; pointer-events: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+.tip[hidden] { display: none; }
+.settings-window .mini { font-size: 13px; padding: 1px 10px; }
+.settings-page h2 { font-size: 19px; margin: 0 0 2px; }
+table.notify tr.off th, table.notify tr.off td { color: var(--muted); }
+table.notify tr.off input { opacity: .4; }
+table.notify .link-go { color: var(--accent); border-color: var(--accent); }
+table.notify .link-go[hidden], table.notify [data-test][hidden] { display: none; }
+table.notify th, table.notify td { padding: 4px 10px; }
+/* Folders as in Explorer: icon, name and where it is; a row opens the folder. */
+.folder-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.folder-list button { display: grid; grid-template-columns: 22px 9em minmax(0, 1fr); align-items: center; gap: 10px; text-align: left; font: inherit;
+                      color: var(--text); background: none; border: 0; padding: 7px 12px; cursor: pointer; }
+.folder-list button + button { border-top: 1px solid var(--line); }
+.folder-list button:hover { background: var(--chip); }
+.folder-list .icon { width: 20px; height: 20px; background: #e8b84a; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+                     --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z'/></svg>"); }
+.folder-list .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+/* About: one line per item, libraries in columns. */
+dl.about { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 0; font-size: 13px; }
+dl.about dt { color: var(--muted); }
+dl.about dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dl.about.libs { grid-template-columns: repeat(3, max-content minmax(0, 1fr)); font-size: 12px; }
 .settings-page h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .settings-page h2 + h3 { border-top: 0; padding-top: 0; margin-top: 0; }
 .settings-page pre { flex: none; max-height: 40dvh; }
@@ -323,9 +358,6 @@ table.notify input { margin: 1px 0; }
 .meta { color: var(--muted); font-size: 12px; }
 .set { color: var(--ok); }
 .links a { color: var(--accent); margin-right: 10px; white-space: nowrap; }
-.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 3px; flex: none; }
-.keys button { display: flex; justify-content: space-between; gap: 4px; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; }
-.keys button kbd { font: 12px Consolas, monospace; color: var(--muted); }
 .keys button[aria-pressed=true] { border-color: var(--accent); }
 .keys button[aria-pressed=true] kbd { color: var(--accent); }
 .shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 10px; flex: none; }
@@ -650,7 +682,6 @@ table.notify input { margin: 1px 0; }
     <h2 class="settings-title">設定</h2>
     <button type="button" data-page="set-notify" aria-current="page">通知</button>
     <button type="button" data-page="set-watch">見張り</button>
-    <button type="button" data-page="set-view">表示</button>
     <button type="button" data-page="set-keys">キー設定</button>
     <hr>
     <button type="button" data-page="set-link">連携</button>
@@ -672,14 +703,14 @@ table.notify input { margin: 1px 0; }
               <td><input type="checkbox" data-option="win_start" aria-label="Windows通知（開始）"></td>
               <td><input type="checkbox" data-option="win_end" aria-label="Windows通知（終了）"></td>
               <td><button class="mini" data-test="win" aria-label="Windowsのテスト通知">テスト</button></td></tr>
-            <tr><th>LINE</th>
+            <tr data-service="line"><th>LINE</th>
               <td><input type="checkbox" data-option="line_start" aria-label="LINE通知（開始）"></td>
               <td><input type="checkbox" data-option="line_end" aria-label="LINE通知（終了）"></td>
-              <td><button class="mini" data-test="line" aria-label="LINEのテスト通知">テスト</button></td></tr>
-            <tr><th>Discord</th>
+              <td><button class="mini" data-test="line" aria-label="LINEのテスト通知">テスト</button><button class="mini link-go" data-link="line">連携する</button></td></tr>
+            <tr data-service="discord"><th>Discord</th>
               <td><input type="checkbox" data-option="discord_start" aria-label="Discord通知（開始）"></td>
               <td><input type="checkbox" data-option="discord_end" aria-label="Discord通知（終了）"></td>
-              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button></td></tr>
+              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button><button class="mini link-go" data-link="discord">連携する</button></td></tr>
           </tbody>
         </table>
     </section>
@@ -722,45 +753,29 @@ table.notify input { margin: 1px 0; }
           </div>
         </div>
     </section>
-    <section class="settings-page" id="set-view" hidden>
-      <h2>表示</h2>
-      <h3>実行ログの表示先</h3>
-          <div class="radios" role="radiogroup" aria-label="実行ログの表示先">
-            <label><input type="radio" name="stdout" value="1"> 上</label>
-            <label><input type="radio" name="stdout" value="2"> 下</label>
-          </div>
-      <h3>ダイアログのボタン</h3>
-          <div class="radios" role="radiogroup" aria-label="ダイアログのボタンの位置">
-            <label><input type="radio" name="dialog-buttons" value="1"> 上</label>
-            <label><input type="radio" name="dialog-buttons" value="2"> 下</label>
-            <label><input type="radio" name="dialog-buttons" value="3"> 両方</label>
-          </div>
-    </section>
     <section class="settings-page" id="set-keys" hidden>
       <h2>キー設定</h2>
-        <div class="keys" id="keys" aria-label="キー設定"></div>
-        <div class="row"><button class="cmd" id="key-clear" disabled>割り当てを解除</button></div>
+      <p class="meta">ボタンを選んでから、割り当てるキーを押します（Esc で取り消し）。</p>
+      <div class="keymap-pad" id="keys" aria-label="キー設定"></div>
+      <div class="row"><button class="cmd" id="key-clear" disabled>選んだボタンの割り当てを解除</button></div>
     </section>
     <section class="settings-page" id="set-update" hidden>
       <h2>更新</h2>
           <div class="checks">
             <label><input type="checkbox" id="auto-update"> 自動更新</label>
-            <label><input type="checkbox" id="prereleases"> 検証版も含める</label>
           </div>
           <div class="row"><button class="cmd" id="update-now">今すぐ更新</button><span class="meta" id="update-meta"></span></div>
           <div class="error" id="update-error"></div>
     </section>
     <section class="settings-page" id="set-folders" hidden>
       <h2>フォルダー</h2>
-          <div class="row">
-            <button class="cmd" data-folder="workspace">作業</button>
-            <button class="cmd" data-folder="settings">設定</button>
-            <button class="cmd" data-folder="logs">ログ</button>
-          </div>
+      <div class="folder-list" id="folder-list" role="list"></div>
     </section>
     <section class="settings-page" id="set-about" hidden>
       <h2>このアプリについて</h2>
-      <pre id="about-text"></pre>
+      <dl class="about" id="about-env"></dl>
+      <h3>ライブラリ</h3>
+      <dl class="about libs" id="about-libs"></dl>
       <div class="row">
         <button type="button" class="cmd" data-menu="changelog">更新履歴</button>
         <button type="button" class="cmd" data-menu="license">ライセンス</button>
@@ -1060,29 +1075,39 @@ function renderSettings() {
     if (document.activeElement !== box && state.options) box.checked = !!state.options[box.dataset.option];
   });
   const choices = state.choices || {};
-  document.querySelectorAll('input[name=stdout]').forEach(r => r.checked = r.value === choices.stdout_destination);
-  document.querySelectorAll('input[name=dialog-buttons]').forEach(r => r.checked = r.value === choices.dialog_buttons);
   const exec = choices.stdout_destination === '2' ? 2 : 1;
   $('log1-title').textContent = exec === 1 ? 'ログ1（実行ログ）' : 'ログ1';
   $('log2-title').textContent = exec === 2 ? 'ログ2（実行ログ）' : 'ログ2';
   const app = state.app || {};
   if (document.activeElement !== $('auto-update')) $('auto-update').checked = !!app.auto_update;
-  if (document.activeElement !== $('prereleases')) $('prereleases').checked = !!app.prereleases;
   const update = app.update || {};
   const checked = update.last_check ? new Date(update.last_check * 1000).toLocaleString('ja-JP') : '未確認';
   $('update-meta').textContent = `v${app.version || '-'} ・ ${checked}`;
   $('update-error').textContent = update.failures ? `更新に失敗しました（${update.failures}回）: ${update.last_error || ''}` : '';
-  $('auto-update').disabled = $('prereleases').disabled = $('update-now').disabled = !!app.portable;
+  $('auto-update').disabled = $('update-now').disabled = !!app.portable;
+  renderFolderList(app.folders || {});
   const note = state.notification || {};
   $('line-set').hidden = !note.line_token_set;
   $('discord-set').hidden = !note.discord_webhook_set;
+  // A service that is not linked yet is grey in 通知, with a button to its settings instead of a test.
+  for (const [service, linked] of [['line', note.line_token_set], ['discord', note.discord_webhook_set]]) {
+    const row = document.querySelector(`tr[data-service="${service}"]`);
+    row.classList.toggle('off', !linked);
+    row.querySelectorAll('input').forEach(box => { box.disabled = !linked; });
+    row.querySelector('[data-test]').hidden = !linked;
+    row.querySelector('.link-go').hidden = !!linked;
+  }
   if (document.activeElement !== $('discord-name') && !$('discord-name').dataset.edited) $('discord-name').value = note.discord_username || '';
 }
 
 // Key config: each input shows its key; pressing one waits for the next key (Esc cancels).
-const KEY_INPUTS = [['A', 'A'], ['B', 'B'], ['X', 'X'], ['Y', 'Y'], ['L', 'L'], ['R', 'R'], ['ZL', 'ZL'], ['ZR', 'ZR'],
-  ['MINUS', '−'], ['PLUS', '＋'], ['LCLICK', 'L-C'], ['RCLICK', 'R-C'], ['HOME', 'HOME'], ['CAPTURE', 'CAP'],
-  ['UP', '↑'], ['DOWN', '↓'], ['LEFT', '←'], ['RIGHT', '→'], ['LS_UP', 'LS↑'], ['LS_DOWN', 'LS↓'], ['LS_LEFT', 'LS←'], ['LS_RIGHT', 'LS→']];
+// The same layout as the on-screen controller: [input, label, grid area, description]. The sticks only take their
+// click, shown in the middle of each stick.
+const KEY_INPUTS = [['ZL', 'ZL', '1/1'], ['L', 'L', '1/2'], ['R', 'R', '1/8'], ['ZR', 'ZR', '1/9'],
+  ['LCLICK', '押込', '2/1/4/4', '左スティック押し込み'], ['MINUS', '−', '2/4'], ['PLUS', '＋', '2/6'], ['X', 'X', '2/8'],
+  ['CAPTURE', 'CAP', '3/4'], ['HOME', 'HOME', '3/6'], ['Y', 'Y', '3/7'], ['A', 'A', '3/9'], ['B', 'B', '4/8'],
+  ['UP', '↑', '4/3', '十字キー上'], ['LEFT', '←', '5/2', '十字キー左'], ['RIGHT', '→', '5/4', '十字キー右'], ['DOWN', '↓', '6/3', '十字キー下'],
+  ['RCLICK', '押込', '5/6/7/9', '右スティック押し込み']];
 const KEY_LABELS = {' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Escape: 'Esc'};
 let assigning = null, keysKey = '';
 function keyLabel(key) { return KEY_LABELS[key] || (key.length === 1 ? key.toUpperCase() : key); }
@@ -1092,14 +1117,18 @@ function renderKeymap() {
   const key = JSON.stringify([byInput, assigning]);
   if (key === keysKey) return;
   keysKey = key;
-  $('keys').replaceChildren(...KEY_INPUTS.map(([name, label]) => {
+  const well = area => Object.assign(document.createElement('span'), {className: 'well', style: `grid-area:${area}`});
+  $('keys').replaceChildren(well('2/1/4/4'), well('5/6/7/9'), ...KEY_INPUTS.map(([name, label, area, description]) => {
     const button = document.createElement('button');
     button.type = 'button';
+    button.style.gridArea = area;
+    if (name.endsWith('CLICK')) button.classList.add('click');
     const keys = byInput[name] || [];
     const shown = assigning === name ? '…' : (keys.map(keyLabel).join(' ') || '—');
     button.append(Object.assign(document.createElement('span'), {textContent: label}), Object.assign(document.createElement('kbd'), {textContent: shown}));
     button.setAttribute('aria-pressed', String(assigning === name));
-    button.setAttribute('aria-label', `${label} のキー: ${keys.map(keyLabel).join(' ') || 'なし'}`);
+    button.setAttribute('aria-label', `${description || label} のキー: ${keys.map(keyLabel).join(' ') || 'なし'}`);
+    if (description) button.dataset.tip = description;
     button.addEventListener('click', () => { assigning = assigning === name ? null : name; $('key-clear').disabled = !assigning; renderKeymap(); });
     return button;
   }));
@@ -1384,9 +1413,11 @@ function showSettingsPage(page) {
   document.querySelectorAll('.settings-page').forEach(section => { section.hidden = section.id !== page; });
   if (page !== 'set-keys' && assigning) { assigning = null; renderKeymap(); }
   if (page === 'set-about') call('about').then(result => {
-    $('about-text').textContent = environment(result)
-      + '■Libraries version\n' + result.libraries.map(([name, version]) => `${name}: ${version || 'Not installed'}`).join('\n');
-  }).catch(error => { $('about-text').textContent = error.message; });
+    const pairs = (list) => list.flatMap(([name, value]) => [
+      Object.assign(document.createElement('dt'), {textContent: name}), Object.assign(document.createElement('dd'), {textContent: value})]);
+    $('about-env').replaceChildren(...pairs([['使用ツール', `${result.name} ${result.version}`], ['OS', result.os], ['Python', result.python]]));
+    $('about-libs').replaceChildren(...pairs(result.libraries.map(([name, version]) => [name, version || 'なし'])));
+  }).catch(error => { $('about-env').textContent = error.message; });
   document.querySelector('.settings-main').scrollTo(0, 0);
 }
 function openSettings(page) {
@@ -1408,6 +1439,41 @@ document.addEventListener('keydown', event => {
   if (event.key === ',' && event.ctrlKey) { event.preventDefault(); if ($('settings').hidden) openSettings(); else closeSettings(); }
   else if (event.key === 'Escape' && !$('settings').hidden && $('info').hidden && $('app-menu').hidden) closeSettings();
 });
+
+// Hover text: a title (or data-tip) shows above its element after a moment, instead of the browser's tooltip under the pointer.
+const tip = Object.assign(document.createElement('div'), {className: 'tip', hidden: true});
+tip.setAttribute('role', 'tooltip');
+document.body.append(tip);
+let tipTarget = null, tipTimer = null;
+function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipTarget = null; tip.hidden = true; }
+function showTip(element) {
+  const text = element.dataset.tip;
+  if (!text || !element.isConnected) return;
+  tip.textContent = text;
+  tip.hidden = false;
+  const box = element.getBoundingClientRect(), size = tip.getBoundingClientRect();
+  let top = box.top - size.height - 6;
+  if (top < 4) top = box.bottom + 6;  // no room above
+  const left = Math.max(4, Math.min(innerWidth - size.width - 4, box.left + box.width / 2 - size.width / 2));
+  tip.style.top = `${top}px`;
+  tip.style.left = `${left}px`;
+}
+document.addEventListener('pointerover', event => {
+  const element = event.target.closest('[title], [data-tip]');
+  if (!element) return;
+  if (element.hasAttribute('title')) {  // the code sets titles; take them over so the browser's tooltip stays away
+    if (element.getAttribute('title')) element.dataset.tip = element.getAttribute('title');
+    element.removeAttribute('title');
+  }
+  if (element === tipTarget) return;
+  hideTip();
+  tipTarget = element;
+  tipTimer = setTimeout(() => showTip(element), 450);
+});
+document.addEventListener('pointerout', event => { if (tipTarget && !tipTarget.contains(event.relatedTarget)) hideTip(); });
+document.addEventListener('pointerdown', hideTip, true);
+document.addEventListener('scroll', hideTip, true);
+window.addEventListener('blur', hideTip);
 
 // In the app window the page draws the title bar; the window says whether it is framed and maximized.
 const appHost = window.chrome && window.chrome.webview;
@@ -2078,12 +2144,7 @@ $('video').addEventListener('error', () => {
 // Settings
 document.querySelectorAll('[data-option]').forEach(box => box.addEventListener('change', () =>
   quiet(command('options', {[box.dataset.option]: box.checked}))));
-document.querySelectorAll('input[name=stdout]').forEach(radio => radio.addEventListener('change', () =>
-  quiet(command('choice', {name: 'stdout_destination', value: radio.value}))));
-document.querySelectorAll('input[name=dialog-buttons]').forEach(radio => radio.addEventListener('change', () =>
-  quiet(command('choice', {name: 'dialog_buttons', value: radio.value}))));
 $('auto-update').addEventListener('change', () => quiet(command('app_options', {auto_update: $('auto-update').checked})));
-$('prereleases').addEventListener('change', () => quiet(command('app_options', {prereleases: $('prereleases').checked})));
 $('update-now').addEventListener('click', () => quiet(command('update_now')));
 // Watch settings are saved on change; numbers are kept inside the ranges the app accepts.
 [['watch-enabled', 'enabled'], ['watch-notify', 'notify'], ['watch-restart', 'auto_restart']].forEach(([id, key]) =>
@@ -2099,6 +2160,24 @@ $('watch-limit').addEventListener('change', () => {
   $('watch-limit').value = limit;
   quiet(command('watch', {restart_limit: limit}));
 });
+const FOLDER_NAMES = [['workspace', '作業フォルダー'], ['scripts', 'スクリプト'], ['captures', 'スクリーンショット・録画'], ['settings', '設定'], ['logs', 'ログ']];
+let folderListKey = '';
+function renderFolderList(folders) {
+  const key = JSON.stringify(folders);
+  if (key === folderListKey) return;
+  folderListKey = key;
+  $('folder-list').replaceChildren(...FOLDER_NAMES.filter(([id]) => folders[id]).map(([id, name]) => {
+    const row = Object.assign(document.createElement('button'), {type: 'button', title: folders[id]});
+    row.setAttribute('role', 'listitem');
+    // The path as in Explorer's address bar (C: › Users › …); it reads right to left so a long one keeps its end in
+    // view, and the bidi marks keep it in order.
+    row.append(Object.assign(document.createElement('span'), {className: 'icon'}), Object.assign(document.createElement('span'), {textContent: name}),
+               Object.assign(document.createElement('span'), {className: 'path', textContent: '\u200e' + folders[id].split(/[\\/]+/).filter(Boolean).join(' › ') + '\u200e'}));
+    row.addEventListener('click', () => openFolder(id).catch(() => {}));
+    return row;
+  }));
+}
+document.querySelectorAll('.link-go').forEach(button => button.addEventListener('click', () => showSettingsPage('set-link')));
 // In the app window, the window lets Explorer come to the front (the app's process opens the folder).
 function openFolder(folder) {
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');

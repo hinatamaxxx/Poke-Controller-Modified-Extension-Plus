@@ -75,6 +75,9 @@ def remove_stale_endpoints(runtime):
 
 
 class QuietServer(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR would let us bind a port another program is listening on; ask for it exclusively.
+    allow_reuse_address = False
+
     def handle_error(self, request, client_address):
         # A browser closing the video stream or a page is normal, not an error worth a traceback.
         if isinstance(sys.exc_info()[1], ConnectionError):
@@ -232,9 +235,23 @@ class ApiServer:
         remove_stale_endpoints(runtime)
         endpoint = {'url': '', 'web_url': '', 'pid': os.getpid(), **(info or {})}
         if http:
-            self.server = QuietServer(('127.0.0.1', 0), Handler)
+            # The same port as last time when it is free: the page's origin stays the same, so what the browser
+            # keeps (the chosen Switch, each Switch's bottom tab, the controller's place) survives a restart.
+            port_file = runtime / 'web-port.txt'
+            try:
+                wanted = int(port_file.read_text(encoding='ascii'))
+            except (OSError, ValueError):
+                wanted = 0
+            try:
+                self.server = QuietServer(('127.0.0.1', wanted), Handler)
+            except OSError:
+                self.server = QuietServer(('127.0.0.1', 0), Handler)
             self.server.daemon_threads = True
             port = self.server.server_port
+            try:
+                port_file.write_text(str(port), encoding='ascii')
+            except OSError:
+                pass
             self.cookie = f'pokecon_{port}'
             self.web_url = f'http://127.0.0.1:{port}/?token={self.web_token}'
             endpoint.update(url=f'http://127.0.0.1:{port}/', web_url=self.web_url)
@@ -396,7 +413,7 @@ class LocalControl(ApiServer):
         state['app'] = {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
                         'auto_update': preferences.values['auto_update'] if preferences else False,
                         'prereleases': preferences.values['prereleases'] if preferences else False,
-                        'update': update_service.read_state()}
+                        'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()}}
         state.update(id=self.id, ready=True, exited=False,
                      catalog={kind: [item['name'] for item in items] for kind, items in self.core.catalog().items()},
                      tags=self.core.catalog())
@@ -610,9 +627,7 @@ class LocalControl(ApiServer):
             threading.Thread(target=update_service.check_now, args=(core.preferences, True), daemon=True).start()
         elif action == 'open_folder':
             import app_paths
-            folders = {'workspace': app_paths.WORKSPACE, 'settings': app_paths.PROFILES, 'logs': app_paths.LOGS,
-                       'captures': app_paths.WORKSPACE / 'Captures', 'scripts': app_paths.WORKSPACE / 'Commands' / 'PythonCommands'}
-            folder = folders.get(values.get('folder'))
+            folder = app_paths.FOLDERS.get(values.get('folder'))
             if folder is None:
                 raise ValueError('Unknown folder')
             folder.mkdir(parents=True, exist_ok=True)
