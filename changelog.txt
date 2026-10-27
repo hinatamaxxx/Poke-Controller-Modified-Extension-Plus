@@ -1,5 +1,8 @@
 Poke-Controller Modified Extension Plus 更新履歴
 
+■ 0.3.0-alpha.11
+  ・設定のウィンドウを横長でない大きさにし、どの項目でも同じ大きさにした。
+
 ■ 0.3.0-alpha.10
   ・設定の「Discord 連携」「LINE 連携」を「連携」1つにまとめた。
 
