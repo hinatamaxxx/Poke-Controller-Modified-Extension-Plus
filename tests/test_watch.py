@@ -243,7 +243,7 @@ class ScriptFilesTest(unittest.TestCase):
         backup = script_files.write('A/b.py', 'x = 2\n', overwrite=True)
         self.assertTrue(os.path.isfile(backup))
         self.assertEqual(script_files.read('A/b.py'), 'x = 2\n')
-        self.assertEqual(script_files.module_name('A/b.py'), 'Commands.PythonCommands.A.b')
+        self.assertEqual(script_files.module_name('A/b.py'), 'スクリプト.A.b')
         for bad in ('../x.py', '..\\..\\x.py', 'A/b.txt'):
             with self.assertRaises(ValueError):
                 script_files.write(bad, 'x = 1\n')

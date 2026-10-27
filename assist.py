@@ -128,24 +128,15 @@ class Assist:
 
     # ---- templates: is this image on screen now? ----
     def templates(self):
-        root = os.path.join(os.getcwd(), 'Template')
-        found = []
-        for folder, _, files in os.walk(root):
-            for name in files:
-                if name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
-                    found.append(os.path.relpath(os.path.join(folder, name), root).replace(os.sep, '/'))
-                    if len(found) >= 1000:
-                        return sorted(found)
-        return sorted(found)
+        import script_files
+        return script_files.image_names()
 
     def find_template(self, name, threshold=0.85, show=True):
-        """Match a template from the Template folder against the current frame (grayscale, like isContainTemplate)."""
+        """Match a template (in Template, or "スクリプト/...") against the current frame (grayscale, like isContainTemplate)."""
         import cv2
+        import script_files
         from ImageProcessing import getImage
-        root = os.path.realpath(os.path.join(os.getcwd(), 'Template'))
-        path = os.path.realpath(os.path.join(root, str(name)))
-        if os.path.commonpath([root, path]) != root:
-            raise ValueError('Template must be inside the Template folder')
+        path = script_files.image_path(name)
         frame = self.core.camera.readFrame()
         if frame is None:
             raise ValueError('No live camera frame')

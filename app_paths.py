@@ -47,6 +47,8 @@ APP_SETTINGS = (PROGRAM if PORTABLE else CONFIG) / 'app-settings.json'
 # Folders the user moved (settings: フォルダー); missing keys keep the defaults.
 FOLDER_CHOICES = (PROGRAM if PORTABLE else CONFIG) / 'folders.json'
 CHOOSABLE = ('workspace', 'captures')
+# The user's scripts (SerialController/Paths.py): one folder per script, images in 画像, shared ones in 共通/画像.
+SCRIPTS = 'スクリプト'
 
 
 def folder_choices():
@@ -64,7 +66,7 @@ def apply_folder_choices():
     WORKSPACE = Path(chosen['workspace']) if chosen.get('workspace') else DEFAULT_WORKSPACE
     CAPTURES = Path(chosen['captures']) if chosen.get('captures') else WORKSPACE / 'Captures'
     # Folders the user can open from the app (settings page, menus).
-    FOLDERS = {'workspace': WORKSPACE, 'scripts': WORKSPACE / 'Commands' / 'PythonCommands', 'captures': CAPTURES,
+    FOLDERS = {'workspace': WORKSPACE, 'scripts': WORKSPACE / SCRIPTS, 'captures': CAPTURES,
                'settings': PROFILES, 'logs': LOGS}
 
 
@@ -103,6 +105,7 @@ apply_folder_choices()
 def prepare_workspace():
     """Copy bundled scripts, images and data the user does not have yet; never overwrite their edits."""
     if PORTABLE:
+        (WORKSPACE / SCRIPTS / '共通' / '画像').mkdir(parents=True, exist_ok=True)
         CAPTURES.mkdir(parents=True, exist_ok=True)
         return
     source = PROGRAM / 'SerialController'
@@ -115,4 +118,5 @@ def prepare_workspace():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(item, target)
     (WORKSPACE / 'Controller_Log').mkdir(parents=True, exist_ok=True)
+    (WORKSPACE / SCRIPTS / '共通' / '画像').mkdir(parents=True, exist_ok=True)
     CAPTURES.mkdir(parents=True, exist_ok=True)

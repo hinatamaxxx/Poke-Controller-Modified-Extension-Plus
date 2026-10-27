@@ -28,6 +28,7 @@ try:
     flag_import_plyer = True
 except Exception:
     flag_import_plyer = False
+import Paths
 from Settings import GuiSettings
 from ImageProcessing import ImageProcessing, crop_image, getImage, opneImage
 
@@ -188,7 +189,7 @@ class PythonCommand(CommandBase.Command):
         self.socket0.alive = True
         self.mqtt0.alive = True
         self.postProcess = postProcess
-        ImageProcPythonCommand.template_path_name = "./Template/"
+        ImageProcPythonCommand.template_path_name = Paths.TEMPLATE
         if not self.thread or not self.thread.is_alive():
             self.thread = threading.Thread(target=self.do_safe, args=(ser,))
             self.thread.start()
@@ -409,7 +410,7 @@ def convertCv2Format(crop_fmt: int | str = "", crop: List[int] = []) -> Tuple(Li
 
 
 class ImageProcPythonCommand(PythonCommand):
-    template_path_name = "./Template/"
+    template_path_name = Paths.TEMPLATE
     capture_path_name = "./Captures/"
 
     def __init__(self, cam: Camera, gui: CaptureArea = None):
@@ -472,6 +473,9 @@ class ImageProcPythonCommand(PythonCommand):
         elif mode == "c":
             return os.path.join(self.capture_path_name, filename)
         elif mode == "t":
+            if self.template_path_name == Paths.TEMPLATE:
+                # Its own 画像 first, then shared images, then Template (Paths.image_folders).
+                return Paths.find_image(filename, type(self).__module__)
             return os.path.join(self.template_path_name, filename)
         else:
             return filename

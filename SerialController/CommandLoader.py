@@ -17,25 +17,26 @@ logger.propagate = True
 
 class CommandLoader:
     def __init__(self, base_path, base_class):
-        self.path = base_path
+        # One folder or several (the bundled Commands/PythonCommands and the user's スクリプト).
+        self.paths = [base_path] if isinstance(base_path, str) else list(base_path)
         self.base_type = base_class
         self.modules = []
 
     def load(self):
         if not self.modules:  # load if empty
-            self.modules = util.importAllModules(self.path)
+            self.modules = [m for path in self.paths for m in util.importAllModules(path)]
 
         # return command class types
         return self.getCommandClasses()
 
     def reload(self):
         loaded_module_dic = {mod.__name__: mod for mod in self.modules}
-        cur_module_names = util.getModuleNames(self.path)
+        cur_module_names = [name for path in self.paths for name in util.getModuleNames(path)]
 
         # Load only not loaded modules
         not_loaded_module_names = list(set(cur_module_names) - set(loaded_module_dic.keys()))
         if len(not_loaded_module_names) > 0:
-            self.modules.extend(util.importAllModules(self.path, not_loaded_module_names))
+            self.modules.extend(util.importAllModules(None, not_loaded_module_names))
 
         # Reload commands except deleted ones
         for mod_name in list(set(cur_module_names) & set(loaded_module_dic.keys())):
@@ -75,8 +76,16 @@ class CommandLoader:
                         del c.TAGS
                 else:
                     c.TAGS = c._LOADER_TAGS
-                dir_name = "/".join(mod.__name__.split(".")[2:])
-                dir_tags = ["@" + t for t in mod.__name__.split(".")[2:-1]]
+                # The name inside its root folder: Commands.PythonCommands.A.b -> A/b. In スクリプト each script has a
+                # folder of its own, so the folder stands for it: スクリプト.BDSP.エンテイ.エンテイ -> BDSP/エンテイ
+                # (listed under BDSP).
+                parts = mod.__name__.split(".")
+                if parts[:2] == ["Commands", "PythonCommands"]:
+                    parts = parts[2:]
+                else:
+                    parts = parts[1:-1] if len(parts) > 2 else parts[1:]
+                dir_name = "/".join(parts)
+                dir_tags = ["@" + t for t in parts[:-1]]
 
                 # add tags of directory name
                 if hasattr(c, "TAGS"):

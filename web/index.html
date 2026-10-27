@@ -607,7 +607,7 @@ table.notify input { margin: 1px 0; }
           <button class="cmd" id="pause">一時停止</button>
           <button class="cmd" id="resume">再開</button>
           <span class="selected-name" id="selected-name"></span>
-          <button class="cmd" data-folder="scripts">フォルダー</button>
+          <button class="cmd" id="script-folder" title="選んだスクリプトのフォルダーを開きます">フォルダー</button>
         </div>
       </div>
       <div class="view" id="script-shortcuts" hidden>
@@ -2216,6 +2216,12 @@ function openFolder(folder) {
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
   return command('open_folder', {folder});
 }
+// The selected script's own folder (its .py and 画像), or スクリプト when none is selected.
+$('script-folder').addEventListener('click', () => {
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
+  const name = $('kind').value === 'python' ? selectedScript : '';
+  quiet(name ? command('open_script_folder', {name}) : command('open_folder', {folder: 'scripts'}));
+});
 document.querySelectorAll('[data-folder]').forEach(button => button.addEventListener('click', () =>
   openFolder(button.dataset.folder).catch(() => {})));
 document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
