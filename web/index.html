@@ -103,7 +103,7 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .settings { position: fixed; left: 0; right: 0; bottom: 0; top: var(--head); z-index: 9; background: var(--shade); display: grid; place-items: center; padding: 16px;
             animation: fade-in .12s ease-out; }
 .settings[hidden] { display: none; }
-.settings-window { width: min(700px, 100%); height: min(500px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+.settings-window { width: min(720px, 100%); height: min(600px, 100%); display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
                    box-shadow: 0 16px 48px rgba(0, 0, 0, .35); overflow: hidden; animation: pop-in .14s ease-out; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
@@ -153,6 +153,12 @@ dl.about { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap
 dl.about dt { color: var(--muted); }
 dl.about dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 dl.about.libs { grid-template-columns: repeat(3, max-content minmax(0, 1fr)); font-size: 12px; }
+.license { margin: 0; font-size: 12px; color: var(--muted); }
+a.ext { color: var(--accent); font-size: 13px; }
+#discord-inline .row { flex-wrap: nowrap; }
+#discord-inline input { flex: 1; min-width: 0; }
+.folder-list button { padding: 4px 12px; }
+#set-about h3 { margin-top: 6px; padding-top: 6px; }
 .settings-page h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .settings-page h2 + h3 { border-top: 0; padding-top: 0; margin-top: 0; }
 .settings-page pre { flex: none; max-height: 40dvh; }
@@ -693,10 +699,9 @@ table.notify input { margin: 1px 0; }
     <button type="button" data-page="set-keys">キー設定</button>
     <button type="button" data-page="set-log">ログ</button>
     <hr>
-    <button type="button" data-page="set-link">連携</button>
+    <button type="button" data-page="set-link">Discord 連携</button>
     <hr>
     <button type="button" data-page="set-update">更新</button>
-    <button type="button" data-page="set-folders">フォルダー</button>
     <button type="button" data-page="set-about">このアプリについて</button>
   </nav>
   <div class="settings-main">
@@ -712,20 +717,22 @@ table.notify input { margin: 1px 0; }
               <td><input type="checkbox" data-option="win_start" aria-label="Windows通知（開始）"></td>
               <td><input type="checkbox" data-option="win_end" aria-label="Windows通知（終了）"></td>
               <td><button class="mini" data-test="win" aria-label="Windowsのテスト通知">テスト</button></td></tr>
-            <tr data-service="line"><th>LINE</th>
-              <td><input type="checkbox" data-option="line_start" aria-label="LINE通知（開始）"></td>
-              <td><input type="checkbox" data-option="line_end" aria-label="LINE通知（終了）"></td>
-              <td><button class="mini" data-test="line" aria-label="LINEのテスト通知">テスト</button><button class="mini link-go" data-link="line">連携する</button></td></tr>
             <tr data-service="discord"><th>Discord</th>
               <td><input type="checkbox" data-option="discord_start" aria-label="Discord通知（開始）"></td>
               <td><input type="checkbox" data-option="discord_end" aria-label="Discord通知（終了）"></td>
-              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button><button class="mini link-go" data-link="discord">連携する</button></td></tr>
+              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button><button class="mini link-go" id="discord-link-go">連携する</button></td></tr>
+            <tr class="inline-link" id="discord-inline" hidden><td colspan="4">
+              <div class="row">
+                <input type="password" id="discord-inline-url" autocomplete="off" placeholder="Discord の Webhook URL" aria-label="DiscordのWebhook URL">
+                <button type="button" class="cmd primary" id="discord-inline-save">連携</button>
+                <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
+              </div>
+            </td></tr>
           </tbody>
         </table>
     </section>
     <section class="settings-page" id="set-link" hidden>
-      <h2>連携</h2>
-      <h3>Discord <span class="state" id="discord-set" hidden>設定済み</span></h3>
+      <h2>Discord 連携 <span class="state" id="discord-set" hidden>設定済み</span></h2>
       <div class="form">
         <label for="discord-url">Webhook URL</label>
         <input type="password" id="discord-url" autocomplete="off" placeholder="変えるときだけ入力" aria-label="DiscordのWebhook URL">
@@ -735,15 +742,7 @@ table.notify input { margin: 1px 0; }
       <div class="row">
         <button type="button" class="cmd primary" id="save-discord">保存</button>
         <button type="button" class="cmd" data-test="discord">テスト通知</button>
-      </div>
-      <h3>LINE <span class="state" id="line-set" hidden>設定済み</span></h3>
-      <div class="form">
-        <label for="line-token">トークン</label>
-        <input type="password" id="line-token" autocomplete="off" placeholder="変えるときだけ入力" aria-label="LINEのトークン">
-      </div>
-      <div class="row">
-        <button type="button" class="cmd primary" id="save-line">保存</button>
-        <button type="button" class="cmd" data-test="line">テスト通知</button>
+        <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
       </div>
     </section>
     <section class="settings-page" id="set-watch" hidden>
@@ -782,26 +781,19 @@ table.notify input { margin: 1px 0; }
           <div class="row"><button class="cmd" id="update-now">今すぐ更新</button><span class="meta" id="update-meta"></span></div>
           <div class="error" id="update-error"></div>
     </section>
-    <section class="settings-page" id="set-folders" hidden>
-      <h2>フォルダー</h2>
-      <div class="folder-list" id="folder-list" role="list"></div>
-    </section>
     <section class="settings-page" id="set-about" hidden>
       <h2>このアプリについて</h2>
       <dl class="about" id="about-env"></dl>
+      <div class="links">
+        <a href="#" class="ext" data-link="guide">使い方ガイド</a>
+        <a href="#" class="ext" data-link="github">GitHub</a>
+      </div>
+      <h3>ファイルの場所</h3>
+      <div class="folder-list" id="folder-list" role="list"></div>
       <h3>ライブラリ</h3>
       <dl class="about libs" id="about-libs"></dl>
-      <div class="row">
-        <button type="button" class="cmd" data-menu="changelog">更新履歴</button>
-        <button type="button" class="cmd" data-menu="license">ライセンス</button>
-        <button type="button" class="cmd" data-menu="question">質問テンプレート</button>
-      </div>
-      <div class="links">
-        <a href="https://pokecontroller.info/" target="_blank" rel="noopener">使い方ガイド</a>
-        <a href="https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus" target="_blank" rel="noopener">GitHub</a>
-      </div>
-      <h3>アプリ</h3>
-      <div class="row"><button class="cmd danger" id="quit">アプリを終了</button></div>
+      <h3>ライセンス</h3>
+      <p class="license" id="about-license"></p>
     </section>
   </div>
  </div>
@@ -1098,16 +1090,16 @@ function renderSettings() {
   $('auto-update').disabled = $('update-now').disabled = !!app.portable;
   renderFolderList(app.folders || {});
   const note = state.notification || {};
-  $('line-set').hidden = !note.line_token_set;
   $('discord-set').hidden = !note.discord_webhook_set;
   // A service that is not linked yet is grey in 通知, with a button to its settings instead of a test.
-  for (const [service, linked] of [['line', note.line_token_set], ['discord', note.discord_webhook_set]]) {
+  for (const [service, linked] of [['discord', note.discord_webhook_set]]) {
     const row = document.querySelector(`tr[data-service="${service}"]`);
     row.classList.toggle('off', !linked);
     row.querySelectorAll('input').forEach(box => { box.disabled = !linked; });
     row.querySelector('[data-test]').hidden = !linked;
     row.querySelector('.link-go').hidden = !!linked;
   }
+  if (note.discord_webhook_set) $('discord-inline').hidden = true;
   if (document.activeElement !== $('discord-name') && !$('discord-name').dataset.edited) $('discord-name').value = note.discord_username || '';
 }
 
@@ -1434,6 +1426,10 @@ function showSettingsPage(page) {
       Object.assign(document.createElement('dt'), {textContent: name}), Object.assign(document.createElement('dd'), {textContent: value})]);
     $('about-env').replaceChildren(...pairs([['使用ツール', `${result.name} ${result.version}`], ['OS', result.os], ['Python', result.python]]));
     $('about-libs').replaceChildren(...pairs(result.libraries.map(([name, version]) => [name, version || 'なし'])));
+    // The license as its name and the copyright holders; the full text stays in the LICENSE file.
+    const lines = (result.license || '').split(/\r?\n/).map(line => line.trim());
+    const holders = lines.filter(line => /^Copyright/i.test(line)).map(line => line.replace(/^Copyright\s*(\(c\)|©)?\s*/i, ''));
+    $('about-license').textContent = `${lines.find(Boolean) || ''}${holders.length ? ' — ' + holders.join('、') : ''}`;
   }).catch(error => { $('about-env').textContent = error.message; });
   document.querySelector('.settings-main').scrollTo(0, 0);
 }
@@ -1450,7 +1446,7 @@ document.querySelectorAll('.settings-nav [data-page]').forEach(button => button.
 $('settings-close').addEventListener('click', closeSettings);
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) closeSettings(); });
 // Discord and LINE pages: Enter saves. Saved secrets are never shown again.
-[['discord-url', 'save-discord'], ['discord-name', 'save-discord'], ['line-token', 'save-line']].forEach(([field, save]) =>
+[['discord-url', 'save-discord'], ['discord-name', 'save-discord'], ['discord-inline-url', 'discord-inline-save']].forEach(([field, save]) =>
   $(field).addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) $(save).click(); }));
 document.addEventListener('keydown', event => {
   if (event.key === ',' && event.ctrlKey) { event.preventDefault(); if ($('settings').hidden) openSettings(); else closeSettings(); }
@@ -1533,15 +1529,6 @@ $('act-discord').addEventListener('click', () => command('discord_image').then((
 const menuActions = {
   settings: () => openSettings(),
   help: () => openSettings('set-about'),
-  question: () => call('about').then(result => {
-    about = result;
-    const script = result.script || {};
-    $('q-name').value = script.name ? script.name + (script.file ? ` (${script.file})` : '') : '';
-    $('q-dev').value = script.developer || '';
-    showInfo('質問テンプレート', {form: true, desc: 'すべての項目を書くと、質問に貼る文章を作ります。'});
-  }),
-  changelog: () => call('about').then(result => showInfo('更新履歴', {text: result.changelog || '更新履歴を読み込めませんでした。'})),
-  license: () => call('about').then(result => showInfo('ライセンス', {text: result.license || 'ライセンスを読み込めませんでした。'})),
 };
 document.querySelectorAll('#app-menu [data-menu], #set-about [data-menu]').forEach(item => item.addEventListener('click', event => {
   event.stopPropagation();
@@ -2200,7 +2187,6 @@ function renderFolderList(folders) {
 $('clear-logs').addEventListener('click', () => Promise.all([1, 2].map(log => command('clear_log', {log})))
   .then(() => { localLog.length = 0; $('clear-logs').textContent = '消去しました'; setTimeout(() => { $('clear-logs').textContent = '画面のログを消去'; }, 1200); })
   .catch(() => {}).finally(refresh));
-document.querySelectorAll('.link-go').forEach(button => button.addEventListener('click', () => showSettingsPage('set-link')));
 // In the app window, the window lets Explorer come to the front (the app's process opens the folder).
 function openFolder(folder) {
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
@@ -2211,31 +2197,24 @@ document.querySelectorAll('[data-folder]').forEach(button => button.addEventList
 document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
   quiet(command('notify_test', {channel: button.dataset.test}))));
 // Saved secrets are never shown again; the fields are cleared after saving.
-$('save-line').addEventListener('click', () => {
-  const token = $('line-token').value.trim();
-  if (!token) return;
-  quiet(command('notification', {line_token: token}).then(() => { $('line-token').value = ''; }));
+// 通知's Discord row links in place: the Webhook URL is typed right there.
+$('discord-link-go').addEventListener('click', () => { $('discord-inline').hidden = false; $('discord-inline-url').focus(); });
+$('discord-inline-save').addEventListener('click', () => {
+  const url = $('discord-inline-url').value.trim();
+  if (!url) return;
+  quiet(command('notification', {discord_webhook_url: url}).then(() => { $('discord-inline-url').value = ''; $('discord-inline').hidden = true; }));
 });
+// Help pages open in the user's own browser, where they are signed in.
+document.querySelectorAll('a.ext[data-link]').forEach(link => link.addEventListener('click', event => {
+  event.preventDefault();
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
+  command('open_url', {link: link.dataset.link}).catch(() => {});
+}));
 $('discord-name').addEventListener('input', () => { $('discord-name').dataset.edited = '1'; });
 $('save-discord').addEventListener('click', () => {
   const values = {discord_username: $('discord-name').value.trim()};
   if ($('discord-url').value.trim()) values.discord_webhook_url = $('discord-url').value.trim();
   quiet(command('notification', values).then(() => { $('discord-url').value = ''; delete $('discord-name').dataset.edited; }));
-});
-// Quitting stops the app for every viewer; the button asks for a second press instead of a pop-up.
-let quitArmed = null;
-$('quit').addEventListener('click', () => {
-  if (!quitArmed) {
-    $('quit').textContent = 'もう一度押すと終了';
-    quitArmed = setTimeout(() => { quitArmed = null; $('quit').textContent = 'アプリを終了'; }, 3000);
-    return;
-  }
-  clearTimeout(quitArmed);
-  quitArmed = null;
-  command('quit').then(() => {
-    $('quit').textContent = '終了しました';
-    $('quit').disabled = true;
-  }).catch(() => {});
 });
 
 // Controller placement is kept per browser; storage may be unavailable, so the default must work without it.

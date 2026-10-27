@@ -21,6 +21,10 @@ STICK_ANGLES = {'UP': 90, 'DOWN': -90, 'LEFT': -180, 'RIGHT': 0}
 MIN_PRESS = .08
 MAX_PRESS = 5.0
 MAX_STREAMS = 4
+# Pages the app opens in the default browser (where the user is signed in, so the private repository shows).
+LINKS = {'guide': 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus#使い方',
+         'github': 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus',
+         'discord_webhook': 'https://support.discord.com/hc/ja/articles/228383668'}
 
 
 def parse_inputs(names):
@@ -625,6 +629,12 @@ class LocalControl(ApiServer):
         elif action == 'update_now':
             import update_service
             threading.Thread(target=update_service.check_now, args=(core.preferences, True), daemon=True).start()
+        elif action == 'open_url':
+            import webbrowser
+            url = LINKS.get(values.get('link'))
+            if url is None:
+                raise ValueError('Unknown link')
+            webbrowser.open(url)
         elif action == 'open_folder':
             import app_paths
             folder = app_paths.FOLDERS.get(values.get('folder'))
