@@ -111,7 +111,7 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 .settings-close:hover { background: var(--chip); color: var(--text); }
 @media (max-width: 700px) {
   .settings { padding: 8px; }
-  .settings-window { flex-direction: column; height: 100%; }
+  .settings-window { flex-direction: column; height: min(360px, 100%); }
   .settings-nav { width: auto; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
   .settings-title, .settings-nav hr { display: none; }
   .settings-nav button { padding: 3px 10px; }
