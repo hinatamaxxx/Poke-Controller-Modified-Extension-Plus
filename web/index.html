@@ -427,6 +427,7 @@ table.notify input { margin: 1px 0; }
 <main>
   <div class="video" aria-label="映像">
     <div class="frame" id="frame" role="img" aria-label="キャプチャ映像">
+      <img id="video-still" alt="" hidden>
       <img id="video" alt="" class="waiting">
       <div class="empty" id="video-empty" hidden>映像がありません</div>
       <div class="down" id="down" hidden><div id="down-text"></div><div class="why" id="down-why"></div><button class="cmd" id="down-restart" hidden>再起動</button></div>
@@ -992,12 +993,32 @@ function renderConnection() {
   $('disconnect').disabled = busy || !state.serial_open;
 }
 
-// The stream of the shown Switch; the image stays hidden until its first frame arrives.
+// The stream of the shown Switch; the image stays hidden until its first frame arrives. Meanwhile the last
+// picture seen of that Switch (kept per Switch, like a tab preview) fills the frame.
+const stills = new Map();
+function keepStill() {
+  const img = $('video');
+  if (!session || img.classList.contains('waiting') || !img.naturalWidth) return;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = Math.round(640 * img.naturalHeight / img.naturalWidth);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    stills.set(session, canvas.toDataURL('image/jpeg', .7));
+  } catch (error) { /* not drawable yet */ }
+}
+function showStill() {
+  const still = stills.get(session);
+  $('video-still').hidden = !still;
+  if (still) $('video-still').src = still;
+}
 function connectStream() {
   $('video').classList.add('waiting');
+  showStill();
   $('video').src = `${STREAM}?session=${encodeURIComponent(session)}&t=${Date.now()}`;
 }
 function stopStream() {
+  keepStill();
   $('video').classList.add('waiting');
   $('video').removeAttribute('src');
 }
@@ -1008,6 +1029,7 @@ function renderVideo() {
   if (show && !img.getAttribute('src')) connectStream();
   if (!show && img.getAttribute('src')) stopStream();
   img.hidden = !show;
+  if (!show || !state.camera_live) $('video-still').hidden = true;
   $('video-empty').hidden = !show || state.camera_live;
   $('frame').classList.toggle('pick', !!(state.options && state.options.show_value));
   if (!(state.options && state.options.show_value)) $('pick-info').textContent = '';
@@ -1259,7 +1281,7 @@ function renderDown(item) {
   $('down-why').textContent = item.switch_error || '';
   $('down-restart').hidden = item.switch_state !== 'crashed';
   setBadge('run-state', '停止中');
-  ['video-empty', 'video', 'run-controls', 'seq', 'assist', 'rec-mark'].forEach(id => $(id).hidden = true);
+  ['video-empty', 'video', 'video-still', 'run-controls', 'seq', 'assist', 'rec-mark'].forEach(id => $(id).hidden = true);
   stopStream();
 }
 $('down-restart').addEventListener('click', () => quiet(call('switch_restart', {switch: session})));
@@ -1996,11 +2018,15 @@ $('connect').addEventListener('click', () => {
   quiet(command('connect', {port: $('port').value, baud: Number($('baud').value), format: $('format').value}));
 });
 $('disconnect').addEventListener('click', () => quiet(command('disconnect')));
-$('video').addEventListener('load', () => $('video').classList.remove('waiting'));
+$('video').addEventListener('load', () => { $('video').classList.remove('waiting'); $('video-still').hidden = true; });
+let streamRetries = 0;
+$('video').addEventListener('load', () => { streamRetries = 0; });
 $('video').addEventListener('error', () => {
   // Reconnect the MJPEG stream if it drops (camera change, app busy), unless the video is switched off.
+  // The first retries come quickly: a refused stream usually only waits for the previous one to close.
   $('video').classList.add('waiting');
-  setTimeout(() => { if ($('video').getAttribute('src')) connectStream(); }, 1000);
+  const delay = streamRetries++ < 3 ? 200 : 1000;
+  setTimeout(() => { if ($('video').getAttribute('src')) connectStream(); }, delay);
 });
 
 // Settings
