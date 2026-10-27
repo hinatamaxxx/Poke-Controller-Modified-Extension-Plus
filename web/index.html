@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Poke-Controller Web</title>
+<script>
+  // In the app window the page is the title bar from the first paint (the window is framed before it loads).
+  if (window.chrome && window.chrome.webview) document.documentElement.classList.add('framed');
+</script>
 <style>
 :root {
   --bg: #f0f0f0; --panel: #ffffff; --text: #1d2026; --muted: #5f6672; --line: #d4d7dc;
@@ -36,13 +40,15 @@ header { flex: none; display: flex; gap: 6px; align-items: center; padding: 0 0 
 header button, header input, header .sw { -webkit-app-region: no-drag; app-region: no-drag; }
 .drag-space { flex: 1 1 0; align-self: stretch; min-width: 24px; }
 .caption { display: none; align-self: stretch; flex: none; margin-left: -6px; }
-body.framed .caption { display: flex; }
-body.framed header { padding-right: 0; }
+.framed .caption { display: flex; }
+.framed header { padding-right: 0; }
+/* Until the first state arrives the bar shows only the menu and window buttons, so nothing jumps in piece by piece. */
+html:not(.loaded) header > :not(.menu-button):not(.caption):not(.drag-space) { visibility: hidden; }
 .caption button { width: 46px; border: 0; padding: 0; background: none; color: var(--text); font: 10px "Segoe Fluent Icons", "Segoe MDL2 Assets"; cursor: default;
                   transition: background-color .1s; }
 .caption button:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .caption button.close:hover { background: #c42b1c; color: #fff; }
-body:not(.framed) header { padding-right: 12px; }
+html:not(.framed) header { padding-right: 12px; }
 header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 /* Switch tabs: one per console; the dot is its state (running, stopped, starting). */
 .switches { display: flex; gap: 0; align-items: flex-end; align-self: stretch; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto;
@@ -170,9 +176,13 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   header h1, header #run-state.idle { display: none; }
   body .tabs button { padding: 2px 5px; font-size: 12px; }
   /* Camera and COM become coloured dots (name in the tooltip) so the run state and its buttons keep the room. */
-  header #camera-state, header #serial-state { width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
-  header #camera-state.ok, header #serial-state.ok { background: var(--ok); }
+  header #camera-state, header #serial-state, header #gamepad-state { width: 18px; height: 18px; padding: 0; border-radius: 0; font-size: 0; border: 0;
+    background: var(--muted); flex: none; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+  header #camera-state.ok, header #serial-state.ok, header #gamepad-state.ok { background: var(--ok); }
   header #camera-state.bad, header #serial-state.bad { background: var(--danger); }
+  #camera-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 6h12a2 2 0 0 1 2 2v1.6l4.2-2.6c.4-.2.8 0 .8.4v9.2c0 .4-.4.6-.8.4L17 14.4V16a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/></svg>"); }
+  #serial-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8 2h2v5h4V2h2v5h2v5a6 6 0 0 1-5 5.9V22h-2v-4.1A6 6 0 0 1 6 12V7h2z'/></svg>"); }
+  #gamepad-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M7 6h10a5 5 0 0 1 4.9 6l-.9 4.6a2.5 2.5 0 0 1-4.3 1.1L14.4 15H9.6l-2.3 2.7A2.5 2.5 0 0 1 3 16.6L2.1 12A5 5 0 0 1 7 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9zM16.2 9.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM18.4 11.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z'/></svg>"); }
   body { font-size: 13px; }
   /* Controller in a tab (portrait, or unless "beside the video" is chosen). body.pad-tab is set by placePad(). */
   body.pad-tab main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "video" "tabs"; }
@@ -189,9 +199,9 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   :root { --head: 30px; }
   header { gap: 5px; }
   .caption button { width: 40px; }
-  header .badge { width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
-  header .badge.ok { background: var(--ok); }
-  header .badge.bad { background: var(--danger); }
+  header .badge:not(#camera-state):not(#serial-state):not(#gamepad-state) { width: 12px; height: 12px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
+  header .badge.ok:not(#camera-state):not(#serial-state):not(#gamepad-state) { background: var(--ok); }
+  header .badge.bad:not(#camera-state):not(#serial-state):not(#gamepad-state) { background: var(--danger); }
   header #profile { display: none; }
   main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video pad" "bar bar"; padding: var(--gap) 8px 4px; }
   body.pad-tab main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video" "bar"; }
@@ -315,7 +325,14 @@ table.notify input { margin: 1px 0; }
 .area-pad { align-items: center; }
 .pad-wrap { display: flex; flex-direction: column; align-items: center; }
 .pad { display: flex; justify-content: center; flex-wrap: nowrap; max-width: 100%; user-select: none; -webkit-user-select: none; touch-action: none; }
-.board { display: grid; grid-template-columns: repeat(3, var(--key-w)); grid-template-rows: repeat(5, var(--key-h)) auto; gap: var(--key-gap); padding: var(--key-gap); min-width: 0; }
+/* Pro Controller layout: the left stick sits high and outside with the D-pad below it, the right stick low and
+   inside below ABXY; − + and capture HOME are toward the middle. */
+.board { display: grid; grid-template-columns: repeat(3, var(--key-w)); gap: var(--key-gap); padding: var(--key-gap); min-width: 0; }
+.board.left { grid-template-rows: var(--key-h) auto repeat(3, var(--key-h)); }
+.board.right { grid-template-rows: repeat(4, var(--key-h)) auto; }
+.board.left .stick-cell { grid-area: 2 / 1 / 3 / 3; }
+.board.right .stick-cell { grid-area: 5 / 1 / 6 / 3; }
+.board.left .ctl[data-btn=CAPTURE] { align-self: center; height: var(--key-h); }
 .board.left { background: var(--joy-l); border-radius: 4px 0 0 4px; }
 .board.right { background: var(--joy-r); border-radius: 0 4px 4px 0; }
 .ctl { border: 0; border-radius: 2px; padding: 0; font: 600 clamp(10px, 1.8vh, 14px)/1 system-ui, "Segoe UI", sans-serif; color: var(--btn-text); background: var(--btn); cursor: pointer; touch-action: none; min-width: 0; overflow: hidden; }
@@ -330,7 +347,7 @@ table.notify input { margin: 1px 0; }
 .stick.on .knob { background: var(--btn-on); }
 .pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
 .pad-slot:empty { display: none; }
-.pad-slot .pad-wrap { --key-h: clamp(14px, min(calc((100cqh - 28px) / 8.2), calc((100cqw - 12px) / 10)), 46px);
+.pad-slot .pad-wrap { --key-h: clamp(14px, min(calc((100cqh - 28px) / 7.2), calc((100cqw - 12px) / 10)), 46px);
                       --key-w: calc(var(--key-h) * 1.45); --stick: calc(var(--key-h) * 2.2); --key-gap: clamp(3px, calc(var(--key-h) / 7), 6px); }
 .pad-slot .ctl { font-size: clamp(10px, calc(var(--key-h) * .42), 15px); }
 .pad .ctl[data-btn=HOME] { font-size: clamp(8px, calc(var(--key-h) * .34), 13px); letter-spacing: -.02em; }
@@ -574,32 +591,30 @@ table.notify input { margin: 1px 0; }
     <div class="pad" id="pad">
       <div class="board left">
         <button class="ctl" data-btn="ZL" aria-label="ZL" style="grid-area:1/1">ZL</button>
-        <button class="ctl" data-btn="L" aria-label="L" style="grid-area:2/1">L</button>
-        <button class="ctl" data-btn="LCLICK" aria-label="左スティック押し込み" style="grid-area:2/2">L-C</button>
-        <button class="ctl" data-btn="MINUS" aria-label="マイナス" style="grid-area:2/3">−</button>
+        <button class="ctl" data-btn="L" aria-label="L" style="grid-area:1/2">L</button>
+        <button class="ctl" data-btn="MINUS" aria-label="マイナス" style="grid-area:1/3">−</button>
+        <button class="ctl" data-btn="CAPTURE" aria-label="キャプチャー" style="grid-area:2/3">CAP</button>
         <button class="ctl" data-btn="UP" aria-label="十字キー上" style="grid-area:3/2">↑</button>
         <button class="ctl" data-btn="LEFT" aria-label="十字キー左" style="grid-area:4/1">←</button>
         <button class="ctl" data-btn="RIGHT" aria-label="十字キー右" style="grid-area:4/3">→</button>
         <button class="ctl" data-btn="DOWN" aria-label="十字キー下" style="grid-area:5/2">↓</button>
-        <button class="ctl" data-btn="CAPTURE" aria-label="キャプチャー" style="grid-area:5/3">CAP</button>
         <div class="stick-cell">
           <div class="stick" id="stick-L" data-stick="L" data-click="LCLICK" tabindex="0" role="slider"
-               aria-label="左スティック" aria-valuetext="中央"><div class="knob"></div></div>
+               aria-label="左スティック" title="軽くタップで押し込み" aria-valuetext="中央"><div class="knob"></div></div>
         </div>
       </div>
       <div class="board right">
+        <button class="ctl" data-btn="PLUS" aria-label="プラス" style="grid-area:1/1">＋</button>
+        <button class="ctl" data-btn="R" aria-label="R" style="grid-area:1/2">R</button>
         <button class="ctl" data-btn="ZR" aria-label="ZR" style="grid-area:1/3">ZR</button>
-        <button class="ctl" data-btn="PLUS" aria-label="プラス" style="grid-area:2/1">＋</button>
         <button class="ctl" data-btn="X" aria-label="X" style="grid-area:2/2">X</button>
-        <button class="ctl" data-btn="R" aria-label="R" style="grid-area:2/3">R</button>
         <button class="ctl" data-btn="Y" aria-label="Y" style="grid-area:3/1">Y</button>
         <button class="ctl" data-btn="A" aria-label="A" style="grid-area:3/3">A</button>
         <button class="ctl" data-btn="B" aria-label="B" style="grid-area:4/2">B</button>
-        <button class="ctl" data-btn="HOME" aria-label="HOME" style="grid-area:5/1">HOME</button>
-        <button class="ctl" data-btn="RCLICK" aria-label="右スティック押し込み" style="grid-area:5/2">R-C</button>
+        <button class="ctl" data-btn="HOME" aria-label="HOME" style="grid-area:2/1">HOME</button>
         <div class="stick-cell">
           <div class="stick" id="stick-R" data-stick="R" data-click="RCLICK" tabindex="0" role="slider"
-               aria-label="右スティック" aria-valuetext="中央"><div class="knob"></div></div>
+               aria-label="右スティック" title="軽くタップで押し込み" aria-valuetext="中央"><div class="knob"></div></div>
         </div>
       </div>
     </div>
@@ -1151,6 +1166,7 @@ async function refresh() {
     switches = result.switches || [];
     if (result.result.id !== session) { forgetSwitch(); session = result.result.id; }
     renderSwitches();
+    document.documentElement.classList.add('loaded');
     const down = result.result.ready === false;
     document.body.classList.toggle('switch-down', down);
     $('down').hidden = !down;
@@ -1159,6 +1175,7 @@ async function refresh() {
     render();
   } catch (error) {
     setBadge('run-state', 'アプリに接続できません', false);
+    document.documentElement.classList.add('loaded');
   }
 }
 
@@ -1376,7 +1393,7 @@ if (appHost) {
   appHost.addEventListener('message', event => {
     const data = event.data || {};
     if (data.type !== 'window') return;
-    document.body.classList.toggle('framed', !!data.framed);
+    document.documentElement.classList.toggle('framed', !!data.framed);
     $('win-max').innerHTML = data.maximized ? '&#xE923;' : '&#xE922;';
     $('win-max').title = data.maximized ? '元に戻す' : '最大化';
     $('win-max').setAttribute('aria-label', $('win-max').title);

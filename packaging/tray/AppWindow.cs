@@ -75,6 +75,9 @@ namespace PokeControllerTray
 
             web = new WebView2 { Dock = DockStyle.Fill };
             Controls.Add(web);
+            // 最初から独自のタイトルバーで開く（読み込んでから切り替えると、上部が動いて見える）
+            framed = true;
+            UpdateFramePadding();
             ApplyTheme();
 
             themeHandler = delegate(object s, UserPreferenceChangedEventArgs e)
@@ -142,6 +145,7 @@ namespace PokeControllerTray
             st.AreBrowserAcceleratorKeysEnabled = false;   // Ctrl+P・Ctrl+F などを無効に（編集キーとページのキー入力は届く）
             // 画面の上のバーをタイトルバーにする（CSS の app-region: drag で移動・ダブルクリックで最大化）
             try { st.IsNonClientRegionSupportEnabled = true; canFrame = true; } catch (Exception) { canFrame = false; }
+            if (!canFrame) SetFramed(false);
             ApplyTheme();
             // 拡大率は 1.0 に固定する（画面はウィンドウの大きさに合わせて組まれる）
             web.ZoomFactor = 1.0;
@@ -188,7 +192,10 @@ namespace PokeControllerTray
             core.NavigationCompleted += delegate(object s, CoreWebView2NavigationCompletedEventArgs e)
             {
                 if (!e.IsSuccess) SetFramed(false);
+                else if (ContainsFocus || Form.ActiveForm == this) web.Focus();
             };
+            // キーボードでの操作が、画面を一度クリックしなくても届くように、窓が前に来たら画面に入力を渡す
+            Activated += delegate { if (ready && !web.ContainsFocus) web.Focus(); };
             Resize += delegate { if (framed) { UpdateFramePadding(); PostWindowState(); } };
 
             ready = true;
