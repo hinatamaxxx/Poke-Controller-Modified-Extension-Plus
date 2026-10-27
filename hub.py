@@ -24,7 +24,7 @@ CRASH_WINDOW, CRASH_LIMIT = 600, 4  # this many crashes within the window: stop 
 HANG_SECONDS = 45  # no answer this long: the process is stuck, so it is ended and started again
 START_SECONDS = 120
 COPIED = ('discord_token.ini', 'line_token.ini', 'watch.json')  # a new Switch gets the first one's notifications
-APP_ACTIONS = ('app_options', 'update_now', 'open_folder', 'quit')
+APP_ACTIONS = ('app_options', 'update_now', 'open_folder', 'quit', 'choose_folder', 'pick_folder')
 STATES = {'starting': '起動しています', 'restarting': '再起動を待っています', 'crashed': '停止しました', 'stopped': '閉じています'}
 
 
@@ -277,7 +277,7 @@ class Worker:
         detail = self.log_tail()
         clip = ''
         try:
-            clip = self.history.save(str(app_paths.WORKSPACE / 'Captures' / 'recordings'), f'{self.label}: {reason}')
+            clip = self.history.save(os.path.join(app_paths.captures_dir(), 'recordings'), f'{self.label}: {reason}')
         except OSError:
             pass
         message = f'{self.label} が止まりました: {reason}。' + (
@@ -478,7 +478,8 @@ class Hub(ApiServer):
         values = self.preferences.values if self.preferences else {}
         return {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
                 'auto_update': values.get('auto_update', False), 'prereleases': values.get('prereleases', False),
-                'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()}}
+                'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()},
+                'chosen_folders': sorted(app_paths.folder_choices())}
 
     def placeholder(self, worker):
         """The page's state for a Switch whose process is not answering (starting, restarting or stopped)."""
@@ -581,10 +582,19 @@ class Hub(ApiServer):
         elif action == 'update_now':
             import update_service
             threading.Thread(target=update_service.check_now, args=(self.preferences, True), daemon=True).start()
+        elif action in ('choose_folder', 'pick_folder'):
+            name = values.get('folder')
+            if name not in app_paths.CHOOSABLE:
+                raise ValueError('Unknown folder')
+            if any(w.state == 'ready' and (w.summary or {}).get('running') for w in self.open_workers()):
+                raise ValueError('スクリプトの実行中は、フォルダーを変えられません')
+            if action == 'pick_folder':
+                # The Windows folder picker, in front; the choice arrives later and the page sees it in its state.
+                threading.Thread(target=self.pick_folder, args=(name,), daemon=True).start()
+            else:
+                self.change_folder(name, values.get('path') or None)
         elif action == 'open_folder':
-            folders = {'workspace': app_paths.WORKSPACE, 'settings': app_paths.PROFILES, 'logs': app_paths.LOGS,
-                       'captures': app_paths.WORKSPACE / 'Captures', 'scripts': app_paths.WORKSPACE / 'Commands' / 'PythonCommands'}
-            folder = folders.get(values.get('folder'))
+            folder = app_paths.FOLDERS.get(values.get('folder'))
             if folder is None:
                 raise ValueError('Unknown folder')
             folder.mkdir(parents=True, exist_ok=True)
@@ -592,6 +602,30 @@ class Hub(ApiServer):
         elif action == 'quit':
             self.exit_requested = True
         return {'accepted': True}
+
+    def change_folder(self, name, path):
+        app_paths.choose_folder(name, path)
+        # The Switches start again so their scripts, screenshots and recordings use the new place.
+        for worker in self.open_workers():
+            threading.Thread(target=worker.restart, daemon=True).start()
+
+    def pick_folder(self, name):
+        try:
+            import tkinter
+            from tkinter import filedialog
+            root = tkinter.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            title = {'workspace': '作業フォルダーを選ぶ', 'captures': 'スクリーンショット・録画の保存先を選ぶ'}[name]
+            path = filedialog.askdirectory(parent=root, title=title, initialdir=str(app_paths.FOLDERS[name]), mustexist=False)
+            root.destroy()
+        except Exception:
+            return
+        if path:
+            try:
+                self.change_folder(name, path)
+            except (OSError, ValueError):
+                pass
 
     def switch_list(self, include_closed=False):
         return [self.workers[e['id']].info() for e in self.registry.entries if include_closed or e.get('open')]
