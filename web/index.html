@@ -1424,7 +1424,7 @@ $('info-form').addEventListener('submit', event => {
 const menuActions = {
   capture: () => command('capture'),
   discord: () => command('discord_image'),
-  captures: () => command('open_folder', {folder: 'captures'}),
+  captures: () => openFolder('captures'),
   clear: () => Promise.all([1, 2].map(log => command('clear_log', {log}))).then(() => { localLog.length = 0; }),
   settings: () => openSettings(),
   help: () => openSettings('set-about'),
@@ -2073,8 +2073,13 @@ $('watch-limit').addEventListener('change', () => {
   $('watch-limit').value = limit;
   quiet(command('watch', {restart_limit: limit}));
 });
+// In the app window, the window lets Explorer come to the front (the app's process opens the folder).
+function openFolder(folder) {
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
+  return command('open_folder', {folder});
+}
 document.querySelectorAll('[data-folder]').forEach(button => button.addEventListener('click', () =>
-  command('open_folder', {folder: button.dataset.folder}).catch(() => {})));
+  openFolder(button.dataset.folder).catch(() => {})));
 document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
   quiet(command('notify_test', {channel: button.dataset.test}))));
 // Saved secrets are never shown again; the fields are cleared after saving.

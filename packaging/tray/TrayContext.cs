@@ -60,7 +60,7 @@ namespace PokeControllerTray
             miUpdate = new MenuItem("アップデート");
             miUpdate.MenuItems.AddRange(new MenuItem[] { miVersion, new MenuItem("-"), miUpdateNow, miAutoUpdate });
 
-            miFolder = new MenuItem("作業フォルダーを開く", delegate { Command("open_folder", "folder", "workspace"); });
+            miFolder = new MenuItem("作業フォルダーを開く", delegate { Program.AllowForeground(); Command("open_folder", "folder", "workspace"); });
 
             miExit = new MenuItem("アプリを終了する", delegate { ConfirmExit(); });
             menu.MenuItems.AddRange(new MenuItem[] {

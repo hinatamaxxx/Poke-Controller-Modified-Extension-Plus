@@ -187,6 +187,7 @@ namespace PokeControllerTray
                     case "minimize": WindowState = FormWindowState.Minimized; break;
                     case "maximize": WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; break;
                     case "close": Close(); break;
+                    case "foreground": Program.AllowForeground(); break;
                 }
             };
             core.NavigationCompleted += delegate(object s, CoreWebView2NavigationCompletedEventArgs e)
