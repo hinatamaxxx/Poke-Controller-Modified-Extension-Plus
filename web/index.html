@@ -77,7 +77,7 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 .ico.ok { background: var(--ok); opacity: 1; }
 .ico.bad { background: var(--danger); opacity: 1; }
 .ico.cam { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 6h12a2 2 0 0 1 2 2v1.6l4.2-2.6c.4-.2.8 0 .8.4v9.2c0 .4-.4.6-.8.4L17 14.4V16a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/></svg>"); }
-.ico.pad, #gamepad-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M7 6h10a5 5 0 0 1 4.9 6l-.9 4.6a2.5 2.5 0 0 1-4.3 1.1L14.4 15H9.6l-2.3 2.7A2.5 2.5 0 0 1 3 16.6L2.1 12A5 5 0 0 1 7 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9zM16.2 9.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM18.4 11.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z'/></svg>"); }
+.ico.gamepad, #gamepad-state { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M7 6h10a5 5 0 0 1 4.9 6l-.9 4.6a2.5 2.5 0 0 1-4.3 1.1L14.4 15H9.6l-2.3 2.7A2.5 2.5 0 0 1 3 16.6L2.1 12A5 5 0 0 1 7 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9zM16.2 9.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM18.4 11.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z'/></svg>"); }
 header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 0; font-size: 0; background: var(--ok); flex: none;
                         -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 .sw .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
@@ -1216,7 +1216,7 @@ function renderSwitches() {
     const icon = (kind, live, set, title) => Object.assign(document.createElement('span'),
       {className: `ico ${kind} ${!ready ? '' : live ? 'ok' : set ? 'bad' : ''}`, title});
     tab.append(icon('cam', item.camera_live, item.camera_path, !ready ? 'カメラ: 不明' : item.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし'),
-               icon('pad', item.serial_open, item.port, !ready ? 'コントローラー: 不明'
+               icon('gamepad', item.serial_open, item.port, !ready ? 'コントローラー: 不明'
                  : item.serial_open ? `コントローラー: ${item.port ? item.port + " " : ""}接続中` : 'コントローラー: 未接続'));
     if (open.length > 1) {
       const close = Object.assign(document.createElement('button'), {className: 'x', type: 'button', textContent: '×'});
