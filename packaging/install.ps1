@@ -126,7 +126,8 @@ function Remove-BrokenRuntime([string]$Folder) {
 
 function Install-Libraries([string]$Interpreter, [string]$Requirements, [switch]$Isolated) {
     # A dedicated environment must not see the user's site-packages, or pip would replace packages there.
-    $prefix = if ($Isolated) { @('-s') } else { @() }
+    # @(...) keeps a one-item result an array; otherwise '-s' + @(...) joins into one string ('-s-m pip ...').
+    $prefix = @(if ($Isolated) { '-s' })
     Invoke-Checked $Interpreter ($prefix + @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-warn-script-location', '--upgrade', 'pip'))
     Invoke-Checked $Interpreter ($prefix + @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-warn-script-location', '-r', $Requirements))
 }
