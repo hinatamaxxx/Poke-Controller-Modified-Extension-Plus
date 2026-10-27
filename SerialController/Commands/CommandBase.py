@@ -9,6 +9,7 @@ import os
 from UiDispatch import on_ui_log as on_ui, trim_log
 
 from PokeConDialogue import (
+    show_dialogue,
     PokeConDialogue,
     generate_new_dialogue_list,
     save_dialogue_settings,
@@ -187,10 +188,7 @@ class Command:
         need: 出力する形式
         """
         # ダイアログ呼び出し
-        self.message_dialogue = tk.Toplevel()
-        ret = PokeConDialogue(
-            self.message_dialogue, title, message, desc=desc, pos=int(self.pos_dialogue_buttons)
-        ).ret_value(need)
+        ret = show_dialogue(title, message, desc=desc, pos=int(self.pos_dialogue_buttons), need=need)
         self.message_dialogue = None
         if not ret:
             self.finish()
@@ -213,10 +211,7 @@ class Command:
             self.finish()
 
         # ダイアログ呼び出し
-        self.message_dialogue = tk.Toplevel()
-        ret = PokeConDialogue(
-            self.message_dialogue, title, dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons)
-        ).ret_value(need)
+        ret = show_dialogue(title, dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons), need=need)
         self.message_dialogue = None
 
         if not ret:
@@ -262,10 +257,7 @@ class Command:
         new_dialogue_list = generate_new_dialogue_list(dialogue_list, filename)
 
         # ダイアログ呼び出し
-        self.message_dialogue = tk.Toplevel()
-        ret = PokeConDialogue(
-            self.message_dialogue, title, new_dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons)
-        ).ret_value(need)
+        ret = show_dialogue(title, new_dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons), need=need)
         self.message_dialogue = None
 
         if not ret:
@@ -325,10 +317,7 @@ class Command:
         new_dialogue_list.append(["Check", "[PokeCon]設定を保存", False])
 
         # ダイアログ呼び出し
-        self.message_dialogue = tk.Toplevel()
-        ret = PokeConDialogue(
-            self.message_dialogue, title, new_dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons)
-        ).ret_value(need)
+        ret = show_dialogue(title, new_dialogue_list, desc=desc, mode=1, pos=int(self.pos_dialogue_buttons), need=need)
         self.message_dialogue = None
 
         if not ret:

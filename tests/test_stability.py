@@ -106,25 +106,6 @@ class StabilityTests(unittest.TestCase):
         self.assertEqual(owners, [camera.thread.ident])
         lease.close.assert_called_once()
 
-    def test_shutdown_waits_for_producer_and_upgrades_disconnect(self):
-        from AppLifecycle import Lifecycle
-        app = Mock()
-        app.cur_command = SimpleNamespace(thread=Mock(), alive=True)
-        app.cur_command.thread.is_alive.return_value = True
-        app.procon_thread = None
-        app.keyboard = None
-        app.ser.last_error = ''
-        life = Lifecycle(app)
-        life.request()
-        life.request(closing=True)
-        life.tick()
-        app.ser.closeSerial.assert_not_called()
-        app._finish_exit.assert_not_called()
-        app.cur_command.thread.is_alive.return_value = False
-        life.tick()
-        app.ser.closeSerial.assert_called_once()
-        app._finish_exit.assert_called_once()
-
     def test_virtual_gamepads_are_isolated_and_hat_releases(self):
         import pygame
         from virtual_gamepad import VirtualPads

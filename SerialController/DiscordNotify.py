@@ -8,6 +8,7 @@ import json
 import cv2
 import io
 import os
+import Paths
 import numpy as np
 from PIL import Image
 from logging import getLogger, DEBUG, NullHandler
@@ -26,7 +27,7 @@ def convert_bgr_to_bytes(image_bgr):
 
 
 class Discord_Notify:
-    DISCORD_SETTING_PATH = os.path.join(os.path.dirname(__file__), "profiles", "default", "discord_token.ini")
+    DISCORD_SETTING_PATH = os.path.join(Paths.PROFILES, "default", "discord_token.ini")
 
     def __init__(self, webhook_url="webhook_url", username="username", avatar_url="", token_name="token"):
         self._logger = getLogger(__name__)

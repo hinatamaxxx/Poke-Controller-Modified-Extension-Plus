@@ -6,50 +6,216 @@
 <title>Poke-Controller Web</title>
 <style>
 :root {
-  --bg: #f4f5f7; --panel: #ffffff; --text: #1d2026; --muted: #646b78; --line: #d9dde3;
-  --key: #2b2f36; --key-text: #ffffff; --key-on: #ffd800; --key-on-text: #1d2026;
-  --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #f8f9fb;
+  --bg: #f0f0f0; --panel: #ffffff; --text: #1d2026; --muted: #5f6672; --line: #d4d7dc;
+  --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #ffffff; --chip: #eef1f5;
+  --joy-l: #5bcef2; --joy-r: #e85050; --btn: #343434; --btn-text: #ffffff;
+  --btn-on: #ffd800; --btn-on-text: #343434; --well: rgba(0, 0, 0, .22); --focus: #1d2026;
+  --shade: rgba(0, 0, 0, .35);
+  /* Controller size follows the window height so everything fits without scrolling. */
+  --key-h: clamp(20px, 4.4vh, 38px); --key-w: clamp(30px, 4.6vw, 60px); --key-gap: clamp(3px, .7vh, 6px);
+  --stick: clamp(44px, 11vh, 104px); --gap: clamp(6px, 1.2vh, 12px);
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #15171b; --panel: #1f2228; --text: #e8eaee; --muted: #9aa1ad; --line: #343840;
-    --key: #3a3f48; --key-text: #ffffff; --accent: #5b8def; --danger: #ef5350; --ok: #66bb6a; --log: #181a1e;
+    --accent: #5b8def; --danger: #ef5350; --ok: #66bb6a; --log: #181a1e; --chip: #2a2e35;
+    --joy-l: #3fa8cc; --joy-r: #c94545; --well: rgba(0, 0, 0, .3); --focus: #ffffff;
+    --shade: rgba(0, 0, 0, .6);
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Segoe UI", "Yu Gothic UI", sans-serif; }
-header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
-header h1 { font-size: 16px; margin: 0; }
-.badge { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+html, body { height: 100%; overflow: hidden; }
+body { margin: 0; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", "Yu Gothic UI", sans-serif; }
+header { flex: none; display: flex; gap: 6px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); background: var(--panel); overflow: hidden; white-space: nowrap; min-height: 30px; }
+header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
+.badge { padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .badge.ok { color: var(--ok); border-color: var(--ok); }
 .badge.bad { color: var(--danger); border-color: var(--danger); }
-main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
-@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
-section h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
-.video { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
-.video img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
-.video .empty[hidden] { display: none; }
-.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; align-items: start; }
-@media (max-width: 600px) { .pad { grid-template-columns: 1fr 1fr; } }
-.cluster { display: grid; grid-template-columns: repeat(3, 48px); grid-auto-rows: 40px; gap: 4px; justify-content: center; }
-.cluster .label { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 12px; align-self: end; }
-.key { border: 0; border-radius: 6px; background: var(--key); color: var(--key-text); font: inherit; font-weight: 600; cursor: pointer; touch-action: none; user-select: none; }
-.key.on { background: var(--key-on); color: var(--key-on-text); }
-.key:disabled { opacity: .4; cursor: not-allowed; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-.row label { color: var(--muted); font-size: 12px; }
-select, input, button.cmd { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-select, input[type=search] { width: 100%; }
-button.cmd { cursor: pointer; }
+.run-controls { display: flex; gap: 4px; flex: none; margin-left: auto; }
+.run-controls[hidden] { display: none; }
+
+main { flex: 1; min-height: 0; display: grid; gap: var(--gap); padding: var(--gap) 12px; width: 100%; max-width: 1500px; margin: 0 auto; }
+.panel { min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: 6px 10px 10px; display: flex; flex-direction: column; }
+.panel-title { font-size: 12px; color: var(--muted); margin: 0 0 4px; display: flex; align-items: center; gap: 6px; flex: none; }
+
+/* Wide: the original four areas, log boxes take the remaining height. */
+main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "video logs" "tabs pad"; }
+.video { grid-area: video; } .area-logs { grid-area: logs; } .area-tabs { grid-area: tabs; } .area-pad { grid-area: pad; }
+.area-logs { display: flex; flex-direction: column; gap: var(--gap); }
+.area-logs .panel { flex: 1; }
+.tab-logs { display: none; }
+.panel-close { display: none; position: absolute; right: 6px; top: 4px; z-index: 2; }
+
+/* Narrow (built-in browser, small windows): video beside the controller, the rest in tabs. */
+@media (max-width: 900px), (max-height: 520px) {
+  :root { --key-h: clamp(20px, 4.2vh, 34px); --key-w: clamp(28px, 7.2vw, 50px); --stick: clamp(44px, 10.5vh, 92px); }
+  main { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr);
+         grid-template-areas: "video pad" "tabs tabs"; padding: var(--gap) 8px; }
+  .video { height: 100%; min-height: 60px; }
+  .area-pad { padding: 0; border: 0; background: none; justify-content: center; }
+  .area-logs { display: none; }
+  .tab-logs { display: block; }
+  header h1 { display: none; }
+  body { font-size: 13px; }
+  /* Controller in a tab (portrait, or unless "beside the video" is chosen). body.pad-tab is set by placePad(). */
+  body.pad-tab main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "video" "tabs"; }
+  body.pad-tab .video { height: min(calc((100vw - 16px) * 9 / 16), max(34dvh, calc(100dvh - 330px))); }
+  body.pad-tab .area-pad { display: none; }
+}
+
+/* Low windows (e.g. the built-in browser pane, about 471x268): video (and controller) fill the middle,
+   the tabs open as a panel over them from a bottom strip. */
+@media (max-height: 459px) {
+  :root { --key-h: clamp(14px, calc((100dvh - 92px) / 7.2), 30px); --key-w: calc(var(--key-h) * 1.45);
+          --key-gap: 3px; --stick: calc(var(--key-h) * 2.2); --gap: 4px; }
+  body { font-size: 12px; }
+  header { min-height: 26px; padding: 2px 8px; gap: 5px; }
+  header .badge { width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
+  header .badge.ok { background: var(--ok); }
+  header .badge.bad { background: var(--danger); }
+  header #profile { display: none; }
+  main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video pad" "bar bar"; padding: var(--gap) 8px 4px; }
+  body.pad-tab main { grid-template-rows: minmax(0, 1fr) 26px; grid-template-areas: "video" "bar"; }
+  body.pad-tab .video { height: 100%; }
+  .pad-options { margin-top: 2px; font-size: 11px; }
+  /* The tab area spans the middle and bottom rows; only the strip shows until a panel is opened. */
+  .area-tabs { position: relative; grid-row: 1 / 3; grid-column: 1 / -1; z-index: 1; padding: 0; border: 0; background: none;
+               display: flex; flex-direction: column-reverse; pointer-events: none; }
+  .area-tabs > * { pointer-events: auto; }
+  .area-tabs .tabs { height: 26px; margin: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg); gap: 4px; align-items: stretch; }
+  .area-tabs .tabs button { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 4px 4px; margin: -1px 0 0; padding: 0 8px; }
+  .area-tabs:not(.open) .tabs button[aria-selected=true] { color: var(--muted); background: none; }
+  .area-tabs.open .tabs button[aria-selected=true] { color: var(--text); background: var(--panel); border-top: 1px solid var(--panel); }
+  .area-tabs:not(.open) .tabpanel, .area-tabs:not(.open) #message { display: none; }
+  .area-tabs.open .tabpanel:not([hidden]) { flex: 1; background: var(--panel); border: 1px solid var(--line); border-bottom: 0;
+                                             border-radius: 6px 6px 0 0; padding: 6px 30px 6px 8px; }
+  .area-tabs.open #message { background: var(--panel); border: 1px solid var(--line); border-width: 0 1px; padding: 0 8px; margin: 0; }
+  .panel-close { display: block; }
+  .area-tabs:not(.open) .panel-close { display: none; }
+  body .row { gap: 4px; }
+  body button.cmd, body select, body input[type=search], body input[type=text], body input[type=password], body input[type=url] { min-height: 22px; padding: 0 6px; }
+  body .modal { padding: 6px; }
+  body .modal .box { padding: 10px; max-height: calc(100dvh - 12px); }
+  body .modal h2 { font-size: 14px; margin-bottom: 2px; }
+  body .modal .desc { margin-bottom: 6px; }
+  body .modal .fields { grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); gap: 4px 10px; }
+  body .modal .actions { margin: 6px 0; }
+}
+
+button.cmd, select, input[type=search], input[type=text], input[type=password], input[type=url] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; min-width: 0; min-height: 26px; }
+button.cmd { cursor: pointer; white-space: nowrap; }
 button.cmd.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.cmd.danger { border-color: var(--danger); color: var(--danger); }
 button.cmd:disabled { opacity: .5; cursor: not-allowed; }
-.side { display: flex; flex-direction: column; gap: 16px; }
-pre { margin: 0; height: 220px; overflow: auto; background: var(--log); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 12px/1.45 Consolas, "BIZ UDGothic", monospace; white-space: pre-wrap; word-break: break-all; }
-#message { min-height: 1.5em; color: var(--danger); font-size: 12px; margin-top: 6px; }
-.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+button.mini { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
+button.mini.danger { color: var(--danger); border-color: var(--danger); }
+.video { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
+.video .frame { position: relative; width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
+.video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.video img[hidden] { display: none; }
+.video .frame.pick img { cursor: crosshair; }
+.video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
+.video .empty[hidden] { display: none; }
+.video .pick-info { position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 4px; background: rgba(0, 0, 0, .65); color: #fff; font: 12px/1.4 Consolas, monospace; pointer-events: none; }
+.video .pick-info:empty { display: none; }
+.logs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--gap); }
+.logs .log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tabpanel .logs .log { border: 0; padding: 0; background: none; }
+pre { flex: 1; min-height: 24px; margin: 0; overflow: auto; background: var(--log); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font: 12px/1.4 Consolas, "BIZ UDGothic", monospace; white-space: pre-wrap; word-break: break-all; }
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 6px; flex: none; }
+.tabs button { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: inherit; color: var(--muted); background: none; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; padding: 2px 10px; cursor: pointer; margin-bottom: -1px; }
+.tabs button[aria-selected=true] { color: var(--text); background: var(--panel); border-color: var(--line); }
+.tabpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; font-size: 13px; }
+.tabpanel[hidden] { display: none; }
+.view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.view[hidden] { display: none; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: none; }
+.row > .grow { flex: 1 1 140px; }
+.seg { display: flex; flex: none; gap: 0; }
+.seg button { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line); padding: 0 10px; cursor: pointer; min-height: 22px; }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; }
+.seg button + button { border-left: 0; }
+.seg button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
+#script { width: 100%; flex: 1; min-height: 0; }
+.chips { display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; scrollbar-width: thin; flex: none; }
+.chips button { font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 999px; padding: 0 10px; cursor: pointer; white-space: nowrap; }
+.chips button[aria-pressed=true] { background: var(--accent); color: #fff; }
+.chips:empty { display: none; }
+#message { color: var(--danger); font-size: 12px; margin-top: 4px; flex: none; }
+#message:empty { display: none; }
+.form { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.form > label { color: var(--muted); }
+.form .inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.form select { max-width: 100%; }
+.form .full { grid-column: 1 / -1; }
+.error { color: var(--danger); font-size: 12px; }
+.error:empty { display: none; }
+.checks { display: flex; flex-wrap: wrap; gap: 0 12px; flex: none; }
+.checks label, .radios label { white-space: nowrap; }
+.radios { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 14px; align-content: start; line-height: 1.3; }
+.sections h3 { font-size: 12px; font-weight: 600; margin: 0 0 2px; color: var(--muted); }
+.sections .row button.cmd { padding: 1px 8px; min-height: 22px; }
+table.notify { border-collapse: collapse; flex: none; }
+table.notify th, table.notify td { padding: 1px 12px 1px 0; text-align: left; font-weight: normal; }
+table.notify thead th { color: var(--muted); font-size: 12px; }
+table.notify input { margin: 1px 0; }
+.meta { color: var(--muted); font-size: 12px; }
+.set { color: var(--ok); }
+.links a { color: var(--accent); margin-right: 10px; white-space: nowrap; }
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 3px; flex: none; }
+.keys button { display: flex; justify-content: space-between; gap: 4px; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; }
+.keys button kbd { font: 12px Consolas, monospace; color: var(--muted); }
+.keys button[aria-pressed=true] { border-color: var(--accent); }
+.keys button[aria-pressed=true] kbd { color: var(--accent); }
+.shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 10px; flex: none; }
+.shortcut { display: flex; gap: 3px; min-width: 0; }
+.shortcut .go { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; white-space: nowrap; }
+.shortcut .go:disabled { color: var(--muted); cursor: default; }
+
+/* Flat pad like the original Tk window: blue left board, red right board, dark square keys. */
+.area-pad { align-items: center; }
+.pad-wrap { display: flex; flex-direction: column; align-items: center; }
+.pad { display: flex; justify-content: center; flex-wrap: nowrap; max-width: 100%; user-select: none; -webkit-user-select: none; touch-action: none; }
+.board { display: grid; grid-template-columns: repeat(3, var(--key-w)); grid-template-rows: repeat(5, var(--key-h)) auto; gap: var(--key-gap); padding: var(--key-gap); min-width: 0; }
+.board.left { background: var(--joy-l); border-radius: 4px 0 0 4px; }
+.board.right { background: var(--joy-r); border-radius: 0 4px 4px 0; }
+.ctl { border: 0; border-radius: 2px; padding: 0; font: 600 clamp(10px, 1.8vh, 14px)/1 system-ui, "Segoe UI", sans-serif; color: var(--btn-text); background: var(--btn); cursor: pointer; touch-action: none; min-width: 0; overflow: hidden; }
+.ctl:focus-visible, .stick:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ctl.on { background: var(--btn-on); color: var(--btn-on-text); }
+.pad.disabled .ctl, .pad.disabled .stick { opacity: .45; cursor: not-allowed; }
+.stick-cell { grid-column: 1 / -1; display: grid; place-items: center; padding-top: 2px; }
+.stick { position: relative; width: var(--stick); aspect-ratio: 1; border-radius: 50%; background: var(--well); cursor: grab; touch-action: none; }
+.stick .knob { position: absolute; left: 50%; top: 50%; width: 56%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: var(--btn); pointer-events: none; transition: transform .12s ease-out; }
+.stick.dragging { cursor: grabbing; }
+.stick.dragging .knob { transition: none; }
+.stick.on .knob { background: var(--btn-on); }
+.pad-options { display: flex; justify-content: center; margin-top: 4px; font-size: 12px; flex: none; }
+.pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
+.pad-slot:empty { display: none; }
+.pad-slot .pad-wrap { --key-h: clamp(14px, min(calc((100cqh - 28px) / 8.2), calc((100cqw - 12px) / 10)), 46px);
+                      --key-w: calc(var(--key-h) * 1.45); --stick: calc(var(--key-h) * 2.2); --key-gap: clamp(3px, calc(var(--key-h) / 7), 6px); }
+.pad-slot .ctl { font-size: clamp(10px, calc(var(--key-h) * .42), 15px); }
+.pad .ctl[data-btn=HOME] { font-size: clamp(8px, calc(var(--key-h) * .34), 13px); letter-spacing: -.02em; }
+.manual-options { justify-content: center; }
+
+/* Script dialog */
+.modal { position: fixed; inset: 0; background: var(--shade); display: grid; place-items: center; padding: 12px; z-index: 10; }
+.modal[hidden] { display: none; }
+.modal .box { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; width: min(480px, 100%); max-height: calc(100dvh - 24px); overflow: auto; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+.modal h2 { font-size: 16px; margin: 0 0 6px; }
+.modal .desc { margin: 0 0 10px; white-space: pre-wrap; }
+.modal .fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.modal .fields hr { grid-column: 1 / -1; width: 100%; border: 0; border-top: 1px solid var(--line); margin: 2px 0; }
+.modal .fields input[type=checkbox] { justify-self: start; margin: 0; }
+.modal .radios { gap: 4px 12px; }
+.modal .scale { display: flex; gap: 8px; align-items: center; }
+.modal .scale input[type=range] { flex: 1; }
+.modal .scale output { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; }
+.modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin: 10px 0; }
+.modal .actions[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -59,91 +225,277 @@ pre { margin: 0; height: 220px; overflow: auto; background: var(--log); border: 
   <span class="badge" id="camera-state">カメラ: -</span>
   <span class="badge" id="serial-state">COM: -</span>
   <span class="badge" id="run-state">停止中</span>
+  <span class="run-controls" id="run-controls" hidden>
+    <button class="mini danger" id="head-stop">停止</button>
+    <button class="mini" id="head-pause">一時停止</button>
+    <button class="mini" id="head-resume">再開</button>
+  </span>
 </header>
 <main>
-  <div>
-    <section aria-label="映像とコントローラー">
-      <div class="video">
-        <img id="video" alt="キャプチャ映像" src="/stream.mjpg">
-        <div class="empty" id="video-empty" hidden>映像がありません</div>
-      </div>
-      <div class="pad" id="pad">
-        <div class="cluster">
-          <div class="label">L側</div>
-          <button class="key" data-btn="ZL" aria-label="ZL">ZL</button>
-          <button class="key" data-btn="L" aria-label="L">L</button>
-          <button class="key" data-btn="MINUS" aria-label="マイナス">−</button>
-          <div class="label">十字キー</div>
-          <span></span><button class="key" data-btn="UP" aria-label="十字キー上">↑</button><span></span>
-          <button class="key" data-btn="LEFT" aria-label="十字キー左">←</button>
-          <button class="key" data-btn="CAPTURE" aria-label="キャプチャー">◎</button>
-          <button class="key" data-btn="RIGHT" aria-label="十字キー右">→</button>
-          <span></span><button class="key" data-btn="DOWN" aria-label="十字キー下">↓</button><span></span>
-        </div>
-        <div class="cluster">
-          <div class="label">左スティック</div>
-          <span></span><button class="key" data-btn="LS_UP" aria-label="左スティック上">▲</button><span></span>
-          <button class="key" data-btn="LS_LEFT" aria-label="左スティック左">◀</button>
-          <button class="key" data-btn="LCLICK" aria-label="左スティック押し込み">LS</button>
-          <button class="key" data-btn="LS_RIGHT" aria-label="左スティック右">▶</button>
-          <span></span><button class="key" data-btn="LS_DOWN" aria-label="左スティック下">▼</button><span></span>
-          <div class="label">右スティック</div>
-          <span></span><button class="key" data-btn="RS_UP" aria-label="右スティック上">▲</button><span></span>
-          <button class="key" data-btn="RS_LEFT" aria-label="右スティック左">◀</button>
-          <button class="key" data-btn="RCLICK" aria-label="右スティック押し込み">RS</button>
-          <button class="key" data-btn="RS_RIGHT" aria-label="右スティック右">▶</button>
-          <span></span><button class="key" data-btn="RS_DOWN" aria-label="右スティック下">▼</button><span></span>
-        </div>
-        <div class="cluster">
-          <div class="label">R側</div>
-          <button class="key" data-btn="PLUS" aria-label="プラス">＋</button>
-          <button class="key" data-btn="R" aria-label="R">R</button>
-          <button class="key" data-btn="ZR" aria-label="ZR">ZR</button>
-          <div class="label">ボタン</div>
-          <span></span><button class="key" data-btn="X" aria-label="X">X</button><span></span>
-          <button class="key" data-btn="Y" aria-label="Y">Y</button>
-          <button class="key" data-btn="HOME" aria-label="HOME">⌂</button>
-          <button class="key" data-btn="A" aria-label="A">A</button>
-          <span></span><button class="key" data-btn="B" aria-label="B">B</button><span></span>
-        </div>
-      </div>
-      <div class="row">
-        <label><input type="checkbox" id="latch"> 押しっぱなしモード（クリックで押す/離す）</label>
-        <button class="cmd" id="neutral">全ボタンを離す</button>
-      </div>
-      <p class="hint">押している間だけ入力します。スクリプト実行中とCOM未接続のときは手動入力できません。</p>
-    </section>
+  <div class="video" aria-label="映像">
+    <div class="frame" id="frame">
+      <img id="video" alt="キャプチャ映像" src="/stream.mjpg">
+      <div class="empty" id="video-empty" hidden>映像がありません</div>
+      <div class="pick-info" id="pick-info" aria-live="polite"></div>
+    </div>
   </div>
-  <div class="side">
-    <section aria-label="スクリプト">
-      <h2>スクリプト</h2>
-      <div class="row">
-        <select id="kind" aria-label="スクリプトの種類">
-          <option value="python">Python</option>
-          <option value="mcu">MCU</option>
-        </select>
-      </div>
-      <div class="row"><input type="search" id="filter" placeholder="名前で絞り込み" aria-label="スクリプトの絞り込み"></div>
-      <div class="row"><select id="script" size="8" aria-label="スクリプト一覧"></select></div>
-      <div class="row">
-        <button class="cmd primary" id="start">開始</button>
-        <button class="cmd danger" id="stop">停止</button>
-        <button class="cmd" id="pause">一時停止</button>
-        <button class="cmd" id="resume">再開</button>
-      </div>
-      <div id="message" role="status"></div>
-    </section>
-    <section aria-label="ログ">
-      <h2>ログ（上）</h2>
-      <pre id="log1"></pre>
-      <h2 style="margin-top:12px">ログ（下）</h2>
-      <pre id="log2"></pre>
-    </section>
+
+  <div class="area-logs" id="logs-home">
+    <div class="logs" id="logs">
+      <section class="panel log" aria-label="ログ1">
+        <div class="panel-title"><span id="log1-title">ログ1</span><button class="mini" id="clear-log1" aria-label="ログ1を消去">消去</button></div>
+        <pre id="log1" aria-label="ログ1"></pre>
+      </section>
+      <section class="panel log" aria-label="ログ2">
+        <div class="panel-title"><span id="log2-title">ログ2</span><button class="mini" id="clear-log2" aria-label="ログ2を消去">消去</button></div>
+        <pre id="log2" aria-label="ログ2"></pre>
+      </section>
+    </div>
   </div>
+
+  <section class="panel area-tabs" aria-label="設定と操作">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-camera" aria-controls="panel-camera" aria-selected="false">カメラ</button>
+      <button role="tab" id="tab-device" aria-controls="panel-device" aria-selected="false">機器接続</button>
+      <button role="tab" id="tab-pad" aria-controls="panel-pad" aria-selected="false">手動操作</button>
+      <button role="tab" id="tab-script" aria-controls="panel-script" aria-selected="true">スクリプト</button>
+      <button role="tab" id="tab-notify" aria-controls="panel-notify" aria-selected="false">通知</button>
+      <button role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false">その他</button>
+      <button role="tab" id="tab-logs" class="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-camera" aria-labelledby="tab-camera" hidden>
+      <div class="form">
+        <label for="camera">カメラ</label>
+        <div class="inline"><select id="camera" aria-label="カメラ"></select><button class="cmd" id="camera-reconnect">再接続</button></div>
+        <label for="fps">フレームレート</label>
+        <div class="inline"><select id="fps" aria-label="フレームレート"></select></div>
+        <div class="error full" id="camera-error"></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" data-option="show_realtime"> 映像を表示</label>
+        <label><input type="checkbox" data-option="show_value"> 座標と色の値</label>
+        <label><input type="checkbox" data-option="show_guide"> ガイド</label>
+      </div>
+      <div class="row">
+        <button class="cmd" id="capture">スクリーンショット</button>
+        <button class="cmd" data-folder="captures">保存先を開く</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-device" aria-labelledby="tab-device" hidden>
+      <div class="form">
+        <label for="port">COMポート</label>
+        <div class="inline"><select id="port" aria-label="COMポート"></select><button class="cmd" id="rescan">再検索</button></div>
+        <label for="format">形式</label>
+        <div class="inline"><select id="format" aria-label="通信形式"></select></div>
+        <label for="baud">ボーレート</label>
+        <div class="inline">
+          <select id="baud" aria-label="ボーレート"></select>
+          <button class="cmd primary" id="connect">接続</button>
+          <button class="cmd" id="disconnect">切断</button>
+        </div>
+        <div class="error full" id="serial-error"></div>
+      </div>
+      <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-pad" aria-labelledby="tab-pad" hidden>
+      <div class="seg" role="group" aria-label="手動操作の表示">
+        <button data-view="pad-main" aria-pressed="true">コントローラー</button>
+        <button data-view="pad-keys" aria-pressed="false">キー設定</button>
+      </div>
+      <div class="view" id="pad-main">
+        <div class="pad-slot" id="pad-slot"></div>
+        <div class="checks manual-options">
+          <label><input type="checkbox" data-option="keyboard"> キーボードで操作</label>
+          <label><input type="checkbox" id="opt-side-pad"> コントローラーを映像の横に並べる</label>
+        </div>
+      </div>
+      <div class="view" id="pad-keys" hidden>
+        <div class="keys" id="keys" aria-label="キー設定"></div>
+        <div class="row"><button class="cmd" id="key-clear" disabled>割り当てを解除</button></div>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-script" aria-labelledby="tab-script">
+      <div class="seg" role="group" aria-label="スクリプトの表示">
+        <button data-view="script-main" aria-pressed="true">一覧</button>
+        <button data-view="script-shortcuts" aria-pressed="false">ショートカット</button>
+      </div>
+      <div class="view" id="script-main">
+        <div class="row">
+          <select id="kind" aria-label="スクリプトの種類">
+            <option value="python">Python</option>
+            <option value="mcu">MCU</option>
+          </select>
+          <input type="search" class="grow" id="filter" placeholder="名前で絞り込み" aria-label="スクリプトの絞り込み">
+          <button class="cmd" id="reload">再読み込み</button>
+          <button class="cmd" data-folder="scripts">フォルダー</button>
+        </div>
+        <div class="chips" id="tags" aria-label="タグで絞り込み"></div>
+        <select id="script" size="4" aria-label="スクリプト一覧"></select>
+        <div class="row">
+          <button class="cmd primary" id="start">開始</button>
+          <button class="cmd danger" id="stop">停止</button>
+          <button class="cmd" id="pause">一時停止</button>
+          <button class="cmd" id="resume">再開</button>
+        </div>
+      </div>
+      <div class="view" id="script-shortcuts" hidden>
+        <div class="shortcuts" id="shortcuts" aria-label="ショートカット"></div>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-notify" aria-labelledby="tab-notify" hidden>
+      <div class="seg" role="group" aria-label="通知の表示">
+        <button data-view="notify-when" aria-pressed="true">通知する時</button>
+        <button data-view="notify-where" aria-pressed="false">送り先</button>
+      </div>
+      <div class="view" id="notify-when">
+        <table class="notify">
+          <thead><tr><th></th><th>開始</th><th>終了</th><th></th></tr></thead>
+          <tbody>
+            <tr><th>Windows</th>
+              <td><input type="checkbox" data-option="win_start" aria-label="Windows通知（開始）"></td>
+              <td><input type="checkbox" data-option="win_end" aria-label="Windows通知（終了）"></td>
+              <td><button class="mini" data-test="win" aria-label="Windowsのテスト通知">テスト</button></td></tr>
+            <tr><th>LINE</th>
+              <td><input type="checkbox" data-option="line_start" aria-label="LINE通知（開始）"></td>
+              <td><input type="checkbox" data-option="line_end" aria-label="LINE通知（終了）"></td>
+              <td><button class="mini" data-test="line" aria-label="LINEのテスト通知">テスト</button></td></tr>
+            <tr><th>Discord</th>
+              <td><input type="checkbox" data-option="discord_start" aria-label="Discord通知（開始）"></td>
+              <td><input type="checkbox" data-option="discord_end" aria-label="Discord通知（終了）"></td>
+              <td><button class="mini" data-test="discord" aria-label="Discordのテスト通知">テスト</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="view" id="notify-where" hidden>
+        <div class="form">
+          <label for="line-token">LINE <span class="set" id="line-set" hidden>✓</span></label>
+          <div class="inline"><input type="password" id="line-token" class="grow" autocomplete="off" placeholder="トークン" aria-label="LINEのトークン"><button class="cmd" id="save-line">保存</button></div>
+          <label for="discord-url">Discord <span class="set" id="discord-set" hidden>✓</span></label>
+          <div class="inline"><input type="password" id="discord-url" class="grow" autocomplete="off" placeholder="Webhook URL" aria-label="DiscordのWebhook URL"></div>
+          <label for="discord-name">ユーザー名</label>
+          <div class="inline"><input type="text" id="discord-name" class="grow" autocomplete="off" aria-label="Discordのユーザー名"><button class="cmd" id="save-discord">保存</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-other" aria-labelledby="tab-other" hidden>
+      <div class="sections">
+        <div>
+          <h3>実行ログの表示先</h3>
+          <div class="radios" role="radiogroup" aria-label="実行ログの表示先">
+            <label><input type="radio" name="stdout" value="1"> 上</label>
+            <label><input type="radio" name="stdout" value="2"> 下</label>
+          </div>
+        </div>
+        <div>
+          <h3>ダイアログのボタン</h3>
+          <div class="radios" role="radiogroup" aria-label="ダイアログのボタンの位置">
+            <label><input type="radio" name="dialog-buttons" value="1"> 上</label>
+            <label><input type="radio" name="dialog-buttons" value="2"> 下</label>
+            <label><input type="radio" name="dialog-buttons" value="3"> 両方</label>
+          </div>
+        </div>
+        <div>
+          <h3>更新</h3>
+          <div class="checks">
+            <label><input type="checkbox" id="auto-update"> 自動更新</label>
+            <label><input type="checkbox" id="prereleases"> 検証版も含める</label>
+          </div>
+          <div class="row"><button class="cmd" id="update-now">今すぐ更新</button><span class="meta" id="update-meta"></span></div>
+          <div class="error" id="update-error"></div>
+        </div>
+        <div>
+          <h3>フォルダー</h3>
+          <div class="row">
+            <button class="cmd" data-folder="workspace">作業</button>
+            <button class="cmd" data-folder="settings">設定</button>
+            <button class="cmd" data-folder="logs">ログ</button>
+          </div>
+        </div>
+        <div>
+          <h3>ヘルプ</h3>
+          <div class="links">
+            <a href="https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://pokecontroller.info/" target="_blank" rel="noopener">使い方ガイド</a>
+            <a href="https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/blob/master/changelog.txt" target="_blank" rel="noopener">変更履歴</a>
+          </div>
+        </div>
+        <div>
+          <h3>アプリ</h3>
+          <div class="row"><button class="cmd danger" id="quit">アプリを終了</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-logs" aria-labelledby="tab-logs" hidden></div>
+    <div id="message" role="status"></div>
+    <button class="mini panel-close" id="panel-close" aria-label="パネルを閉じる" title="閉じる">✕</button>
+  </section>
+
+  <section class="panel area-pad" aria-label="画面上のコントローラー">
+    <div class="pad-wrap" id="pad-wrap">
+    <div class="pad" id="pad">
+      <div class="board left">
+        <button class="ctl" data-btn="ZL" aria-label="ZL" style="grid-area:1/1">ZL</button>
+        <button class="ctl" data-btn="L" aria-label="L" style="grid-area:2/1">L</button>
+        <button class="ctl" data-btn="LCLICK" aria-label="左スティック押し込み" style="grid-area:2/2">L-C</button>
+        <button class="ctl" data-btn="MINUS" aria-label="マイナス" style="grid-area:2/3">−</button>
+        <button class="ctl" data-btn="UP" aria-label="十字キー上" style="grid-area:3/2">↑</button>
+        <button class="ctl" data-btn="LEFT" aria-label="十字キー左" style="grid-area:4/1">←</button>
+        <button class="ctl" data-btn="RIGHT" aria-label="十字キー右" style="grid-area:4/3">→</button>
+        <button class="ctl" data-btn="DOWN" aria-label="十字キー下" style="grid-area:5/2">↓</button>
+        <button class="ctl" data-btn="CAPTURE" aria-label="キャプチャー" style="grid-area:5/3">CAP</button>
+        <div class="stick-cell">
+          <div class="stick" id="stick-L" data-stick="L" data-click="LCLICK" tabindex="0" role="slider"
+               aria-label="左スティック" aria-valuetext="中央"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="board right">
+        <button class="ctl" data-btn="ZR" aria-label="ZR" style="grid-area:1/3">ZR</button>
+        <button class="ctl" data-btn="PLUS" aria-label="プラス" style="grid-area:2/1">＋</button>
+        <button class="ctl" data-btn="X" aria-label="X" style="grid-area:2/2">X</button>
+        <button class="ctl" data-btn="R" aria-label="R" style="grid-area:2/3">R</button>
+        <button class="ctl" data-btn="Y" aria-label="Y" style="grid-area:3/1">Y</button>
+        <button class="ctl" data-btn="A" aria-label="A" style="grid-area:3/3">A</button>
+        <button class="ctl" data-btn="B" aria-label="B" style="grid-area:4/2">B</button>
+        <button class="ctl" data-btn="HOME" aria-label="HOME" style="grid-area:5/1">HOME</button>
+        <button class="ctl" data-btn="RCLICK" aria-label="右スティック押し込み" style="grid-area:5/2">R-C</button>
+        <div class="stick-cell">
+          <div class="stick" id="stick-R" data-stick="R" data-click="RCLICK" tabindex="0" role="slider"
+               aria-label="右スティック" aria-valuetext="中央"><div class="knob"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="pad-options"><label><input type="checkbox" id="latch"> 押しっぱなし</label></div>
+    </div>
+  </section>
 </main>
+
+<div class="modal" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+  <form class="box" id="dialog-form">
+    <h2 id="dialog-title"></h2>
+    <p class="desc" id="dialog-desc"></p>
+    <div class="actions" id="dialog-actions-top" hidden>
+      <button type="button" class="cmd" data-dialog="cancel">キャンセル</button>
+      <button type="submit" class="cmd primary">OK</button>
+    </div>
+    <div class="fields" id="dialog-fields"></div>
+    <div class="actions" id="dialog-actions-bottom">
+      <button type="button" class="cmd" data-dialog="cancel">キャンセル</button>
+      <button type="submit" class="cmd primary" id="dialog-ok">OK</button>
+    </div>
+  </form>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
-let state = null, catalogKey = '';
+let state = null, catalogKey = '', tagKey = '', activeTag = '';
+const STREAM = '/stream.mjpg';
 
 async function call(method, params = {}) {
   // Retry dropped connections; a lost "release" would otherwise leave a button held.
@@ -170,10 +522,12 @@ function command(action, values = {}) {
   $('message').textContent = '';
   return call('command', {action, values}).catch(error => { $('message').textContent = error.message; throw error; });
 }
+const quiet = promise => promise.catch(() => {}).finally(refresh);
 
 function setBadge(id, text, good) {
   const element = $(id);
   element.textContent = text;
+  element.title = text;
   element.className = 'badge ' + (good === undefined ? '' : good ? 'ok' : 'bad');
 }
 
@@ -185,15 +539,50 @@ function fillLog(id, text) {
   if (atBottom) element.scrollTop = element.scrollHeight;
 }
 
+// Replace a select's options only when the list changed, and never while the user has it open.
+function fillSelect(select, items, value) {
+  const key = JSON.stringify(items);
+  if (select.dataset.key !== key && document.activeElement !== select) {
+    select.dataset.key = key;
+    select.replaceChildren(...items.map(([v, label]) => {
+      const option = document.createElement('option');
+      option.value = v;
+      option.textContent = label;
+      return option;
+    }));
+  }
+  if (document.activeElement !== select && value !== undefined) select.value = String(value);
+}
+
+// Scripts
+function scriptItems() { return (state && state.tags && state.tags[$('kind').value]) || []; }
+function renderTags() {
+  const tags = [...new Set(scriptItems().flatMap(item => item.tags || []))].sort();
+  if (!tags.includes(activeTag)) activeTag = '';
+  const key = tags.join('\n') + '\n' + activeTag;
+  if (key === tagKey) return;
+  tagKey = key;
+  const chip = (tag, label) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.setAttribute('aria-pressed', String(activeTag === tag));
+    button.setAttribute('aria-label', tag ? `タグ「${tag}」で絞り込み` : 'タグの絞り込みを解除');
+    button.addEventListener('click', () => { activeTag = tag; renderTags(); renderScripts(); });
+    return button;
+  };
+  $('tags').replaceChildren(...(tags.length ? [chip('', 'すべて'), ...tags.map(tag => chip(tag, tag))] : []));
+}
 function renderScripts() {
   if (!state) return;
-  const names = state.catalog[$('kind').value] || [];
   const filter = $('filter').value.trim().toLowerCase();
-  const key = $('kind').value + '\n' + filter + '\n' + names.join('\n');
+  const names = scriptItems().filter(item => item.name.toLowerCase().includes(filter)
+    && (!activeTag || (item.tags || []).includes(activeTag))).map(item => item.name);
+  const key = $('kind').value + '\n' + names.join('\n');
   if (key === catalogKey) return;
   catalogKey = key;
   const selected = $('script').value;
-  $('script').replaceChildren(...names.filter(n => n.toLowerCase().includes(filter)).map(name => {
+  $('script').replaceChildren(...names.map(name => {
     const option = document.createElement('option');
     option.value = option.textContent = name;
     option.selected = name === selected;
@@ -201,24 +590,180 @@ function renderScripts() {
   }));
 }
 
+// Shortcuts 1-10: the name button starts it, 登録 stores the script selected in the list.
+let shortcutKey = '';
+function renderShortcuts() {
+  const items = state.shortcuts || [];
+  const key = JSON.stringify([items, state.running]);
+  if (key === shortcutKey) return;
+  shortcutKey = key;
+  $('shortcuts').replaceChildren(...items.map(item => {
+    const row = document.createElement('div');
+    row.className = 'shortcut';
+    const go = Object.assign(document.createElement('button'), {className: 'go', type: 'button'});
+    go.textContent = `${item.slot}. ${item.kind ? item.name : '空き'}`;
+    go.title = item.kind ? item.name : '';
+    go.setAttribute('aria-label', item.kind ? `ショートカット${item.slot}を開始: ${item.name}` : `ショートカット${item.slot}（空き）`);
+    go.disabled = !item.kind || state.running;
+    go.addEventListener('click', () => quiet(command('start', {kind: item.kind, name: item.name})));
+    const save = Object.assign(document.createElement('button'), {className: 'mini', type: 'button', textContent: '登録'});
+    save.setAttribute('aria-label', `選んでいるスクリプトをショートカット${item.slot}に登録`);
+    save.addEventListener('click', () => {
+      if (!$('script').value) { $('message').textContent = 'スクリプトを一覧で選んでください'; return; }
+      quiet(command('shortcut', {slot: item.slot, kind: $('kind').value, name: $('script').value}));
+    });
+    const clear = Object.assign(document.createElement('button'), {className: 'mini', type: 'button', textContent: '解除'});
+    clear.setAttribute('aria-label', `ショートカット${item.slot}を解除`);
+    clear.disabled = !item.kind;
+    clear.addEventListener('click', () => quiet(command('shortcut', {slot: item.slot, kind: item.kind, name: ''})));
+    row.append(go, save, clear);
+    return row;
+  }));
+}
+
+// Camera and device connection
+let devices = {cameras: [], ports: []}, devicesAt = 0;
+async function loadDevices(force = false) {
+  if (!force && Date.now() - devicesAt < 2000) return;
+  devicesAt = Date.now();
+  try { devices = await call('devices'); } catch (error) { return; }
+  if (state) renderConnection();
+}
+function renderConnection() {
+  const camera = state.camera || {};
+  const cameras = [['', '使用しない'], ...devices.cameras.map(c => [c.path, c.name])];
+  if (camera.path && !devices.cameras.some(c => c.path === camera.path)) cameras.push([camera.path, `${camera.name || camera.path}（未接続）`]);
+  fillSelect($('camera'), cameras, camera.path || '');
+  $('camera-error').textContent = camera.error || '';
+  fillSelect($('fps'), ['15', '30', '45', '60'].map(f => [f, f]), (state.choices || {}).fps || '45');
+
+  const serial = state.serial || {};
+  const describe = p => (p.description || '').replace(` (${p.port})`, '').trim();
+  const ports = devices.ports.map(p => [p.port, describe(p) && describe(p) !== p.port ? `${p.port} — ${describe(p)}` : p.port]);
+  if (serial.port && !devices.ports.some(p => p.port === serial.port)) ports.push([serial.port, `${serial.port}（未接続）`]);
+  if (!ports.length) ports.push(['', 'ポートがありません']);
+  fillSelect($('port'), ports, serial.port || (ports[0] && ports[0][0]));
+  fillSelect($('format'), (serial.formats || ['Default']).map(f => [f, f]), serial.format);
+  const bauds = [...new Set([9600, 19200, 38400, 57600, 115200, serial.baud || 9600])].sort((a, b) => a - b);
+  fillSelect($('baud'), bauds.map(b => [b, String(b)]), serial.baud || 9600);
+  $('serial-error').textContent = serial.error || '';
+  const busy = state.running;
+  ['port', 'format', 'baud', 'connect'].forEach(id => $(id).disabled = busy);
+  $('disconnect').disabled = busy || !state.serial_open;
+}
+
+// Live video can be switched off (show_realtime); the stream is dropped, not just hidden.
+function renderVideo() {
+  const show = !state.options || state.options.show_realtime !== false;
+  const img = $('video');
+  if (show && !img.getAttribute('src')) img.src = STREAM + '?' + Date.now();
+  if (!show && img.getAttribute('src')) img.removeAttribute('src');
+  img.hidden = !show;
+  $('video-empty').hidden = !show || state.camera_live;
+  $('frame').classList.toggle('pick', !!(state.options && state.options.show_value));
+  if (!(state.options && state.options.show_value)) $('pick-info').textContent = '';
+}
+
+// Settings stored by the app (options, choices, update) and per browser (controller placement).
+function renderSettings() {
+  document.querySelectorAll('[data-option]').forEach(box => {
+    if (document.activeElement !== box && state.options) box.checked = !!state.options[box.dataset.option];
+  });
+  const choices = state.choices || {};
+  document.querySelectorAll('input[name=stdout]').forEach(r => r.checked = r.value === choices.stdout_destination);
+  document.querySelectorAll('input[name=dialog-buttons]').forEach(r => r.checked = r.value === choices.dialog_buttons);
+  const exec = choices.stdout_destination === '2' ? 2 : 1;
+  $('log1-title').textContent = exec === 1 ? 'ログ1（実行ログ）' : 'ログ1';
+  $('log2-title').textContent = exec === 2 ? 'ログ2（実行ログ）' : 'ログ2';
+  const app = state.app || {};
+  if (document.activeElement !== $('auto-update')) $('auto-update').checked = !!app.auto_update;
+  if (document.activeElement !== $('prereleases')) $('prereleases').checked = !!app.prereleases;
+  const update = app.update || {};
+  const checked = update.last_check ? new Date(update.last_check * 1000).toLocaleString('ja-JP') : '未確認';
+  $('update-meta').textContent = `v${app.version || '-'} ・ ${checked}`;
+  $('update-error').textContent = update.failures ? `更新に失敗しました（${update.failures}回）: ${update.last_error || ''}` : '';
+  $('auto-update').disabled = $('prereleases').disabled = $('update-now').disabled = !!app.portable;
+  const note = state.notification || {};
+  $('line-set').hidden = !note.line_token_set;
+  $('discord-set').hidden = !note.discord_webhook_set;
+  if (document.activeElement !== $('discord-name') && !$('discord-name').dataset.edited) $('discord-name').value = note.discord_username || '';
+}
+
+// Key config: each input shows its key; pressing one waits for the next key (Esc cancels).
+const KEY_INPUTS = [['A', 'A'], ['B', 'B'], ['X', 'X'], ['Y', 'Y'], ['L', 'L'], ['R', 'R'], ['ZL', 'ZL'], ['ZR', 'ZR'],
+  ['MINUS', '−'], ['PLUS', '＋'], ['LCLICK', 'L-C'], ['RCLICK', 'R-C'], ['HOME', 'HOME'], ['CAPTURE', 'CAP'],
+  ['UP', '↑'], ['DOWN', '↓'], ['LEFT', '←'], ['RIGHT', '→'], ['LS_UP', 'LS↑'], ['LS_DOWN', 'LS↓'], ['LS_LEFT', 'LS←'], ['LS_RIGHT', 'LS→']];
+const KEY_LABELS = {' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Escape: 'Esc'};
+let assigning = null, keysKey = '';
+function keyLabel(key) { return KEY_LABELS[key] || (key.length === 1 ? key.toUpperCase() : key); }
+function renderKeymap() {
+  const byInput = {};
+  Object.entries(state.keymap || {}).forEach(([key, name]) => { (byInput[name] = byInput[name] || []).push(key); });
+  const key = JSON.stringify([byInput, assigning]);
+  if (key === keysKey) return;
+  keysKey = key;
+  $('keys').replaceChildren(...KEY_INPUTS.map(([name, label]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    const keys = byInput[name] || [];
+    const shown = assigning === name ? '…' : (keys.map(keyLabel).join(' ') || '—');
+    button.append(Object.assign(document.createElement('span'), {textContent: label}), Object.assign(document.createElement('kbd'), {textContent: shown}));
+    button.setAttribute('aria-pressed', String(assigning === name));
+    button.setAttribute('aria-label', `${label} のキー: ${keys.map(keyLabel).join(' ') || 'なし'}`);
+    button.addEventListener('click', () => { assigning = assigning === name ? null : name; $('key-clear').disabled = !assigning; renderKeymap(); });
+    return button;
+  }));
+  $('key-clear').disabled = !assigning;
+}
+function assignKey(key) {
+  const name = assigning;
+  assigning = null;
+  $('key-clear').disabled = true;
+  renderKeymap();
+  quiet(command('keymap', {mapping: {[name]: key}}));
+}
+$('key-clear').addEventListener('click', () => { if (assigning) assignKey(''); });
+
+function manualAllowed() { return !!state && !state.running && state.serial_open; }
+
 function render() {
   setBadge('profile', 'プロファイル: ' + state.profile + (state.demo ? '（デモ）' : ''));
   setBadge('camera-state', state.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし', state.camera_live);
-  setBadge('serial-state', state.serial_open ? 'COM: 接続中' : 'COM: 未接続', state.serial_open);
-  setBadge('run-state', state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中', state.running ? true : undefined);
-  $('video-empty').hidden = state.camera_live;
-  const manual = !state.running && state.serial_open;
-  document.querySelectorAll('.key').forEach(key => {
+  const port = state.serial && state.serial.port ? ` ${state.serial.port}` : '';
+  setBadge('serial-state', state.serial_open ? `COM:${port} 接続中` : 'COM: 未接続', state.serial_open);
+  const running = state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中';
+  setBadge('run-state', running, state.running ? true : undefined);
+  $('run-controls').hidden = !state.running;
+  $('head-pause').hidden = !state.running || state.paused;
+  $('head-resume').hidden = !state.running || !state.paused;
+  const manual = manualAllowed();
+  $('pad').classList.toggle('disabled', !manual);
+  document.querySelectorAll('.ctl').forEach(key => {
     key.disabled = !manual;
-    key.classList.toggle('on', state.held.includes(key.dataset.btn));
+    key.classList.toggle('on', pressed.has(key.dataset.btn) || keyNames.has(key.dataset.btn) || state.held.includes(key.dataset.btn));
+  });
+  document.querySelectorAll('.stick').forEach(stick => {
+    stick.setAttribute('aria-disabled', String(!manual));
+    const prefix = stick.dataset.stick === 'L' ? 'LS_' : 'RS_';
+    stick.classList.toggle('on', state.held.includes(stick.dataset.click) || [...keyNames, ...state.held].some(name => name.startsWith(prefix)));
   });
   $('start').disabled = state.running;
   $('stop').disabled = !state.running;
   $('pause').disabled = !state.running || state.paused;
   $('resume').disabled = !state.running || !state.paused;
+  $('reload').disabled = state.running;
+  renderTags();
   renderScripts();
-  fillLog('log1', state.log);
-  fillLog('log2', state.log2);
+  renderShortcuts();
+  renderConnection();
+  renderVideo();
+  renderSettings();
+  renderKeymap();
+  renderDialog();
+  const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
+  const local = localLog.length ? localLog.join('\n') + '\n' : '';
+  fillLog('log1', state.log + (exec === 1 ? local : ''));
+  fillLog('log2', state.log2 + (exec === 2 ? local : ''));
 }
 
 async function refresh() {
@@ -233,14 +778,126 @@ async function refresh() {
   }
 }
 
-// Press while the pointer is down; latch mode toggles instead.
+// Coordinates and colour (show_value): like the original preview, log the clicked point in preview and capture pixels.
+const localLog = [];
+const pickCanvas = document.createElement('canvas');
+$('video').addEventListener('click', event => {
+  if (!state || !state.options || !state.options.show_value) return;
+  const img = $('video');
+  const width = img.naturalWidth, height = img.naturalHeight;
+  if (!width || !height) return;
+  const rect = img.getBoundingClientRect();
+  const scale = Math.min(rect.width / width, rect.height / height);
+  const left = (rect.width - width * scale) / 2, top = (rect.height - height * scale) / 2;
+  const sx = Math.round(event.clientX - rect.left - left), sy = Math.round(event.clientY - rect.top - top);
+  const x = Math.floor(sx / scale), y = Math.floor(sy / scale);
+  if (x < 0 || y < 0 || x >= width || y >= height) return;
+  pickCanvas.width = width;
+  pickCanvas.height = height;
+  const context = pickCanvas.getContext('2d', {willReadFrequently: true});
+  context.drawImage(img, 0, 0, width, height);
+  const [r, g, b] = context.getImageData(x, y, 1, 1).data;
+  $('pick-info').textContent = `(${x}, ${y})  R${r} G${g} B${b}`;
+  localLog.push(`Mouse down: Show (${sx}, ${sy}) / Capture (${x}, ${y})`, `Color [R: ${r}, G: ${g}, B: ${b}]`);
+  if (localLog.length > 40) localLog.splice(0, localLog.length - 40);
+  render();
+});
+
+// Script dialogs: show the first pending one; values follow the non-separator fields in order.
+let dialogShown = null;
+const answered = new Set();
+function renderDialog() {
+  const place = (state.choices || {}).dialog_buttons || '2';
+  $('dialog-actions-top').hidden = place === '2';
+  $('dialog-actions-bottom').hidden = place === '1';
+  const pending = (state.dialogs || []).find(d => !answered.has(d.id));
+  if (!pending) { if (dialogShown) closeDialog(); return; }
+  if (dialogShown === pending.id) return;
+  dialogShown = pending.id;
+  $('dialog-title').textContent = pending.title || 'スクリプトからの確認';
+  $('dialog-desc').textContent = pending.desc || '';
+  $('dialog-desc').hidden = !pending.desc;
+  const inputs = [];
+  const nodes = [];
+  (pending.fields || []).forEach((field, index) => {
+    if (field.type === 'next') { nodes.push(document.createElement('hr')); return; }
+    const id = `dialog-field-${index}`;
+    const label = document.createElement('label');
+    label.textContent = field.label || '';
+    label.htmlFor = id;
+    let control, read;
+    const options = (field.options || []).map(String);
+    if (field.type === 'check') {
+      control = document.createElement('input');
+      control.type = 'checkbox';
+      control.checked = !!field.value;
+      read = () => control.checked;
+    } else if (field.type === 'combo' || field.type === 'spin') {
+      control = document.createElement('select');
+      control.append(...options.map(o => Object.assign(document.createElement('option'), {value: o, textContent: o})));
+      control.value = String(field.value ?? options[0] ?? '');
+      read = () => control.value;
+    } else if (field.type === 'radio') {
+      control = document.createElement('div');
+      control.className = 'radios';
+      control.setAttribute('role', 'radiogroup');
+      control.setAttribute('aria-label', field.label || '選択');
+      options.forEach((o, i) => {
+        const wrap = document.createElement('label');
+        const radio = Object.assign(document.createElement('input'), {type: 'radio', name: id, value: o});
+        radio.checked = String(field.value ?? options[0]) === o;
+        if (i === 0) radio.id = id;
+        wrap.append(radio, ' ' + o);
+        control.append(wrap);
+      });
+      read = () => (control.querySelector('input:checked') || {}).value ?? null;
+    } else if (field.type === 'scale') {
+      control = document.createElement('div');
+      control.className = 'scale';
+      const digit = Number(field.digit || 0);
+      const range = Object.assign(document.createElement('input'), {type: 'range', id,
+        min: field.min ?? 0, max: field.max ?? 100, step: digit > 0 ? Math.pow(10, -digit) : 1, value: field.value ?? field.min ?? 0});
+      range.setAttribute('aria-label', field.label || '値');
+      const output = document.createElement('output');
+      const show = () => { output.textContent = Number(range.value).toFixed(Math.max(0, digit)); };
+      range.addEventListener('input', show);
+      show();
+      control.append(range, output);
+      read = () => Number(range.value);
+    } else {
+      control = document.createElement('input');
+      control.type = 'text';
+      control.value = field.value ?? '';
+      read = () => control.value;
+    }
+    if (!control.id && control.tagName !== 'DIV') control.id = id;
+    if (control.tagName !== 'DIV') control.setAttribute('aria-label', field.label || '入力');
+    inputs.push(read);
+    nodes.push(label, control);
+  });
+  $('dialog-fields').replaceChildren(...nodes);
+  $('dialog-form').onsubmit = event => { event.preventDefault(); answer(pending.id, inputs.map(read => read())); };
+  document.querySelectorAll('[data-dialog=cancel]').forEach(button => { button.onclick = () => answer(pending.id, null); });
+  $('dialog').hidden = false;
+  const first = $('dialog-fields').querySelector('input, select');
+  (first || $('dialog-ok')).focus();
+}
+function closeDialog() { dialogShown = null; $('dialog').hidden = true; }
+function answer(id, values) {
+  answered.add(id);
+  closeDialog();
+  quiet(command('answer', {dialog: id, values}));
+}
+$('dialog').addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelector('[data-dialog=cancel]').click(); });
+
+// Buttons: press while the pointer is down; latch mode toggles instead.
 const pressed = new Set();
 function release(key) {
   if (!pressed.delete(key.dataset.btn)) return;
   key.classList.remove('on');
   command('release', {buttons: [key.dataset.btn]}).catch(() => {}).finally(refresh);
 }
-document.querySelectorAll('.key').forEach(key => {
+document.querySelectorAll('.ctl').forEach(key => {
   key.addEventListener('pointerdown', event => {
     if (key.disabled) return;
     event.preventDefault();
@@ -249,7 +906,7 @@ document.querySelectorAll('.key').forEach(key => {
       command('release', {buttons: [name]}).catch(() => {}).finally(refresh);
       return;
     }
-    key.setPointerCapture(event.pointerId);
+    try { key.setPointerCapture(event.pointerId); } catch (error) { /* synthetic or already released pointer */ }
     pressed.add(name);
     key.classList.add('on');
     command('hold', {buttons: [name]}).catch(() => { pressed.delete(name); key.classList.remove('on'); });
@@ -262,27 +919,306 @@ document.querySelectorAll('.key').forEach(key => {
     if (event.detail === 0 && !key.disabled) command('press', {buttons: [key.dataset.btn], duration: .1}).catch(() => {});
   });
 });
-$('neutral').addEventListener('click', () => command('neutral').finally(refresh));
-window.addEventListener('blur', () => document.querySelectorAll('.key').forEach(release));
+// Turning latch mode off lets go of everything it was holding.
+$('latch').addEventListener('change', () => { if (!$('latch').checked) quiet(command('neutral')); });
+
+// Sticks: drag inside a circle; values are sent at about 20 Hz and return to center on release.
+const SEND_INTERVAL = 50, TAP_DISTANCE = .12, TAP_TIME = 300;
+function setupStick(stick) {
+  const knob = stick.querySelector('.knob');
+  const which = stick.dataset.stick;
+  let pos = {x: 0, y: 0}, sent = {x: 0, y: 0}, timer = null, lastSend = 0, startAt = 0, maxDistance = 0, pointer = null;
+  const keys = new Set();
+
+  const toByte = v => Math.max(0, Math.min(255, Math.round(128 + v * 127)));
+  function draw() {
+    const travel = stick.clientWidth * .22;
+    knob.style.transform = `translate(calc(-50% + ${pos.x * travel}px), calc(-50% + ${pos.y * travel}px))`;
+    const distance = Math.hypot(pos.x, pos.y);
+    stick.setAttribute('aria-valuetext', distance < .05 ? '中央' : `x ${toByte(pos.x)}, y ${toByte(pos.y)}`);
+  }
+  function send() {
+    clearTimeout(timer);
+    timer = null;
+    if (pos.x === sent.x && pos.y === sent.y) return;
+    sent = {...pos};
+    lastSend = performance.now();
+    command('stick', {stick: which, x: toByte(pos.x), y: toByte(pos.y)}).catch(() => {});
+  }
+  // Leading-edge throttle: the first movement goes out at once, later ones at most every SEND_INTERVAL.
+  function schedule() {
+    if (timer) return;
+    const wait = SEND_INTERVAL - (performance.now() - lastSend);
+    if (wait <= 0) send(); else timer = setTimeout(send, wait);
+  }
+  function move(clientX, clientY) {
+    const rect = stick.getBoundingClientRect();
+    let x = (clientX - rect.left - rect.width / 2) / (rect.width * .22);
+    let y = (clientY - rect.top - rect.height / 2) / (rect.height * .22);
+    const length = Math.hypot(x, y);
+    if (length > 1) { x /= length; y /= length; }
+    pos = {x, y};
+    maxDistance = Math.max(maxDistance, Math.hypot(x, y));
+    draw();
+    schedule();
+  }
+  function center() {
+    // A quick flick may end before the throttled send; deliver that tilt before returning to center.
+    if (timer) send();
+    pos = {x: 0, y: 0};
+    draw();
+    if (sent.x !== 0 || sent.y !== 0) send();
+  }
+
+  stick.addEventListener('pointerdown', event => {
+    if (!manualAllowed()) return;
+    event.preventDefault();
+    stick.focus({preventScroll: true});
+    try { stick.setPointerCapture(event.pointerId); } catch (error) { /* synthetic or already released pointer */ }
+    pointer = event.pointerId;
+    stick.classList.add('dragging');
+    startAt = performance.now();
+    maxDistance = 0;
+    move(event.clientX, event.clientY);
+  });
+  stick.addEventListener('pointermove', event => { if (event.pointerId === pointer) move(event.clientX, event.clientY); });
+  const finish = (event, cancelled) => {
+    if (event.pointerId !== pointer) return;
+    pointer = null;
+    stick.classList.remove('dragging');
+    const tap = !cancelled && maxDistance < TAP_DISTANCE && performance.now() - startAt < TAP_TIME;
+    center();
+    if (tap) command('press', {buttons: [stick.dataset.click], duration: .1}).catch(() => {}).finally(refresh);
+  };
+  stick.addEventListener('pointerup', event => finish(event, false));
+  stick.addEventListener('pointercancel', event => finish(event, true));
+
+  // Arrow keys tilt fully while held; Enter/Space clicks the stick.
+  const arrows = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]};
+  function fromKeys() {
+    let x = 0, y = 0;
+    keys.forEach(k => { x += arrows[k][0]; y += arrows[k][1]; });
+    const length = Math.hypot(x, y) || 1;
+    pos = {x: x / length, y: y / length};
+    draw();
+    if (!keys.size) center(); else schedule();
+  }
+  stick.addEventListener('keydown', event => {
+    if (!manualAllowed()) return;
+    if (arrows[event.key]) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!keys.has(event.key)) { keys.add(event.key); fromKeys(); }
+    } else if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
+      event.preventDefault();
+      event.stopPropagation();
+      command('press', {buttons: [stick.dataset.click], duration: .1}).catch(() => {});
+    }
+  });
+  stick.addEventListener('keyup', event => { if (keys.delete(event.key)) { event.stopPropagation(); fromKeys(); } });
+  stick.addEventListener('blur', () => { if (keys.size) { keys.clear(); fromKeys(); } });
+  window.addEventListener('resize', draw);
+  stick.releaseAll = () => { keys.clear(); if (pointer === null) center(); };
+  stick.setAttribute('aria-roledescription', 'スティック');
+}
+document.querySelectorAll('.stick').forEach(setupStick);
+
+window.addEventListener('blur', () => {
+  document.querySelectorAll('.ctl').forEach(release);
+  document.querySelectorAll('.stick').forEach(stick => stick.releaseAll());
+});
 window.addEventListener('pagehide', () => {
-  if (pressed.size) fetch('/api/call', {method: 'POST', keepalive: true,
+  if (pressed.size || keyHeld.size || $('latch').checked) fetch('/api/call', {method: 'POST', keepalive: true,
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral'}})});
 });
 
-$('kind').addEventListener('change', renderScripts);
+// Narrow windows show the logs as a tab; wide ones keep them beside the video.
+const narrowQuery = matchMedia('(max-width: 900px), (max-height: 520px)');
+function placeLogs() {
+  const home = narrowQuery.matches ? $('panel-logs') : $('logs-home');
+  if ($('logs').parentElement !== home) home.append($('logs'));
+  if (!narrowQuery.matches && $('tab-logs').getAttribute('aria-selected') === 'true') $('tab-script').click();
+}
+narrowQuery.addEventListener('change', placeLogs);
+
+// Tabs; in low windows a tab opens a panel over the video, and pressing it again closes the panel.
+const shortQuery = matchMedia('(max-height: 459px)');
+const tabArea = document.querySelector('.area-tabs');
+function closePanel() { tabArea.classList.remove('open'); }
+$('panel-close').addEventListener('click', closePanel);
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && shortQuery.matches && $('dialog').hidden && !assigning) closePanel(); });
+shortQuery.addEventListener('change', closePanel);
+document.querySelectorAll('[role=tab]').forEach(tab => tab.addEventListener('click', event => {
+  if (shortQuery.matches && event.isTrusted !== false) {
+    const reopen = tab.getAttribute('aria-selected') === 'true' && tabArea.classList.contains('open');
+    tabArea.classList.toggle('open', !reopen);
+  }
+  document.querySelectorAll('[role=tab]').forEach(other => {
+    const selected = other === tab;
+    other.setAttribute('aria-selected', String(selected));
+    $(other.getAttribute('aria-controls')).hidden = !selected;
+  });
+  if (tab.id === 'tab-device' || tab.id === 'tab-camera') loadDevices(true);
+}));
+// Small view switches inside a tab.
+document.querySelectorAll('.seg').forEach(group => group.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+  group.querySelectorAll('button').forEach(other => {
+    other.setAttribute('aria-pressed', String(other === button));
+    $(other.dataset.view).hidden = other !== button;
+  });
+  if (button.dataset.view !== 'pad-keys' && assigning) { assigning = null; renderKeymap(); }
+})));
+
+// Scripts
+$('kind').addEventListener('change', () => { activeTag = ''; renderTags(); renderScripts(); });
 $('filter').addEventListener('input', renderScripts);
+$('reload').addEventListener('click', () => quiet(command('reload')));
 $('start').addEventListener('click', () => {
   const name = $('script').value;
   if (!name) { $('message').textContent = 'スクリプトを選んでください'; return; }
-  command('start', {kind: $('kind').value, name}).finally(refresh);
+  quiet(command('start', {kind: $('kind').value, name}));
 });
-$('stop').addEventListener('click', () => command('stop').finally(refresh));
-$('pause').addEventListener('click', () => command('suspend').finally(refresh));
-$('resume').addEventListener('click', () => command('resume').finally(refresh));
+$('script').addEventListener('dblclick', () => { if (state && !state.running && $('script').value) $('start').click(); });
+['stop', 'head-stop'].forEach(id => $(id).addEventListener('click', () => quiet(command('stop'))));
+['pause', 'head-pause'].forEach(id => $(id).addEventListener('click', () => quiet(command('suspend'))));
+['resume', 'head-resume'].forEach(id => $(id).addEventListener('click', () => quiet(command('resume'))));
+$('clear-log1').addEventListener('click', () => { if ((state.choices || {}).stdout_destination !== '2') localLog.length = 0; quiet(command('clear_log', {log: 1})); });
+$('clear-log2').addEventListener('click', () => { if ((state.choices || {}).stdout_destination === '2') localLog.length = 0; quiet(command('clear_log', {log: 2})); });
 
-// Reconnect the MJPEG stream if it drops (camera change, app busy).
-$('video').addEventListener('error', () => setTimeout(() => { $('video').src = '/stream.mjpg?' + Date.now(); }, 1000));
-refresh();
+// Camera and device connection: device lists are refreshed whenever a list is about to open.
+['camera', 'port'].forEach(id => {
+  $(id).addEventListener('pointerdown', () => loadDevices());
+  $(id).addEventListener('focus', () => loadDevices());
+});
+$('camera').addEventListener('change', () => quiet(command('camera', {path: $('camera').value}).then(() => $('camera').blur())));
+$('fps').addEventListener('change', () => quiet(command('choice', {name: 'fps', value: $('fps').value}).then(() => $('fps').blur())));
+$('camera-reconnect').addEventListener('click', () => quiet(command('camera_reconnect')));
+$('capture').addEventListener('click', () => quiet(command('capture')));
+$('rescan').addEventListener('click', () => loadDevices(true));
+$('connect').addEventListener('click', () => {
+  if (!$('port').value) { $('message').textContent = 'COMポートを選んでください'; return; }
+  quiet(command('connect', {port: $('port').value, baud: Number($('baud').value), format: $('format').value}));
+});
+$('disconnect').addEventListener('click', () => quiet(command('disconnect')));
+$('video').addEventListener('error', () => setTimeout(() => {
+  // Reconnect the MJPEG stream if it drops (camera change, app busy), unless the video is switched off.
+  if ($('video').getAttribute('src')) $('video').src = STREAM + '?' + Date.now();
+}, 1000));
+
+// Settings
+document.querySelectorAll('[data-option]').forEach(box => box.addEventListener('change', () =>
+  quiet(command('options', {[box.dataset.option]: box.checked}))));
+document.querySelectorAll('input[name=stdout]').forEach(radio => radio.addEventListener('change', () =>
+  quiet(command('choice', {name: 'stdout_destination', value: radio.value}))));
+document.querySelectorAll('input[name=dialog-buttons]').forEach(radio => radio.addEventListener('change', () =>
+  quiet(command('choice', {name: 'dialog_buttons', value: radio.value}))));
+$('auto-update').addEventListener('change', () => quiet(command('app_options', {auto_update: $('auto-update').checked})));
+$('prereleases').addEventListener('change', () => quiet(command('app_options', {prereleases: $('prereleases').checked})));
+$('update-now').addEventListener('click', () => quiet(command('update_now')));
+document.querySelectorAll('[data-folder]').forEach(button => button.addEventListener('click', () =>
+  command('open_folder', {folder: button.dataset.folder}).catch(() => {})));
+document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () =>
+  quiet(command('notify_test', {channel: button.dataset.test}))));
+// Saved secrets are never shown again; the fields are cleared after saving.
+$('save-line').addEventListener('click', () => {
+  const token = $('line-token').value.trim();
+  if (!token) return;
+  quiet(command('notification', {line_token: token}).then(() => { $('line-token').value = ''; }));
+});
+$('discord-name').addEventListener('input', () => { $('discord-name').dataset.edited = '1'; });
+$('save-discord').addEventListener('click', () => {
+  const values = {discord_username: $('discord-name').value.trim()};
+  if ($('discord-url').value.trim()) values.discord_webhook_url = $('discord-url').value.trim();
+  quiet(command('notification', values).then(() => { $('discord-url').value = ''; delete $('discord-name').dataset.edited; }));
+});
+// Quitting stops the app for every viewer; the button asks for a second press instead of a pop-up.
+let quitArmed = null;
+$('quit').addEventListener('click', () => {
+  if (!quitArmed) {
+    $('quit').textContent = 'もう一度押すと終了';
+    quitArmed = setTimeout(() => { quitArmed = null; $('quit').textContent = 'アプリを終了'; }, 3000);
+    return;
+  }
+  clearTimeout(quitArmed);
+  quitArmed = null;
+  command('quit').then(() => {
+    $('quit').textContent = '終了しました';
+    $('quit').disabled = true;
+  }).catch(() => {});
+});
+
+// Controller placement is kept per browser; storage may be unavailable, so the default must work without it.
+function loadOption(name, fallback) {
+  try { const value = localStorage.getItem('pokecon.' + name); return value === null ? fallback : value === '1'; }
+  catch (error) { return fallback; }
+}
+function saveOption(name, value) { try { localStorage.setItem('pokecon.' + name, value ? '1' : '0'); } catch (error) { /* not persisted */ } }
+const options = {sidePad: loadOption('sidePad', false)};
+$('opt-side-pad').checked = options.sidePad;
+
+const portraitQuery = matchMedia('(orientation: portrait)');
+function placePad() {
+  const inTab = narrowQuery.matches && (portraitQuery.matches || !options.sidePad);
+  const wasInTab = document.body.classList.contains('pad-tab');
+  document.body.classList.toggle('pad-tab', inTab);
+  const home = inTab ? $('pad-slot') : document.querySelector('.area-pad');
+  if ($('pad-wrap').parentElement !== home) home.append($('pad-wrap'));
+  const padSelected = $('tab-pad').getAttribute('aria-selected') === 'true';
+  // Show the manual tab on taller layouts; low windows keep the video visible until a tab is opened.
+  if (inTab && !wasInTab && !padSelected && !shortQuery.matches) $('tab-pad').click();
+}
+[portraitQuery, narrowQuery, shortQuery].forEach(query => query.addEventListener('change', placePad));
+$('opt-side-pad').addEventListener('change', () => { options.sidePad = $('opt-side-pad').checked; saveOption('sidePad', options.sidePad); placePad(); });
+
+// Keyboard play (options.keyboard, saved by the app): held keys follow the app's keymap
+// (KeyboardEvent.key, single letters in lower case). Key config captures the next key first.
+const keyHeld = new Map(), keyNames = new Set();
+function keyName(event) { return event.key.length === 1 ? event.key.toLowerCase() : event.key; }
+function typingTarget(target) {
+  return !$('dialog').hidden || (target && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)));
+}
+function releaseKeys() {
+  const names = [...keyHeld.values()];
+  keyHeld.clear();
+  keyNames.clear();
+  if (names.length) command('release', {buttons: names}).catch(() => {}).finally(refresh);
+}
+document.addEventListener('keydown', event => {
+  if (!assigning) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.key === 'Escape') { assigning = null; $('key-clear').disabled = true; renderKeymap(); return; }
+  if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+  assignKey(keyName(event));
+}, true);
+document.addEventListener('keydown', event => {
+  if (!state || !state.options || !state.options.keyboard) return;
+  if (event.ctrlKey || event.altKey || event.metaKey || typingTarget(event.target)) return;
+  const key = keyName(event);
+  const name = state.keymap && state.keymap[key];
+  if (!name) return;
+  event.preventDefault();
+  if (event.repeat || keyHeld.has(key) || !manualAllowed()) return;
+  keyHeld.set(key, name);
+  keyNames.add(name);
+  render();
+  command('hold', {buttons: [name]}).catch(() => { keyHeld.delete(key); keyNames.delete(name); });
+});
+document.addEventListener('keyup', event => {
+  const key = keyName(event);
+  const name = keyHeld.get(key);
+  if (!name) return;
+  event.preventDefault();
+  keyHeld.delete(key);
+  if (![...keyHeld.values()].includes(name)) keyNames.delete(name);
+  render();
+  command('release', {buttons: [name]}).catch(() => {}).finally(refresh);
+});
+window.addEventListener('blur', releaseKeys);
+
+placeLogs();
+placePad();
+refresh().then(() => loadDevices(true));
 setInterval(refresh, 1000);
 </script>
 </body>

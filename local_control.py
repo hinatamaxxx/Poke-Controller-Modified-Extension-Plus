@@ -1,11 +1,11 @@
-"""Token-authenticated localhost API and browser UI. All app access runs on Tk's thread."""
+"""Token-authenticated localhost API and browser UI for the window-less app core."""
 import base64
 import hmac
 import json
 import os
 from pathlib import Path
-import queue
 import secrets
+import sys
 import threading
 import time
 from urllib.parse import parse_qs, urlparse
@@ -72,13 +72,21 @@ def remove_stale_endpoints(runtime):
             path.unlink(missing_ok=True)
 
 
+class QuietServer(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        # A browser closing the video stream or a page is normal, not an error worth a traceback.
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
+
 class LocalControl:
-    def __init__(self, app, runtime, demo=False):
-        self.app = app
-        self.demo = demo
+    def __init__(self, core, runtime):
+        self.core = core
+        self.demo = core.demo
         self.id = uuid.uuid4().hex
-        self.queue = queue.Queue(maxsize=64)
         self.cache = {}
+        self.cache_lock = threading.Lock()
         self.token = secrets.token_hex(32)
         self.web_token = secrets.token_hex(32)
         self.held_at = {}
@@ -159,7 +167,7 @@ class LocalControl:
                     self.end_headers()
                     last = None
                     while not owner.closed:
-                        frame_at = getattr(owner.app.camera, 'frame_at', 0)
+                        frame_at = getattr(owner.core.camera, 'frame_at', 0)
                         frame = owner.encode_frame() if frame_at != last else None
                         if frame is not None:
                             last = frame_at
@@ -210,7 +218,7 @@ class LocalControl:
                         result, status = {'ok': False, 'error': str(exc)}, 400
                 self.reply(status, json.dumps(result).encode())
 
-        self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.server = QuietServer(('127.0.0.1', 0), Handler)
         self.server.daemon_threads = True
         port = self.server.server_port
         self.cookie = f'pokecon_{port}'
@@ -219,89 +227,103 @@ class LocalControl:
         runtime.mkdir(parents=True, exist_ok=True)
         remove_stale_endpoints(runtime)
         self.path = runtime / f'controller-{os.getpid()}.json'
-        self.path.write_text(json.dumps({'url': f'http://127.0.0.1:{port}/', 'web_url': self.web_url,
-                                        'token': self.token, 'pid': os.getpid(), 'profile': app.profile}),
+        # MCP and other local programs use a named pipe: some security software (e.g. AdGuard's
+        # localhost filtering) breaks loopback TCP for Python clients, but leaves pipes alone.
+        from multiprocessing.connection import Listener
+        self.pipe = rf'\\.\pipe\PokeController-{os.getpid()}-{secrets.token_hex(8)}'
+        self.listener = Listener(self.pipe, family='AF_PIPE', authkey=self.token.encode())
+        self.path.write_text(json.dumps({'url': f'http://127.0.0.1:{port}/', 'web_url': self.web_url, 'pipe': self.pipe,
+                                        'token': self.token, 'pid': os.getpid(), 'profile': core.profile}),
                              encoding='utf-8')
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
-        self.timer = app.root.after(30, self.tick)
+        threading.Thread(target=self.serve_pipe, daemon=True).start()
+
+    def serve_pipe(self):
+        from multiprocessing import AuthenticationError
+        while not self.closed:
+            try:
+                connection = self.listener.accept()
+            except AuthenticationError:
+                continue
+            except OSError:
+                if self.closed:
+                    return
+                continue
+            threading.Thread(target=self.pipe_client, args=(connection,), daemon=True).start()
+
+    def pipe_client(self, connection):
+        with connection:
+            while not self.closed:
+                try:
+                    payload = connection.recv()
+                except (EOFError, OSError):
+                    return
+                if not isinstance(payload, dict) or not isinstance(payload.get('params', {}), dict):
+                    result = {'ok': False, 'error': 'Request and params must be objects'}
+                else:
+                    result, _ = self.submit(payload)
+                try:
+                    connection.send(result)
+                except OSError:
+                    return
 
     def submit(self, payload):
-        """Queue a request for the Tk thread and wait for its result."""
-        job = {'payload': payload, 'done': threading.Event(), 'expires': time.monotonic() + 10}
+        """Run one request. Commands are cached by request ID so a retried request is not applied twice."""
+        request_id = payload.get('request_id', '')
         try:
-            self.queue.put_nowait(job)
-        except queue.Full:
-            return {'ok': False, 'error': 'Too many requests; retry later'}, 400
-        if not job['done'].wait(12):
-            return {'ok': False, 'error': 'UI did not respond; operation may be pending. Check status.'}, 400
-        return job['result'], 200
-
-    def encode_frame(self):
-        import cv2
-        camera = self.app.camera
-        image = getattr(camera, 'image_bgr', None)
-        if image is None or time.time() - getattr(camera, 'frame_at', 0) >= 2:
-            return None
-        ok, encoded = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        return encoded.tobytes() if ok else None
-
-    def tick(self):
-        if self.closed:
-            return
-        for _ in range(8):
-            try:
-                job = self.queue.get_nowait()
-            except queue.Empty:
-                break
-            payload = job['payload']
-            request_id = payload.get('request_id', '')
+            if not isinstance(request_id, str) or len(request_id) != 32 or any(c not in '0123456789abcdef' for c in request_id):
+                raise ValueError('Invalid request ID')
             signature = json.dumps(payload, sort_keys=True)
-            now = time.monotonic()
-            self.cache = {k: v for k, v in self.cache.items() if now - v[0] < 300}
-            try:
-                if not isinstance(request_id, str) or len(request_id) != 32 or any(c not in '0123456789abcdef' for c in request_id):
-                    raise ValueError('Invalid request ID')
+            with self.cache_lock:
+                now = time.monotonic()
+                self.cache = {k: v for k, v in self.cache.items() if now - v[0] < 300}
                 if request_id in self.cache:
                     _, original, result = self.cache[request_id]
                     if original != signature:
                         raise ValueError('Request ID reused with different parameters')
-                else:
-                    if now > job['expires']:
-                        raise ValueError('Request expired before execution')
-                    if len(self.cache) >= 4096:
-                        raise ValueError('Too many requests; retry later')
-                    try:
-                        result = {'ok': True, 'result': self.execute(payload['method'], payload.get('params', {}))}
-                    except Exception as exc:
-                        result = {'ok': False, 'error': str(exc)}
-                    if payload.get('method') == 'command':
-                        self.cache[request_id] = (now, signature, result)
-                job['result'] = result
+                    return result, 200
+                if len(self.cache) >= 4096:
+                    raise ValueError('Too many requests; retry later')
+            try:
+                with self.core.lock:
+                    result = {'ok': True, 'result': self.execute(payload['method'], payload.get('params', {}))}
             except Exception as exc:
-                job['result'] = {'ok': False, 'error': str(exc)}
-            finally:
-                job['done'].set()
-        self.timer = self.app.root.after(30, self.tick)
+                result = {'ok': False, 'error': str(exc)}
+            if payload.get('method') == 'command':
+                with self.cache_lock:
+                    self.cache[request_id] = (time.monotonic(), signature, result)
+            return result, 200
+        except Exception as exc:
+            return {'ok': False, 'error': str(exc)}, 400
+
+    def encode_frame(self):
+        import cv2
+        camera = self.core.camera
+        image = getattr(camera, 'image_bgr', None)
+        if image is None or time.time() - getattr(camera, 'frame_at', 0) >= 2:
+            return None
+        ok, encoded = cv2.imencode('.jpg', self.core.overlay.draw(image), [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return encoded.tobytes() if ok else None
 
     def snapshot(self):
-        from Commands.CommandBase import Command
-        app = self.app
-        live = getattr(app.camera, 'image_bgr', None) is not None and time.time() - getattr(app.camera, 'frame_at', 0) < 2
-        return {'id': self.id, 'profile': app.profile, 'ready': True,
-                'running': str(app.start_button['text']) == '停止', 'paused': bool(Command.isPause),
-                'command': Command.cur_command_name, 'demo': self.demo, 'exited': False,
-                'camera_live': live, 'serial_open': self.demo or app.ser.isOpened(),
-                'held': [getattr(b, 'showName', None) or b.name for b in app.keys_software_controller.holdButton],
-                'catalog': {'python': [c.NAME for c in app.py_classes],
-                            'mcu': [c.NAME for c in app.mcu_classes]},
-                'log': app.text_area_1.get('end-100l', 'end')[-16000:],
-                'log2': app.text_area_2.get('end-100l', 'end')[-16000:]}
+        state = self.core.snapshot()
+        import app_paths
+        import update_service
+        from product import VERSION
+        preferences = getattr(self.core, 'preferences', None)
+        state['app'] = {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
+                        'auto_update': preferences.values['auto_update'] if preferences else False,
+                        'prereleases': preferences.values['prereleases'] if preferences else False,
+                        'update': update_service.read_state()}
+        state.update(id=self.id, ready=True, exited=False,
+                     catalog={kind: [item['name'] for item in items] for kind, items in self.core.catalog().items()},
+                     tags=self.core.catalog())
+        return state
 
     def check_manual_input(self):
-        snapshot = self.snapshot()
-        if snapshot['running']:
+        if self.core.running:
             raise ValueError('Stop the running script before manual input')
-        if not snapshot['serial_open']:
+        if not self.core.serial_open():
             raise ValueError('COM port is not connected')
 
     def press(self, values):
@@ -311,10 +333,18 @@ class LocalControl:
         if not MIN_PRESS <= duration <= MAX_PRESS:
             raise ValueError(f'duration must be {MIN_PRESS}-{MAX_PRESS} seconds')
         inputs = self.hold(parse_inputs(values.get('buttons')))
-        self.app.root.after(int(duration * 1000), lambda: self.release(inputs))
+        self.later(duration, lambda: self.release(inputs))
+
+    def later(self, seconds, callback):
+        def run():
+            with self.core.lock:
+                callback()
+        timer = threading.Timer(seconds, run)
+        timer.daemon = True
+        timer.start()
 
     def hold(self, inputs):
-        keys = self.app.keys_software_controller
+        keys = self.core.keys_software_controller
         new = [b for b in inputs if not contains(keys.holdButton, b)]
         if new:
             keys.hold(new)
@@ -322,27 +352,57 @@ class LocalControl:
                 self.held_at[repr(b)] = time.monotonic()
         return new
 
+    def stick(self, values):
+        """Tilt one analog stick to x/y (0-255, 128 = center, y grows downward)."""
+        from Commands.Keys import Direction, Stick
+        self.check_manual_input()
+        which = str(values.get('stick', '')).upper()
+        if which not in ('L', 'R'):
+            raise ValueError('stick must be L or R')
+        x, y = values.get('x'), values.get('y')
+        if not all(isinstance(v, int) and 0 <= v <= 255 for v in (x, y)):
+            raise ValueError('x and y must be integers 0-255')
+        keys = self.core.keys_software_controller
+        target = Stick.LEFT if which == 'L' else Stick.RIGHT
+        # An analog position replaces any held direction button of the same stick.
+        keys.holdButton = [b for b in keys.holdButton if not (isinstance(b, Direction) and b.stick == target)]
+        state = keys.format
+        if which == 'L':
+            state.format['lx'], state.format['ly'] = x, y
+            state.L_stick_changed = True
+        else:
+            state.format['rx'], state.format['ry'] = x, y
+            state.R_stick_changed = True
+        keys.input([])
+
     def release(self, inputs):
-        keys = self.app.keys_software_controller
+        keys = self.core.keys_software_controller
         held = [b for b in inputs if contains(keys.holdButton, b)]
         if not held:
             return
         # Keep very short browser taps long enough for the console to register them.
         wait = max(self.held_at.get(repr(b), 0) + MIN_PRESS - time.monotonic() for b in held)
         if wait > 0:
-            self.app.root.after(int(wait * 1000) + 1, lambda: self.release(held))
+            self.later(wait + .001, lambda: self.release(held))
             return
         for b in held:
             self.held_at.pop(repr(b), None)
         keys.holdEnd(held)
 
+    def neutral(self):
+        self.held_at.clear()
+        keys = self.core.keys_software_controller
+        keys.neutral()
+        if not self.core.running and self.core.serial_open():
+            for which in ('L', 'R'):
+                self.stick({'stick': which, 'x': 128, 'y': 128})
+
     def execute(self, method, params):
-        from Commands.CommandBase import Command
+        core = self.core
         if method == 'sessions':
             return [self.snapshot()]
         if params.get('id') != self.id:
             raise ValueError('Session not found')
-        app = self.app
         if method == 'frame':
             frame = self.encode_frame()
             if frame is None:
@@ -350,38 +410,24 @@ class LocalControl:
             return {'data': base64.b64encode(frame).decode(), 'mimeType': 'image/jpeg'}
         if method == 'web_url':
             return {'url': self.web_url}
+        if method == 'devices':
+            return {'cameras': core.cameras(), 'ports': core.ports()}
         if method != 'command':
             raise ValueError('Unknown method')
         action = params.get('action')
         values = params.get('values', {})
         if not isinstance(values, dict):
             raise ValueError('values must be an object')
-        running = self.snapshot()['running']
         if action == 'start':
-            if hasattr(app, 'lifecycle') and (app.lifecycle.busy() or app.lifecycle.closing or app.lifecycle.disconnecting):
-                raise ValueError('The previous operation is still stopping')
-            if running:
-                raise ValueError('A script is already running')
-            kind, name = values.get('kind', 'python'), values.get('name')
-            if kind not in ('python', 'mcu'):
-                raise ValueError('Unknown script kind')
-            classes = app.py_classes if kind == 'python' else app.mcu_classes
-            if name not in [c.NAME for c in classes]:
-                raise ValueError('Script not found')
-            if self.demo and not any(c.NAME == name and c.__module__ == 'Commands.PythonCommands.Samples.PortableDemo' for c in classes):
-                raise ValueError('Demo mode only runs PortableDemo')
-            app.command_nb.select(0 if kind == 'python' else 1)
-            (app.py_cb if kind == 'python' else app.mcu_cb).set(name)
-            app.startPlay()
+            core.start_script(values.get('kind', 'python'), values.get('name'))
         elif action == 'stop':
-            if running:
-                app.stopPlay()
+            core.stop_script()
         elif action == 'suspend':
-            if running and not Command.isPause:
-                app.pausePlay()
+            core.pause(True)
         elif action == 'resume':
-            if running and Command.isPause:
-                app.restartPlay()
+            core.pause(False)
+        elif action == 'reload':
+            core.reload_scripts()
         elif action == 'press':
             self.press(values)
         elif action == 'hold':
@@ -389,9 +435,57 @@ class LocalControl:
             self.hold(parse_inputs(values.get('buttons')))
         elif action == 'release':
             self.release(parse_inputs(values.get('buttons')))
+        elif action == 'stick':
+            self.stick(values)
         elif action == 'neutral':
-            self.held_at.clear()
-            app.holdForceEnd()
+            self.neutral()
+        elif action == 'camera':
+            core.select_camera(values.get('path', ''))
+        elif action == 'connect':
+            core.connect_serial(values.get('port'), values.get('baud'), values.get('format'))
+        elif action == 'disconnect':
+            core.disconnect_serial()
+        elif action == 'options':
+            core.set_options(values)
+        elif action == 'answer':
+            core.dialogs.answer(values.get('dialog'), values.get('values'))
+        elif action == 'capture':
+            core.save_capture()
+        elif action == 'clear_log':
+            core.clear_log(1 if values.get('log') == 1 else 2)
+        elif action == 'app_options':
+            for key in ('auto_update', 'prereleases'):
+                if key in values:
+                    core.preferences.set(key, values[key])
+        elif action == 'update_now':
+            import update_service
+            threading.Thread(target=update_service.check_now, args=(core.preferences, True), daemon=True).start()
+        elif action == 'open_folder':
+            import app_paths
+            folders = {'workspace': app_paths.WORKSPACE, 'settings': app_paths.PROFILES, 'logs': app_paths.LOGS,
+                       'captures': app_paths.WORKSPACE / 'Captures', 'scripts': app_paths.WORKSPACE / 'Commands' / 'PythonCommands'}
+            folder = folders.get(values.get('folder'))
+            if folder is None:
+                raise ValueError('Unknown folder')
+            folder.mkdir(parents=True, exist_ok=True)
+            os.startfile(folder)
+        elif action == 'choice':
+            core.set_choice(values.get('name'), values.get('value'))
+        elif action == 'shortcut':
+            core.set_shortcut(values.get('slot'), values.get('kind'), values.get('name', ''))
+        elif action == 'keymap':
+            mapping = values.get('mapping')
+            if not isinstance(mapping, dict):
+                raise ValueError('mapping must be an object')
+            core.set_keymap(mapping)
+        elif action == 'notification':
+            core.set_notification(values)
+        elif action == 'notify_test':
+            core.notify_test(values.get('channel'))
+        elif action == 'camera_reconnect':
+            core.reconnect_camera_now()
+        elif action == 'quit':
+            core.exit_requested = True
         else:
             raise ValueError('Unknown action')
         return {'accepted': True}
@@ -399,5 +493,6 @@ class LocalControl:
     def close(self):
         self.closed = True
         self.path.unlink(missing_ok=True)
+        self.listener.close()
         self.server.shutdown()
         self.server.server_close()

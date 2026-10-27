@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import configparser
 import os
+import Paths
 import time
 import socket
 import datetime
@@ -35,7 +36,7 @@ def generate_token_file(filename):
 
 # socket通信用class
 class SocketCommunications:
-    SOCKET_TOKEN_PATH = os.path.join(os.path.dirname(__file__), "profiles", "default", "external_token.ini")
+    SOCKET_TOKEN_PATH = os.path.join(Paths.PROFILES, "default", "external_token.ini")
 
     def __init__(self):
         """
@@ -242,7 +243,7 @@ receive_msg = None
 
 # MQTT通信用class
 class MQTTCommunications:
-    MQTT_TOKEN_PATH = os.path.join(os.path.dirname(__file__), "profiles", "default", "external_token.ini")
+    MQTT_TOKEN_PATH = os.path.join(Paths.PROFILES, "default", "external_token.ini")
 
     def __init__(self, clientId):
         """

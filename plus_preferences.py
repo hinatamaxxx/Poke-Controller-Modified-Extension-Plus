@@ -1,4 +1,4 @@
-"""Profile-local preferences; no credentials are stored here. MIT."""
+"""App-wide preferences (shared by every profile); no credentials are stored here. MIT."""
 import json
 from pathlib import Path
 from safe_settings import read_checked, write_text
@@ -7,7 +7,7 @@ from safe_settings import read_checked, write_text
 class Preferences:
     def __init__(self, path):
         self.path = Path(path)
-        self.values = {'mcp_enabled': False, 'prereleases': True}
+        self.values = {'auto_update': True, 'prereleases': True}
         if self.path.exists() or self.path.with_name(self.path.name + '.bak').exists():
             def parse(text):
                 data = json.loads(text)
@@ -23,5 +23,6 @@ class Preferences:
         if key not in self.values or not isinstance(value, bool):
             raise ValueError('Invalid preference')
         changed = {**self.values, key: value}
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         write_text(self.path, json.dumps(changed, indent=2))
         self.values = changed

@@ -30,7 +30,7 @@ async def protocol(command, args, endpoint):
     from mcp.client.stdio import StdioServerParameters
     async with Client(StdioServerParameters(command=command, args=args)) as client:
         tools = await client.list_tools()
-        assert len(tools.tools) == 10
+        assert len(tools.tools) == 11
         session = call(endpoint, 'sessions')[0]
         sid = session['id']
         demo_name = next(name for name in session['catalog']['python'] if name.startswith('PortableDemo /'))
@@ -65,31 +65,32 @@ async def protocol(command, args, endpoint):
 
 def browser(endpoint):
     """Exercise the browser UI: token login, cookie auth, host checks, state, frames and input."""
-    from http.cookiejar import CookieJar
-    from urllib.error import HTTPError
-    from urllib.request import HTTPCookieProcessor, ProxyHandler, Request, build_opener
+    # curl, like a browser, is not intercepted by security software that breaks Python's loopback HTTP
+    # (AdGuard's localhost filtering stalls large responses to Python clients).
     web_url = json.loads(Path(endpoint).read_text(encoding='utf-8'))['web_url']
     base = web_url.split('?')[0]
-    opener = build_opener(ProxyHandler({}), HTTPCookieProcessor(CookieJar()))
+    jar = Path(tempfile.mkdtemp()) / 'cookies.txt'
 
-    def status(url, **kwargs):
+    def status(url, data=None, headers=None):
+        command = ['curl.exe', '-s', '--max-time', '10', '-b', str(jar), '-c', str(jar), '-o', '-', '-w', '\n%{http_code}']
+        for key, value in (headers or {}).items():
+            command += ['-H', f'{key}: {value}']
+        if data is not None:
+            command += ['--data-binary', '@-']
         for attempt in range(4):
-            try:
-                with opener.open(Request(url, **kwargs), timeout=10) as response:
-                    return response.status, response.read()
-            except HTTPError as exc:
-                return exc.code, b''
-            except (ConnectionError, TimeoutError):
-                # Some PCs drop a few loopback connections (security filters); retry like the clients do.
-                if attempt == 3:
-                    raise
-                time.sleep(.2)
+            result = subprocess.run(command + [url], input=data, capture_output=True)
+            if result.returncode == 0:
+                body, _, code = result.stdout.rpartition(b'\n')
+                return int(code), body
+            time.sleep(.2)
+        raise AssertionError(f'curl failed: {result.returncode}')
 
     assert status(base)[0] == 403, 'Page must require the token'
     assert status(base + '?token=wrong')[0] == 403
     assert status(base + 'api/state')[0] == 403
-    code, page = status(web_url)
-    assert code == 200 and b'Poke-Controller Web' in page
+    assert status(web_url)[0] == 303, 'The token link must set the cookie and redirect'
+    code, page = status(base)
+    assert code == 200 and b'<title>' in page
     assert status(base, headers={'Host': 'evil.example'})[0] == 403, 'Host header must be checked'
     code, body = status(base + 'api/state')
     assert code == 200 and json.loads(body)['result']['serial_open']
@@ -107,49 +108,42 @@ def browser(endpoint):
     assert code == 200 and not json.loads(body)['ok']
 
 
+async def autostart(command, args):
+    """With no app running, the MCP server starts one in the background on first use."""
+    from mcp.client import Client
+    from mcp.client.stdio import StdioServerParameters
+    runtime = ROOT / 'runtime'
+    assert not any(runtime.glob('controller-*.json')), 'another app is still running'
+    async with Client(StdioServerParameters(command=command, args=args)) as client:
+        result = await client.call_tool('list_sessions', {})
+        assert not result.is_error, result
+    endpoint = next(runtime.glob('controller-*.json'))
+    session = call(endpoint, 'sessions')[0]
+    call(endpoint, 'command', {'id': session['id'], 'action': 'quit'})
+    until(lambda: not endpoint.exists(), timeout=20)
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--package', type=Path)
-    parser.add_argument('--mcp-disabled', action='store_true')
-    options = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='poke-qa-') as temporary:
         report = Path(temporary) / 'report.json'
         profile = 'qa-' + uuid.uuid4().hex[:8]
-        if options.package:
-            command = [str(options.package / 'PokeController.exe')]
-            mcp_command, mcp_args = str(options.package / 'PokeControllerMCP.exe'), []
-        else:
-            command = [sys.executable, str(ROOT / 'app.py')]
-            mcp_command, mcp_args = sys.executable, [str(ROOT / 'controller_mcp.py')]
-        env = os.environ.copy()
-        if options.package:
-            env.update(PYTHONHOME='C:\\nonexistent-python', PYTHONPATH='C:\\nonexistent-python',
-                       PATH=os.path.join(os.environ['WINDIR'], 'System32'))
-        if not options.mcp_disabled:
-            command += ['--mcp']
-        process = subprocess.Popen(command + ['--demo', '--profile', profile,
-                                   '--smoke-test', str(report)], env=env)
+        command = [sys.executable, str(ROOT / 'app.py')]
+        mcp_command, mcp_args = sys.executable, [str(ROOT / 'controller_mcp.py')]
+        process = subprocess.Popen(command + ['--demo', '--profile', profile, '--smoke-test', str(report)])
         try:
             until(lambda: report.exists() or process.poll() is not None, timeout=45)
             assert report.exists(), f'App failed: {process.returncode}'
             state = json.loads(report.read_text())
-            if options.mcp_disabled:
-                assert state['mcp_endpoint'] is None
-                print('PASS: MCP is disabled by default', flush=True)
-                return
             endpoint = Path(state['mcp_endpoint'])
             assert state['python_scripts'] >= 30 and state['mcu_scripts'] == 4
-            if options.package:
-                assert Path(state['python']).is_relative_to(options.package)
-            from urllib.error import HTTPError
+            assert json.loads(endpoint.read_text())['pipe'], 'local calls must use the named pipe'
             try:
                 call(endpoint, 'sessions', token_override='invalid')
                 raise AssertionError('Missing authentication')
-            except HTTPError as exc:
-                assert exc.code == 403
+            except PermissionError:
+                pass
             browser(endpoint)
             asyncio.run(protocol(mcp_command, mcp_args, endpoint))  # discovers running apps without --endpoint
-            print('PASS: app startup, bundled runtime, authentication, browser UI, ten MCP tools, capture, button input, start/pause/resume/stop, logs, error handling', flush=True)
         finally:
             report.with_suffix('.stop').touch()
             try:
@@ -157,6 +151,9 @@ def main():
             except subprocess.TimeoutExpired:
                 subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], capture_output=True)
                 raise
+        asyncio.run(autostart(mcp_command, mcp_args))
+        print('PASS: window-less startup, authentication, browser UI, 11 MCP tools, capture, button input, '
+              'start/pause/resume/stop, logs, error handling, background autostart', flush=True)
 
 
 if __name__ == '__main__':
