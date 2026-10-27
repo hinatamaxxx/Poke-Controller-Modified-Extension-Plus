@@ -38,8 +38,8 @@ class SettingsWindow:
             self.tabs.add(page, text=title)
             self.pages[key] = page
         general = self.pages['general']
-        ttk.Checkbutton(general, text='MCPを有効にする', variable=self.mcp_enabled, command=self.toggle_mcp).pack(anchor='w')
-        ttk.Label(general, text='初期状態はOFFです。設定はプロファイルごとに保存します。\n接続先はこのPC内（127.0.0.1）のみで、接続トークンを使います。\nMCPクライアントから既存スクリプトの開始・停止などを操作できます。', wraplength=650).pack(anchor='w', pady=14)
+        ttk.Checkbutton(general, text='MCP・Web操作を有効にする', variable=self.mcp_enabled, command=self.toggle_mcp).pack(anchor='w')
+        ttk.Label(general, text='初期状態はOFFです。設定はプロファイルごとに保存します。\n接続先はこのPC内（127.0.0.1）のみで、接続トークンを使います。\nMCPクライアントやブラウザ（Claudeの内蔵ブラウザなど）から、映像の確認、ボタン操作、既存スクリプトの開始・停止などを行えます。', wraplength=650).pack(anchor='w', pady=14)
         ttk.Button(general, text='接続方法を開く', command=lambda: os.startfile(self.root / 'MCP.md')).pack(anchor='w')
         update = self.pages['updates']
         ttk.Label(update, text=f'{NAME}\n現在のバージョン：{VERSION}', wraplength=650).pack(anchor='w')

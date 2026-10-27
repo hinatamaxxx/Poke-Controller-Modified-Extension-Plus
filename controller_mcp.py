@@ -11,7 +11,9 @@ def build_server(endpoint_path=None):
     server = MCPServer(NAME, instructions=(
         'Use list_sessions to identify the exact session before any operation. '
         'Run timing-sensitive work as an existing Python script. '
-        'After starting a script, inspect its status and logs; an accepted start is not completion.'))
+        'After starting a script, inspect its status and logs; an accepted start is not completion. '
+        'For manual play, use press_buttons and check the result with get_capture. '
+        'get_web_url returns a page that can be opened in a browser to watch and operate the session.'))
     read_only = ToolAnnotations(read_only_hint=True, open_world_hint=False)
     control = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=False)
 
@@ -72,6 +74,21 @@ def build_server(endpoint_path=None):
         """Start an existing script in exactly one session. Returns acceptance, not completion."""
         call('command', {'id': session_id, 'action': 'start', 'values': {'name': name, 'kind': kind}})
         return {'accepted': True, 'session_id': session_id, 'name': name}
+
+    @server.tool(annotations=control)
+    def press_buttons(session_id: str, buttons: list[str], duration: float = 0.1) -> dict:
+        """Press controller inputs together for duration seconds (0.08-5), then release.
+        Names: A B X Y L R ZL ZR PLUS MINUS HOME CAPTURE LCLICK RCLICK, D-pad UP DOWN LEFT RIGHT,
+        sticks LS_UP LS_DOWN LS_LEFT LS_RIGHT RS_UP RS_DOWN RS_LEFT RS_RIGHT.
+        Rejected while a script runs or the COM port is closed. Returns acceptance, not completion."""
+        call('command', {'id': session_id, 'action': 'press', 'values': {'buttons': buttons, 'duration': duration}})
+        return {'accepted': True, 'buttons': buttons, 'duration': duration}
+
+    @server.tool(annotations=read_only)
+    def get_web_url(session_id: str) -> dict:
+        """Get the local browser UI URL (live video, buttons, scripts, logs) for one session.
+        The URL contains an access token; open it only in a local browser and do not share it."""
+        return call('web_url', {'id': session_id})
 
     @server.tool(annotations=control)
     def stop_script(session_id: str) -> dict:

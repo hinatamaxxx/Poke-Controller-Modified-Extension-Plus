@@ -105,7 +105,15 @@ def main():
         if save:
             preferences.set('mcp_enabled', enabled.get())
     mcp_menu = tk.Menu(app.menu, tearoff=False)
-    mcp_menu.add_checkbutton(label='MCPを有効にする', variable=enabled, command=toggle_mcp)
+    def open_browser():
+        import webbrowser
+        from tkinter.messagebox import showinfo
+        if api is None:
+            showinfo('ブラウザで開く', 'MCP・Web操作を有効にしてから開いてください。', parent=root)
+        else:
+            webbrowser.open(api.web_url)
+    mcp_menu.add_checkbutton(label='MCP・Web操作を有効にする', variable=enabled, command=toggle_mcp)
+    mcp_menu.add_command(label='ブラウザで開く', command=open_browser)
     mcp_menu.add_command(label='接続方法', command=lambda: os.startfile(ROOT / 'MCP.md'))
     app.menu.add_cascade(label='MCP', menu=mcp_menu)
     from plus_settings import SettingsWindow

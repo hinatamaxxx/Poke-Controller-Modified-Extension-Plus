@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poke-Controller Web</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --text: #1d2026; --muted: #646b78; --line: #d9dde3;
+  --key: #2b2f36; --key-text: #ffffff; --key-on: #ffd800; --key-on-text: #1d2026;
+  --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #f8f9fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171b; --panel: #1f2228; --text: #e8eaee; --muted: #9aa1ad; --line: #343840;
+    --key: #3a3f48; --key-text: #ffffff; --accent: #5b8def; --danger: #ef5350; --ok: #66bb6a; --log: #181a1e;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Segoe UI", "Yu Gothic UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 16px; margin: 0; }
+.badge { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.badge.ok { color: var(--ok); border-color: var(--ok); }
+.badge.bad { color: var(--danger); border-color: var(--danger); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+section h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+.video { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
+.video img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
+.video .empty[hidden] { display: none; }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; align-items: start; }
+@media (max-width: 600px) { .pad { grid-template-columns: 1fr 1fr; } }
+.cluster { display: grid; grid-template-columns: repeat(3, 48px); grid-auto-rows: 40px; gap: 4px; justify-content: center; }
+.cluster .label { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 12px; align-self: end; }
+.key { border: 0; border-radius: 6px; background: var(--key); color: var(--key-text); font: inherit; font-weight: 600; cursor: pointer; touch-action: none; user-select: none; }
+.key.on { background: var(--key-on); color: var(--key-on-text); }
+.key:disabled { opacity: .4; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.row label { color: var(--muted); font-size: 12px; }
+select, input, button.cmd { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+select, input[type=search] { width: 100%; }
+button.cmd { cursor: pointer; }
+button.cmd.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.cmd.danger { border-color: var(--danger); color: var(--danger); }
+button.cmd:disabled { opacity: .5; cursor: not-allowed; }
+.side { display: flex; flex-direction: column; gap: 16px; }
+pre { margin: 0; height: 220px; overflow: auto; background: var(--log); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 12px/1.45 Consolas, "BIZ UDGothic", monospace; white-space: pre-wrap; word-break: break-all; }
+#message { min-height: 1.5em; color: var(--danger); font-size: 12px; margin-top: 6px; }
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Poke-Controller Web</h1>
+  <span class="badge" id="profile">-</span>
+  <span class="badge" id="camera-state">カメラ: -</span>
+  <span class="badge" id="serial-state">COM: -</span>
+  <span class="badge" id="run-state">停止中</span>
+</header>
+<main>
+  <div>
+    <section aria-label="映像とコントローラー">
+      <div class="video">
+        <img id="video" alt="キャプチャ映像" src="/stream.mjpg">
+        <div class="empty" id="video-empty" hidden>映像がありません</div>
+      </div>
+      <div class="pad" id="pad">
+        <div class="cluster">
+          <div class="label">L側</div>
+          <button class="key" data-btn="ZL" aria-label="ZL">ZL</button>
+          <button class="key" data-btn="L" aria-label="L">L</button>
+          <button class="key" data-btn="MINUS" aria-label="マイナス">−</button>
+          <div class="label">十字キー</div>
+          <span></span><button class="key" data-btn="UP" aria-label="十字キー上">↑</button><span></span>
+          <button class="key" data-btn="LEFT" aria-label="十字キー左">←</button>
+          <button class="key" data-btn="CAPTURE" aria-label="キャプチャー">◎</button>
+          <button class="key" data-btn="RIGHT" aria-label="十字キー右">→</button>
+          <span></span><button class="key" data-btn="DOWN" aria-label="十字キー下">↓</button><span></span>
+        </div>
+        <div class="cluster">
+          <div class="label">左スティック</div>
+          <span></span><button class="key" data-btn="LS_UP" aria-label="左スティック上">▲</button><span></span>
+          <button class="key" data-btn="LS_LEFT" aria-label="左スティック左">◀</button>
+          <button class="key" data-btn="LCLICK" aria-label="左スティック押し込み">LS</button>
+          <button class="key" data-btn="LS_RIGHT" aria-label="左スティック右">▶</button>
+          <span></span><button class="key" data-btn="LS_DOWN" aria-label="左スティック下">▼</button><span></span>
+          <div class="label">右スティック</div>
+          <span></span><button class="key" data-btn="RS_UP" aria-label="右スティック上">▲</button><span></span>
+          <button class="key" data-btn="RS_LEFT" aria-label="右スティック左">◀</button>
+          <button class="key" data-btn="RCLICK" aria-label="右スティック押し込み">RS</button>
+          <button class="key" data-btn="RS_RIGHT" aria-label="右スティック右">▶</button>
+          <span></span><button class="key" data-btn="RS_DOWN" aria-label="右スティック下">▼</button><span></span>
+        </div>
+        <div class="cluster">
+          <div class="label">R側</div>
+          <button class="key" data-btn="PLUS" aria-label="プラス">＋</button>
+          <button class="key" data-btn="R" aria-label="R">R</button>
+          <button class="key" data-btn="ZR" aria-label="ZR">ZR</button>
+          <div class="label">ボタン</div>
+          <span></span><button class="key" data-btn="X" aria-label="X">X</button><span></span>
+          <button class="key" data-btn="Y" aria-label="Y">Y</button>
+          <button class="key" data-btn="HOME" aria-label="HOME">⌂</button>
+          <button class="key" data-btn="A" aria-label="A">A</button>
+          <span></span><button class="key" data-btn="B" aria-label="B">B</button><span></span>
+        </div>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="latch"> 押しっぱなしモード（クリックで押す/離す）</label>
+        <button class="cmd" id="neutral">全ボタンを離す</button>
+      </div>
+      <p class="hint">押している間だけ入力します。スクリプト実行中とCOM未接続のときは手動入力できません。</p>
+    </section>
+  </div>
+  <div class="side">
+    <section aria-label="スクリプト">
+      <h2>スクリプト</h2>
+      <div class="row">
+        <select id="kind" aria-label="スクリプトの種類">
+          <option value="python">Python</option>
+          <option value="mcu">MCU</option>
+        </select>
+      </div>
+      <div class="row"><input type="search" id="filter" placeholder="名前で絞り込み" aria-label="スクリプトの絞り込み"></div>
+      <div class="row"><select id="script" size="8" aria-label="スクリプト一覧"></select></div>
+      <div class="row">
+        <button class="cmd primary" id="start">開始</button>
+        <button class="cmd danger" id="stop">停止</button>
+        <button class="cmd" id="pause">一時停止</button>
+        <button class="cmd" id="resume">再開</button>
+      </div>
+      <div id="message" role="status"></div>
+    </section>
+    <section aria-label="ログ">
+      <h2>ログ（上）</h2>
+      <pre id="log1"></pre>
+      <h2 style="margin-top:12px">ログ（下）</h2>
+      <pre id="log2"></pre>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let state = null, catalogKey = '';
+
+async function call(method, params = {}) {
+  const response = await fetch('/api/call', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({method, params}),
+  });
+  const result = await response.json().catch(() => ({ok: false, error: `HTTP ${response.status}`}));
+  if (!result.ok) throw new Error(result.error || 'Operation failed');
+  return result.result;
+}
+
+function command(action, values = {}) {
+  $('message').textContent = '';
+  return call('command', {action, values}).catch(error => { $('message').textContent = error.message; throw error; });
+}
+
+function setBadge(id, text, good) {
+  const element = $(id);
+  element.textContent = text;
+  element.className = 'badge ' + (good === undefined ? '' : good ? 'ok' : 'bad');
+}
+
+function fillLog(id, text) {
+  const element = $(id);
+  if (element.textContent === text) return;
+  const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+  element.textContent = text;
+  if (atBottom) element.scrollTop = element.scrollHeight;
+}
+
+function renderScripts() {
+  if (!state) return;
+  const names = state.catalog[$('kind').value] || [];
+  const filter = $('filter').value.trim().toLowerCase();
+  const key = $('kind').value + '\n' + filter + '\n' + names.join('\n');
+  if (key === catalogKey) return;
+  catalogKey = key;
+  const selected = $('script').value;
+  $('script').replaceChildren(...names.filter(n => n.toLowerCase().includes(filter)).map(name => {
+    const option = document.createElement('option');
+    option.value = option.textContent = name;
+    option.selected = name === selected;
+    return option;
+  }));
+}
+
+function render() {
+  setBadge('profile', 'プロファイル: ' + state.profile + (state.demo ? '（デモ）' : ''));
+  setBadge('camera-state', state.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし', state.camera_live);
+  setBadge('serial-state', state.serial_open ? 'COM: 接続中' : 'COM: 未接続', state.serial_open);
+  setBadge('run-state', state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中', state.running ? true : undefined);
+  $('video-empty').hidden = state.camera_live;
+  const manual = !state.running && state.serial_open;
+  document.querySelectorAll('.key').forEach(key => {
+    key.disabled = !manual;
+    key.classList.toggle('on', state.held.includes(key.dataset.btn));
+  });
+  $('start').disabled = state.running;
+  $('stop').disabled = !state.running;
+  $('pause').disabled = !state.running || state.paused;
+  $('resume').disabled = !state.running || !state.paused;
+  renderScripts();
+  fillLog('log1', state.log);
+  fillLog('log2', state.log2);
+}
+
+async function refresh() {
+  try {
+    const response = await fetch('/api/state', {cache: 'no-store'});
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error);
+    state = result.result;
+    render();
+  } catch (error) {
+    setBadge('run-state', 'アプリに接続できません', false);
+  }
+}
+
+// Press while the pointer is down; latch mode toggles instead.
+const pressed = new Set();
+function release(key) {
+  if (!pressed.delete(key.dataset.btn)) return;
+  key.classList.remove('on');
+  command('release', {buttons: [key.dataset.btn]}).catch(() => {}).finally(refresh);
+}
+document.querySelectorAll('.key').forEach(key => {
+  key.addEventListener('pointerdown', event => {
+    if (key.disabled) return;
+    event.preventDefault();
+    const name = key.dataset.btn;
+    if ($('latch').checked && state && state.held.includes(name)) {
+      command('release', {buttons: [name]}).catch(() => {}).finally(refresh);
+      return;
+    }
+    key.setPointerCapture(event.pointerId);
+    pressed.add(name);
+    key.classList.add('on');
+    command('hold', {buttons: [name]}).catch(() => { pressed.delete(name); key.classList.remove('on'); });
+  });
+  const end = () => { if (!$('latch').checked) release(key); else { pressed.delete(key.dataset.btn); refresh(); } };
+  key.addEventListener('pointerup', end);
+  key.addEventListener('pointercancel', () => release(key));
+  // Keyboard activation (Enter/Space) sends a short press.
+  key.addEventListener('click', event => {
+    if (event.detail === 0 && !key.disabled) command('press', {buttons: [key.dataset.btn], duration: .1}).catch(() => {});
+  });
+});
+$('neutral').addEventListener('click', () => command('neutral').finally(refresh));
+window.addEventListener('blur', () => document.querySelectorAll('.key').forEach(release));
+window.addEventListener('pagehide', () => {
+  if (pressed.size) fetch('/api/call', {method: 'POST', keepalive: true,
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral'}})});
+});
+
+$('kind').addEventListener('change', renderScripts);
+$('filter').addEventListener('input', renderScripts);
+$('start').addEventListener('click', () => {
+  const name = $('script').value;
+  if (!name) { $('message').textContent = 'スクリプトを選んでください'; return; }
+  command('start', {kind: $('kind').value, name}).finally(refresh);
+});
+$('stop').addEventListener('click', () => command('stop').finally(refresh));
+$('pause').addEventListener('click', () => command('suspend').finally(refresh));
+$('resume').addEventListener('click', () => command('resume').finally(refresh));
+
+// Reconnect the MJPEG stream if it drops (camera change, app busy).
+$('video').addEventListener('error', () => setTimeout(() => { $('video').src = '/stream.mjpg?' + Date.now(); }, 1000));
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
