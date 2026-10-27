@@ -1,5 +1,8 @@
 Poke-Controller Modified Extension Plus 更新履歴
 
+■ 0.3.0-alpha.10
+  ・設定の「Discord 連携」「LINE 連携」を「連携」1つにまとめた。
+
 ■ 0.3.0-alpha.9
   ・DiscordのWebhookとLINEのトークンは、設定の「Discord 連携」「LINE 連携」で設定するようにした（「通知」は通知する時だけ）。
 

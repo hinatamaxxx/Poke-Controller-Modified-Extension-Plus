@@ -119,7 +119,7 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
   .settings-close { top: 4px; right: 6px; }
 }
 .modal .actions .grow { flex: 1; }
-.settings-page h2 .state { font-size: 12px; font-weight: normal; color: var(--ok); margin-left: 8px; }
+.settings-page h3 .state { font-size: 12px; font-weight: normal; color: var(--ok); margin-left: 8px; }
 .settings-page .form { max-width: 520px; }
 .modal .box.wide { width: min(720px, 100%); display: flex; flex-direction: column; }
 .modal .box pre { max-height: 60dvh; min-height: 6em; }
@@ -632,8 +632,7 @@ table.notify input { margin: 1px 0; }
     <button type="button" data-page="set-view">表示</button>
     <button type="button" data-page="set-keys">キー設定</button>
     <hr>
-    <button type="button" data-page="set-discord">Discord 連携</button>
-    <button type="button" data-page="set-line">LINE 連携</button>
+    <button type="button" data-page="set-link">連携</button>
     <hr>
     <button type="button" data-page="set-update">更新</button>
     <button type="button" data-page="set-folders">フォルダー</button>
@@ -663,8 +662,9 @@ table.notify input { margin: 1px 0; }
           </tbody>
         </table>
     </section>
-    <section class="settings-page" id="set-discord" hidden>
-      <h2>Discord 連携 <span class="state" id="discord-set" hidden>設定済み</span></h2>
+    <section class="settings-page" id="set-link" hidden>
+      <h2>連携</h2>
+      <h3>Discord <span class="state" id="discord-set" hidden>設定済み</span></h3>
       <div class="form">
         <label for="discord-url">Webhook URL</label>
         <input type="password" id="discord-url" autocomplete="off" placeholder="変えるときだけ入力" aria-label="DiscordのWebhook URL">
@@ -675,9 +675,7 @@ table.notify input { margin: 1px 0; }
         <button type="button" class="cmd primary" id="save-discord">保存</button>
         <button type="button" class="cmd" data-test="discord">テスト通知</button>
       </div>
-    </section>
-    <section class="settings-page" id="set-line" hidden>
-      <h2>LINE 連携 <span class="state" id="line-set" hidden>設定済み</span></h2>
+      <h3>LINE <span class="state" id="line-set" hidden>設定済み</span></h3>
       <div class="form">
         <label for="line-token">トークン</label>
         <input type="password" id="line-token" autocomplete="off" placeholder="変えるときだけ入力" aria-label="LINEのトークン">
