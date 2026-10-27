@@ -25,6 +25,10 @@ namespace PokeControllerTray
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
         [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(int processId);
 
+        // フォルダーは裏で動く本体が開くので、そのままでは Windows がエクスプローラーを前面に出さない。
+        // 前面にいるこのプロセス（メニューや画面を操作した直後）から、ほかのプロセスが前面に出ることを許す
+        internal static void AllowForeground() { AllowSetForegroundWindow(-1 /*ASFW_ANY*/); }
+
         internal static string Root { get { return AppDomain.CurrentDomain.BaseDirectory; } }
         internal static string LocalDir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppName); } }
 
