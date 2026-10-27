@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import socket
 import sys
 import threading
 import time
@@ -168,7 +169,7 @@ class ApiServer:
                     self.send_header('Cache-Control', 'no-store')
                     self.end_headers()
                     for frame in owner.stream_frames(session):
-                        if owner.closed:
+                        if owner.closed or (frame is None and self.client_gone()):
                             break
                         if frame is not None:
                             self.wfile.write(b'--frame\r\nContent-Type: image/jpeg\r\nContent-Length: '
@@ -178,6 +179,15 @@ class ApiServer:
                     pass
                 finally:
                     owner.streams.release()
+
+            def client_gone(self):
+                # The page sends nothing on a stream, so a readable socket means it was closed.
+                import select
+                try:
+                    readable, _, _ = select.select([self.connection], [], [], 0)
+                    return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
+                except (OSError, ValueError):
+                    return True
 
             def do_POST(self):
                 self.connection.settimeout(5)
