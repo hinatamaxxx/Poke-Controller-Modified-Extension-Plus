@@ -496,6 +496,47 @@ class Core:
         else:
             raise ValueError('Unknown channel')
 
+    def send_discord_image(self):
+        # The original window's Discord button: the current frame to the Discord webhook.
+        from product import NAME
+        from DiscordNotify import Discord_Notify
+        frame = self.camera.readFrame() if self.camera_live() else None
+        if frame is None:
+            raise ValueError('送る映像がありません')
+        if not self.notification_settings()['discord_webhook_set']:
+            raise ValueError('Discord の Webhook URL が設定されていません（通知タブの送り先）')
+        Discord_Notify().send_message(f'{NAME} ({self.label}) の画面', image=frame.copy())
+
+    def about(self):
+        """Versions for the version window and the question template (the original help menu)."""
+        import platform
+        from importlib import metadata
+        from pathlib import Path
+        from product import NAME, VERSION
+        root = Path(__file__).resolve().parent
+
+        def read(name):
+            try:
+                return (root / name).read_text(encoding='utf-8-sig')
+            except OSError:
+                return ''
+        libraries = []
+        for line in read('requirements.txt').splitlines():
+            name = line.split('#')[0].split('==')[0].split('>=')[0].strip()
+            if not name:
+                continue
+            try:
+                libraries.append([name, metadata.version(name)])
+            except metadata.PackageNotFoundError:
+                libraries.append([name, ''])
+        command = self.cur_command
+        script = {}
+        if command is not None:
+            script = {'name': str(getattr(command, 'NAME', '') or ''), 'file': str(getattr(command, 'FILENAME', '') or ''),
+                      'developer': str(getattr(command, 'DEVELOPER', '') or '')}
+        return {'name': NAME, 'version': VERSION, 'os': platform.platform(), 'python': sys.version.split(' ')[0],
+                'libraries': libraries, 'script': script, 'license': read('LICENSE'), 'changelog': read('changelog.txt')}
+
     def reconnect_camera_now(self):
         with self.lock:
             self.camera_missing = False

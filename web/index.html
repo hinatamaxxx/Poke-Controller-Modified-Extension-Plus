@@ -35,20 +35,36 @@ header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
 /* Switch tabs: one per console; the dot is its state (running, stopped, starting). */
 .switches { display: flex; gap: 2px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; margin-right: 6px; }
 .sw { display: flex; align-items: center; gap: 5px; flex: none; font: inherit; font-size: 13px; color: var(--muted); background: none;
-      border: 1px solid transparent; border-radius: 6px; padding: 1px 6px 1px 8px; cursor: pointer; max-width: 14em; }
+      border: 1px solid transparent; border-radius: 6px; padding: 1px 3px 1px 8px; cursor: pointer; max-width: 14em; overflow: hidden;
+      transition: background-color .15s, color .15s, border-color .15s; }
+.sw:not([aria-selected=true]):hover { background: color-mix(in srgb, var(--chip) 60%, transparent); color: var(--text); }
+/* Tabs grow in when opened and shrink away when closed, as in Chrome. */
+.sw.opening { animation: sw-open .18s ease-out; }
+.sw.closing { animation: sw-close .16s ease-in forwards; pointer-events: none; }
+@keyframes sw-open { from { max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; } }
+@keyframes sw-close { to { max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; border-width: 0; } }
+@media (prefers-reduced-motion: reduce) { .sw.opening, .sw.closing { animation-duration: 1ms; } }
 .sw[aria-selected=true] { color: var(--text); background: var(--chip); border-color: var(--line); font-weight: 600; }
 .sw .label { overflow: hidden; text-overflow: ellipsis; }
 .sw .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
 .sw .dot.run { background: var(--ok); }
 .sw .dot.down { background: var(--danger); }
 .sw .dot.wait { background: var(--muted); animation: blink 1s steps(2, start) infinite; }
-.sw .x { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 0 2px; line-height: 1; cursor: pointer; visibility: hidden; }
+.sw .x { border: 0; background: none; color: var(--muted); font: inherit; font-size: 16px; width: 20px; height: 20px; padding: 0; line-height: 1;
+         border-radius: 50%; display: grid; place-items: center; flex: none; cursor: pointer; visibility: hidden; transition: background-color .15s; }
+.sw .x:hover { background: var(--line); color: var(--text); }
 .sw[aria-selected=true] .x, .sw:hover .x { visibility: visible; }
 .sw input { font: inherit; width: 9em; padding: 0 2px; }
 .sw-add { flex: none; font: inherit; font-size: 15px; line-height: 1; color: var(--muted); background: none; border: 0; padding: 0 6px; cursor: pointer; }
 .sw-menu { position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px;
            box-shadow: 0 4px 16px var(--shade); display: flex; flex-direction: column; min-width: 12em; }
 .sw-menu[hidden] { display: none; }
+.menu-button { flex: none; font: inherit; font-size: 16px; line-height: 1; color: var(--muted); background: none; border: 0; border-radius: 4px; padding: 2px 6px; cursor: pointer; margin-left: -6px; }
+.menu-button:hover, .menu-button[aria-expanded=true] { background: var(--chip); color: var(--text); }
+.sw-menu .sub { font-size: 11px; color: var(--muted); padding: 2px 8px 0; }
+.modal .box.wide { width: min(720px, 100%); display: flex; flex-direction: column; }
+.modal .box pre { max-height: 60dvh; min-height: 6em; }
+.modal textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; resize: vertical; min-height: 5em; }
 .sw-menu button { font: inherit; text-align: left; background: none; border: 0; color: var(--text); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
 .sw-menu button:hover, .sw-menu button:focus { background: var(--chip); }
 .sw-menu hr { border: 0; border-top: 1px solid var(--line); margin: 3px 0; width: 100%; }
@@ -324,6 +340,7 @@ table.notify input { margin: 1px 0; }
 </head>
 <body>
 <header>
+  <button class="menu-button" id="menu-button" aria-label="メニュー" aria-haspopup="menu" aria-expanded="false">☰</button>
   <nav class="switches" id="switches" role="tablist" aria-label="Switch"></nav>
   <button class="sw-add" id="sw-add" aria-label="Switch を開く" title="Switch を開く（右クリックで選ぶ）">＋</button>
   <span class="badge" id="profile" hidden>デモ</span>
@@ -652,6 +669,43 @@ table.notify input { margin: 1px 0; }
 </div>
 
 <div class="sw-menu" id="sw-menu" role="menu" hidden></div>
+<div class="sw-menu" id="app-menu" role="menu" aria-label="メニュー" hidden>
+  <button type="button" role="menuitem" data-menu="capture">スクリーンショット</button>
+  <button type="button" role="menuitem" data-menu="discord">画面を Discord に送る</button>
+  <button type="button" role="menuitem" data-menu="captures">保存先を開く</button>
+  <hr>
+  <button type="button" role="menuitem" data-menu="clear">ログを消去</button>
+  <button type="button" role="menuitem" data-menu="keys">キー設定</button>
+  <button type="button" role="menuitem" data-menu="settings">設定</button>
+  <hr>
+  <div class="sub" aria-hidden="true">ヘルプ</div>
+  <button type="button" role="menuitem" data-menu="guide">使い方ガイド</button>
+  <button type="button" role="menuitem" data-menu="question">質問テンプレート</button>
+  <button type="button" role="menuitem" data-menu="version">バージョン情報</button>
+  <button type="button" role="menuitem" data-menu="changelog">更新履歴</button>
+  <button type="button" role="menuitem" data-menu="license">ライセンス</button>
+  <button type="button" role="menuitem" data-menu="github">GitHub</button>
+  <hr>
+  <button type="button" role="menuitem" data-menu="quit">アプリを終了</button>
+</div>
+<div class="modal" id="info" role="dialog" aria-modal="true" aria-labelledby="info-title" hidden>
+  <form class="box wide" id="info-form">
+    <h2 id="info-title"></h2>
+    <p class="desc" id="info-desc"></p>
+    <div class="fields" id="info-fields" hidden>
+      <label for="q-name">プログラム名</label><input type="text" id="q-name" required>
+      <label for="q-dev">製作者</label><input type="text" id="q-dev" required>
+      <label for="q-what">質問内容</label><textarea id="q-what" rows="5" required></textarea>
+      <label for="q-tried">試したこと</label><textarea id="q-tried" rows="5" required></textarea>
+    </div>
+    <pre id="info-text" hidden></pre>
+    <div class="actions">
+      <button type="button" class="cmd" id="info-copy" hidden>コピー</button>
+      <button type="submit" class="cmd primary" id="info-make" hidden>作成</button>
+      <button type="button" class="cmd" id="info-close">閉じる</button>
+    </div>
+  </form>
+</div>
 <script>
 const $ = id => document.getElementById(id);
 let state = null, catalogKey = '', folderKey = '', selectedScript = '';
@@ -1008,15 +1062,19 @@ function switchTitle(item) {
   if (item.state !== 'ready') return `${item.label}: ${item.state_text}${item.error ? '（' + item.error + '）' : ''}`;
   return item.running ? `${item.label}: ${item.paused ? '一時停止中' : '実行中'} ${item.command}` : item.label;
 }
-let switchesKey = '', renaming = null;
+let switchesKey = '', renaming = null, shownSwitches = null;
+const closingSwitches = new Set();
 function renderSwitches() {
-  const open = switches.filter(item => item.open);
+  const open = switches.filter(item => item.open && !closingSwitches.has(item.id));
   const key = JSON.stringify([open.map(i => [i.id, i.label, switchDot(i), switchTitle(i), i.primary]), session, renaming]);
   if (key === switchesKey) return;
   switchesKey = key;
+  const before = shownSwitches;
+  shownSwitches = new Set(open.map(item => item.id));
   $('switches').replaceChildren(...open.map(item => {
     const tab = document.createElement('div');
-    tab.className = 'sw';
+    tab.className = 'sw' + (before && !before.has(item.id) ? ' opening' : '');
+    tab.dataset.id = item.id;
     tab.setAttribute('role', 'tab');
     tab.setAttribute('aria-selected', String(item.id === session));
     tab.tabIndex = item.id === session ? 0 : -1;
@@ -1086,8 +1144,26 @@ function selectSwitch(id) {
   refresh().then(() => loadDevices(true));
 }
 function closeSwitch(item) {
-  if (item.id === session) selectSwitch(switches.find(other => other.open && other.primary).id);
-  quiet(call('switch_close', {switch: item.id}).catch(error => { $('message').textContent = error.message; }));
+  // Like Chrome: the tab shrinks away, and closing the shown one shows its right neighbour (the left one at the end).
+  const open = switches.filter(other => other.open && !closingSwitches.has(other.id));
+  const index = open.findIndex(other => other.id === item.id);
+  const next = open[index + 1] || open[index - 1];
+  const tab = [...$('switches').children].find(element => element.dataset.id === item.id);
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    closingSwitches.add(item.id);
+    if (item.id === session && next) selectSwitch(next.id);
+    else { switchesKey = ''; renderSwitches(); }
+    call('switch_close', {switch: item.id})
+      .catch(error => { $('message').textContent = error.message; })
+      .finally(() => refresh().then(() => { closingSwitches.delete(item.id); switchesKey = ''; renderSwitches(); }));
+  };
+  if (!tab) { finish(); return; }
+  tab.classList.add('closing');
+  tab.addEventListener('animationend', finish, {once: true});
+  setTimeout(finish, 400);
 }
 function renderDown(item) {
   $('down-text').textContent = `${item.label}: ${(switches.find(s => s.id === item.id) || {}).state_text || ''}`;
@@ -1099,6 +1175,105 @@ function renderDown(item) {
 }
 $('down-restart').addEventListener('click', () => quiet(call('switch_restart', {switch: session})));
 function hideSwitchMenu() { $('sw-menu').hidden = true; }
+
+// The original window's menu (メニュー and ヘルプ), at the top left.
+function hideAppMenu() {
+  $('app-menu').hidden = true;
+  $('menu-button').setAttribute('aria-expanded', 'false');
+  const quit = $('app-menu').querySelector('[data-menu=quit]');
+  quit.textContent = 'アプリを終了';
+  delete quit.dataset.armed;
+}
+$('menu-button').addEventListener('click', event => {
+  event.stopPropagation();
+  if (!$('app-menu').hidden) { hideAppMenu(); return; }
+  const box = event.currentTarget.getBoundingClientRect();
+  $('app-menu').style.left = `${Math.max(4, box.left)}px`;
+  $('app-menu').style.top = `${box.bottom + 4}px`;
+  $('app-menu').hidden = false;
+  $('menu-button').setAttribute('aria-expanded', 'true');
+  $('app-menu').querySelector('button').focus();
+});
+document.addEventListener('click', event => { if (!$('app-menu').contains(event.target)) hideAppMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('app-menu').hidden) { hideAppMenu(); $('menu-button').focus(); } });
+$('app-menu').addEventListener('keydown', event => {
+  if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+  event.preventDefault();
+  const items = [...$('app-menu').querySelectorAll('button')];
+  const index = items.indexOf(document.activeElement);
+  items[(index + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+});
+function openTab(id, view) {
+  $(id).click();
+  if (shortQuery.matches) tabArea.classList.add('open');
+  if (view) document.querySelector(`[data-view="${view}"]`).click();
+}
+function showInfo(title, {text = '', desc = '', form = false} = {}) {
+  $('info-title').textContent = title;
+  $('info-desc').textContent = desc;
+  $('info-desc').hidden = !desc;
+  $('info-fields').hidden = !form;
+  $('info-make').hidden = !form;
+  $('info-text').textContent = text;
+  $('info-text').hidden = form || !text;
+  $('info-copy').hidden = form || !text;
+  $('info-copy').textContent = 'コピー';
+  $('info').hidden = false;
+  (form ? $('q-what') : $('info-close')).focus();
+  if (!form) $('info-text').scrollTop = 0;
+}
+function hideInfo() { $('info').hidden = true; }
+$('info-close').addEventListener('click', hideInfo);
+$('info').addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); hideInfo(); } });
+$('info-copy').addEventListener('click', () => navigator.clipboard.writeText($('info-text').textContent)
+  .then(() => { $('info-copy').textContent = 'コピーしました'; }).catch(() => { $('info-copy').textContent = 'コピーできません'; }));
+function environment(about) {
+  return `■使用ツール\n${about.name} ${about.version}\n■OS\n${about.os}\n■Python version\n${about.python}\n`;
+}
+let about = null;
+$('info-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if ($('info-make').hidden || !about) return;
+  const text = '---------------------------ここからコピペ---------------------------\n'
+    + `■プログラム名\n${$('q-name').value.trim()}\n■製作者様\n${$('q-dev').value.trim()}\n` + environment(about)
+    + `■質問内容(詳しくご記述ください。)\n${$('q-what').value.trim()}\n■試したこと(詳しくご記述ください。)\n${$('q-tried').value.trim()}\n`
+    + '---------------------------ここまでコピペ---------------------------';
+  showInfo('質問テンプレート', {text, desc: '添付資料（動作の動画、ポケコンのログ、エラーの出ている画面など）も用意してください。'});
+});
+const menuActions = {
+  capture: () => command('capture'),
+  discord: () => command('discord_image'),
+  captures: () => command('open_folder', {folder: 'captures'}),
+  clear: () => Promise.all([1, 2].map(log => command('clear_log', {log}))).then(() => { localLog.length = 0; }),
+  keys: () => openTab('tab-pad', 'pad-keys'),
+  settings: () => openTab('tab-other'),
+  guide: () => window.open('https://pokecontroller.info/', '_blank', 'noopener'),
+  github: () => window.open('https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus', '_blank', 'noopener'),
+  question: () => call('about').then(result => {
+    about = result;
+    const script = result.script || {};
+    $('q-name').value = script.name ? script.name + (script.file ? ` (${script.file})` : '') : '';
+    $('q-dev').value = script.developer || '';
+    showInfo('質問テンプレート', {form: true, desc: 'すべての項目を書くと、質問に貼る文章を作ります。'});
+  }),
+  version: () => call('about').then(result => showInfo('バージョン情報', {text: environment(result)
+    + '■Libraries version\n' + result.libraries.map(([name, version]) => `${name}: ${version || 'Not installed'}`).join('\n')})),
+  changelog: () => call('about').then(result => showInfo('更新履歴', {text: result.changelog || '更新履歴を読み込めませんでした。'})),
+  license: () => call('about').then(result => showInfo('ライセンス', {text: result.license || 'ライセンスを読み込めませんでした。'})),
+};
+$('app-menu').querySelectorAll('[data-menu]').forEach(item => item.addEventListener('click', event => {
+  event.stopPropagation();
+  const action = item.dataset.menu;
+  if (action === 'quit') {
+    // Quitting stops every Switch; a second press confirms, as in その他.
+    if (!item.dataset.armed) { item.dataset.armed = '1'; item.textContent = 'もう一度押すと終了'; return; }
+    hideAppMenu();
+    command('quit').catch(() => {});
+    return;
+  }
+  hideAppMenu();
+  Promise.resolve(menuActions[action]()).catch(error => { $('message').textContent = error.message; }).finally(refresh);
+}));
 function addSwitch() {
   call('switch_add', {}).then(item => { hideSwitchMenu(); selectSwitch(item.id); })
     .catch(error => { $('message').textContent = error.message; });
