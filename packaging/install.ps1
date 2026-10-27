@@ -24,6 +24,7 @@ $Local = Join-Path $env:LOCALAPPDATA $App
 $Config = Join-Path $env:APPDATA $App
 $PythonVersion = '3.12.10'
 $script:Step = 0
+$script:FilesTouched = $false
 
 function Step([string]$Text) {
     $script:Step++
@@ -36,12 +37,29 @@ function Invoke-Checked([string]$File, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "$File $($Arguments -join ' ') が失敗しました（終了コード $LASTEXITCODE）" }
 }
 
+function Invoke-Probe([string]$File, [string[]]$Arguments) {
+    # With 'Stop', PowerShell 5.1 turns a native command's stderr into a terminating error even with 2>$null.
+    # A probe only looks at the exit code ($LASTEXITCODE) and the output.
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $output = & $File @Arguments 2>$null } catch { $global:LASTEXITCODE = 1; $output = $null }
+    finally { $ErrorActionPreference = $saved }
+    return $output
+}
+
 function Test-Python312([string]$Path) {
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $false }
     # The Microsoft Store Python needs its own camera permission, so it is not used for the app.
     if ($Path -like '*\WindowsApps\*') { return $false }
-    $version = & $Path -c "import sys, tkinter; print('%d.%d-%d' % (sys.version_info[0], sys.version_info[1], sys.maxsize > 2**32))" 2>$null
+    $version = Invoke-Probe $Path @('-c', "import sys, tkinter; print('%d.%d-%d' % (sys.version_info[0], sys.version_info[1], sys.maxsize > 2**32))")
     return $LASTEXITCODE -eq 0 -and $version -eq '3.12-1'
+}
+
+# A dedicated environment is reused only when it still works (an interrupted install or an uninstalled base Python breaks it).
+function Test-Runtime([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $false }
+    $null = Invoke-Probe $Path @('-s', '-c', 'import encodings, tkinter, pip')
+    return $LASTEXITCODE -eq 0
 }
 
 function Find-Python312 {
@@ -54,7 +72,7 @@ function Find-Python312 {
     }
     $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($launcher) {
-        $candidate = & $launcher.Source -3.12 -c "import sys; print(sys.executable)" 2>$null
+        $candidate = Invoke-Probe $launcher.Source @('-3.12', '-c', 'import sys; print(sys.executable)')
         if ($LASTEXITCODE -eq 0 -and (Test-Python312 $candidate)) { return $candidate }
     }
     foreach ($command in Get-Command python.exe -All -ErrorAction SilentlyContinue) {
@@ -67,22 +85,44 @@ function Install-PrivatePython([string]$Folder) {
     # Official python.org MSIs unpacked with an administrative install: no registry entries, no admin rights.
     $download = Join-Path $env:TEMP "$App-python-$PythonVersion"
     New-Item -ItemType Directory -Force $download | Out-Null
-    foreach ($part in 'core', 'exe', 'lib', 'tcltk') {
-        $msi = Join-Path $download "$part.msi"
-        if (-not (Test-Path -LiteralPath $msi)) {
-            Invoke-WebRequest "https://www.python.org/ftp/python/$PythonVersion/amd64/$part.msi" -OutFile $msi -UseBasicParsing
+    # Unpacked into a temporary folder first, so a failed part never leaves a half-built environment behind.
+    $staging = "$Folder.new-$([DateTime]::Now.Ticks)"
+    try {
+        foreach ($part in 'core', 'exe', 'lib', 'tcltk') {
+            $msi = Join-Path $download "$part.msi"
+            for ($attempt = 1; ; $attempt++) {
+                if (-not (Test-Path -LiteralPath $msi)) {
+                    $partial = "$msi.part"
+                    Invoke-WebRequest "https://www.python.org/ftp/python/$PythonVersion/amd64/$part.msi" -OutFile $partial -UseBasicParsing
+                    Move-Item -LiteralPath $partial -Destination $msi -Force
+                }
+                $signature = Get-AuthenticodeSignature -LiteralPath $msi
+                if ($signature.Status -eq 'Valid' -and $signature.SignerCertificate.Subject -like '*Python Software Foundation*') { break }
+                # A truncated or damaged download is removed so the next attempt fetches it again.
+                Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
+                if ($attempt -ge 2) { throw "$part.msi の署名を確認できません。ダウンロードをやり直してください。" }
+            }
+            $process = Start-Process msiexec.exe -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$staging`"" -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "$part.msi を展開できません（$($process.ExitCode)）" }
         }
-        $signature = Get-AuthenticodeSignature -LiteralPath $msi
-        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Python Software Foundation*') {
-            throw "$part.msi の署名を確認できません。ダウンロードをやり直してください。"
-        }
-        $process = Start-Process msiexec.exe -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$Folder`"" -Wait -PassThru
-        if ($process.ExitCode -ne 0) { throw "$part.msi を展開できません（$($process.ExitCode)）" }
+        Get-ChildItem -LiteralPath $staging -Filter *.msi | Remove-Item -Force
+        Rename-Item -LiteralPath $staging -NewName (Split-Path $Folder -Leaf)
+    } finally {
+        if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
     }
-    Get-ChildItem -LiteralPath $Folder -Filter *.msi | Remove-Item -Force
     Remove-Item -LiteralPath $download -Recurse -Force -ErrorAction SilentlyContinue
     # -s: never read or change the user's own site-packages (%APPDATA%\Python\Python312).
     Invoke-Checked (Join-Path $Folder 'python.exe') @('-s', '-m', 'ensurepip', '--default-pip')
+}
+
+# Removes a dedicated environment that no longer works, so it is built again.
+function Remove-BrokenRuntime([string]$Folder) {
+    if (-not (Test-Path -LiteralPath $Folder)) { return }
+    foreach ($exe in (Join-Path $Folder 'python.exe'), (Join-Path $Folder 'Scripts\python.exe')) {
+        if (Test-Runtime $exe) { return }
+    }
+    Step '壊れた Python の環境を作り直します'
+    Remove-Item -LiteralPath $Folder -Recurse -Force
 }
 
 function Install-Libraries([string]$Interpreter, [string]$Requirements, [switch]$Isolated) {
@@ -151,23 +191,16 @@ try {
     Step 'フォルダーを準備しています'
     foreach ($folder in $Target, $Local, $Config) { New-Item -ItemType Directory -Force $folder | Out-Null }
 
-    Step 'アプリのファイルをコピーしています'
-    # A running tray app and its WebView2 DLLs are moved aside instead of stopped; the next update removes them.
-    Get-ChildItem -LiteralPath $Target -Filter '*.old-*' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-    foreach ($exe in Get-ChildItem -LiteralPath $Target -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' }) {
-        Rename-Item -LiteralPath $exe.FullName -NewName "$($exe.Name).old-$([DateTime]::Now.Ticks)"
-    }
-    $copy = Start-Process robocopy.exe -ArgumentList "`"$Source`" `"$Target`" /MIR /XF *.old-* python.txt /NFL /NDL /NJH /NJS /NP" -Wait -PassThru -WindowStyle Hidden
-    if ($copy.ExitCode -ge 8) { throw "ファイルをコピーできません（robocopy $($copy.ExitCode)）" }
-
     $record = Join-Path $Config 'python.txt'
-    $requirements = Join-Path $Target 'requirements-lock.txt'
+    # Libraries come from the new version's list before any app file changes, so a failed pip leaves the current version intact.
+    $requirements = Join-Path $Source 'requirements-lock.txt'
     $hash = (Get-FileHash -LiteralPath $requirements -Algorithm SHA256).Hash
     $hashFile = Join-Path $Local 'requirements.sha256'
     $current = if (Test-Path -LiteralPath $record) { (Get-Content -LiteralPath $record -Raw).Trim() } else { $null }
     $dedicated = Join-Path $Local 'python'
     $needsLibraries = -not $Update -or -not $current -or -not (Test-Path -LiteralPath $current) -or
-        ((Test-Path -LiteralPath $hashFile) -and (Get-Content -LiteralPath $hashFile -Raw).Trim() -ne $hash)
+        ((Test-Path -LiteralPath $hashFile) -and (Get-Content -LiteralPath $hashFile -Raw).Trim() -ne $hash) -or
+        ($current.StartsWith($dedicated, [StringComparison]::OrdinalIgnoreCase) -and -not (Test-Runtime $current))
     if ($Update -and $current -and -not $current.StartsWith($dedicated, [StringComparison]::OrdinalIgnoreCase)) {
         $needsLibraries = $false  # the user's own Python is theirs to manage
     }
@@ -185,6 +218,7 @@ try {
                 Install-Libraries $interpreter $requirements
             }
             'Auto' {
+                Remove-BrokenRuntime $dedicated
                 if (Test-Path -LiteralPath (Join-Path $dedicated 'python.exe')) {
                     $interpreter = Join-Path $dedicated 'python.exe'
                 } elseif (Test-Path -LiteralPath (Join-Path $dedicated 'Scripts\python.exe')) {
@@ -207,6 +241,27 @@ try {
         }
         Set-Content -LiteralPath $record -Value $interpreter -Encoding UTF8
         Set-Content -LiteralPath $hashFile -Value $hash -Encoding ASCII
+    }
+
+    Step 'アプリのファイルをコピーしています'
+    # A running tray app and its WebView2 DLLs are moved aside instead of stopped; the next update removes them.
+    Get-ChildItem -LiteralPath $Target -Filter '*.old-*' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    $script:FilesTouched = $true
+    $moved = @()
+    try {
+        foreach ($exe in Get-ChildItem -LiteralPath $Target -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' }) {
+            $aside = "$($exe.Name).old-$([DateTime]::Now.Ticks)"
+            Rename-Item -LiteralPath $exe.FullName -NewName $aside
+            $moved += ,@($exe.FullName, (Join-Path $Target $aside))
+        }
+        $copy = Start-Process robocopy.exe -ArgumentList "`"$Source`" `"$Target`" /MIR /XF *.old-* python.txt /NFL /NDL /NJH /NJS /NP" -Wait -PassThru -WindowStyle Hidden
+        if ($copy.ExitCode -ge 8) { throw "ファイルをコピーできません（robocopy $($copy.ExitCode)）" }
+    } catch {
+        # Put back whatever was not replaced, so PokeController.exe still starts.
+        foreach ($pair in $moved) {
+            if (-not (Test-Path -LiteralPath $pair[0])) { Rename-Item -LiteralPath $pair[1] -NewName (Split-Path $pair[0] -Leaf) -ErrorAction SilentlyContinue }
+        }
+        throw
     }
 
     # The tray app and the MCP launcher read this copy first (tray\ServerHost.cs, Launcher.cs); robocopy /MIR removes it, so write it every time.
@@ -244,6 +299,7 @@ try {
     if (-not $Update -and -not $NoFinishScreen) { Start-Process -FilePath $exePath -ArgumentList '--install-finished' }
 } catch {
     if ($ProgressLog) { Add-Content -LiteralPath $ProgressLog -Value "#error $($_.Exception.Message)" -Encoding UTF8 }
-    Write-Error $_.Exception.Message
-    exit 1
+    Write-Error $_.Exception.Message -ErrorAction Continue
+    # 1: nothing in the program folder was changed. 2: app files may be partly replaced.
+    if ($script:FilesTouched) { exit 2 } else { exit 1 }
 }

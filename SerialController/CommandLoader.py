@@ -39,7 +39,12 @@ class CommandLoader:
 
         # Reload commands except deleted ones
         for mod_name in list(set(cur_module_names) & set(loaded_module_dic.keys())):
-            importlib.reload(loaded_module_dic[mod_name])
+            try:
+                importlib.reload(loaded_module_dic[mod_name])
+            except Exception:
+                # Keep the previous version loaded; one broken file must not stop the others from reloading.
+                logger.exception("スクリプトを読み込めませんでした: %s", mod_name)
+                print(f"読み込み失敗: {mod_name}（詳細は診断ログ）")
 
         # Unload deleted commands
         for mod_name in list(set(loaded_module_dic.keys()) - set(cur_module_names)):
@@ -61,6 +66,15 @@ class CommandLoader:
 
             # make tags of directory name
             for c in class_list:
+                # A class kept across reloads (its module failed to reload) must not get the suffix twice.
+                if "_LOADER_NAME" not in c.__dict__:
+                    c._LOADER_NAME, c._LOADER_TAGS = c.NAME, getattr(c, "TAGS", None)
+                c.NAME = c._LOADER_NAME
+                if c._LOADER_TAGS is None:
+                    if "TAGS" in c.__dict__:
+                        del c.TAGS
+                else:
+                    c.TAGS = c._LOADER_TAGS
                 dir_name = "/".join(mod.__name__.split(".")[2:])
                 dir_tags = ["@" + t for t in mod.__name__.split(".")[2:-1]]
 

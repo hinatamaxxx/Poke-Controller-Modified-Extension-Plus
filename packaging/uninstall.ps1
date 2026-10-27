@@ -5,6 +5,7 @@ Poke-Controller のアンインストール。PokeController.exe --uninstall か
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\PokeController'),
     [string]$ProgressLog,
+    [int]$CallerPid = 0,
     [switch]$KeepSettings
 )
 $ErrorActionPreference = 'Stop'
@@ -25,16 +26,35 @@ function Remove-Folder([string]$Path) {
     throw "$Path を削除できません。使用中のファイルがないか確認してください。"
 }
 
-try {
-    Step 'Poke-Controller を終了しています'
-    $self = $PID
-    $owned = Get-CimInstance Win32_Process | Where-Object {
-        $_.ProcessId -ne $self -and (
+# Processes started from the install folder, the Python processes running its code, and their children.
+# The caller (PokeController.exe --uninstall) and this script are never included.
+function Get-OwnedProcesses {
+    $all = @(Get-CimInstance Win32_Process)
+    $skip = @($PID, $CallerPid)
+    $owned = @($all | Where-Object {
+        $skip -notcontains $_.ProcessId -and (
             ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase)) -or
             ($_.CommandLine -and $_.CommandLine.IndexOf($InstallDir, [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
              $_.Name -match '^pythonw?\.exe$'))
+    })
+    $ids = @($owned | ForEach-Object { $_.ProcessId })
+    $children = @($all | Where-Object { $ids -contains $_.ParentProcessId -and $ids -notcontains $_.ProcessId -and $skip -notcontains $_.ProcessId })
+    return @($owned) + $children
+}
+
+try {
+    Step 'Poke-Controller を終了しています'
+    # Ask the tray app to quit first so the app can close the camera and COM port and save its settings.
+    $exe = Join-Path $InstallDir 'PokeController.exe'
+    if (Test-Path -LiteralPath $exe) {
+        try { Start-Process -FilePath $exe -ArgumentList '--quit' -Wait -WindowStyle Hidden } catch { }
+        $deadline = [DateTime]::Now.AddSeconds(15)
+        while ([DateTime]::Now -lt $deadline -and
+               @(Get-OwnedProcesses | Where-Object { $_.Name -ieq 'PokeController.exe' }).Count -gt 0) {
+            Start-Sleep -Milliseconds 500
+        }
     }
-    foreach ($process in $owned) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
+    foreach ($process in Get-OwnedProcesses) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 500
 
     Step 'スタートメニューの項目を削除しています'
@@ -48,6 +68,15 @@ try {
     Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$App" -Recurse -Force -ErrorAction SilentlyContinue
 
     Step 'プログラムを削除しています'
+    # A running exe cannot be deleted but can be moved: the caller's own exe goes to this script's temporary folder,
+    # which the caller removes after it exits.
+    if ($CallerPid) {
+        $caller = Get-Process -Id $CallerPid -ErrorAction SilentlyContinue
+        $callerPath = if ($caller) { $caller.Path } else { $null }
+        if ($callerPath -and $callerPath.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase)) {
+            Move-Item -LiteralPath $callerPath -Destination (Join-Path $PSScriptRoot ("caller-" + [DateTime]::Now.Ticks + '.exe')) -Force
+        }
+    }
     Remove-Folder $InstallDir
 
     Step '専用の Python 環境とログを削除しています'

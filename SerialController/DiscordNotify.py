@@ -13,6 +13,12 @@ import numpy as np
 from PIL import Image
 from logging import getLogger, DEBUG, NullHandler
 
+# ロガーの設定は 1 回だけ行う(作るたびに addHandler すると、ハンドラが増え続ける。フォーク元 0.2.0 の修正)
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 
 def convert_bgr_to_bytes(image_bgr):
     """
@@ -30,10 +36,7 @@ class Discord_Notify:
     DISCORD_SETTING_PATH = os.path.join(Paths.PROFILES, "default", "discord_token.ini")
 
     def __init__(self, webhook_url="webhook_url", username="username", avatar_url="", token_name="token"):
-        self._logger = getLogger(__name__)
-        self._logger.addHandler(NullHandler())
-        self._logger.setLevel(DEBUG)
-        self._logger.propagate = True
+        self._logger = _logger
 
         self.default_username = f"Poke-Controller Modified Extension (profile: {os.path.basename(os.path.dirname(self.DISCORD_SETTING_PATH))})"
 
@@ -42,16 +45,16 @@ class Discord_Notify:
         self.open_file_with_utf8()
 
         self.section_list = list(self.setting_file.keys())
-        self.webhook_url_dict = {
-            key: self.setting_file[key]["webhook_url"] for key in self.section_list if "DISCORD_WEBHOOK" in key
-        }
-        self.username_dict = {
-            key: self.setting_file[key]["username"] for key in self.section_list if "DISCORD_WEBHOOK" in key
-        }
-        self.avatar_url_dict = {
-            key: self.setting_file[key]["avatar_url"] for key in self.section_list if "DISCORD_WEBHOOK" in key
-        }
-        self.webhook_keys = [key for key in self.section_list if "DISCORD_WEBHOOK" in key]
+        # webhook_url の無いセクションは通知先にしない。username / avatar_url は省略できる
+        # (以前は、どれかが欠けていると KeyError で、スクリプトを開始できなかった。フォーク元 0.2.0 の修正)
+        self.webhook_keys = [
+            key
+            for key in self.section_list
+            if "DISCORD_WEBHOOK" in key and self.setting_file.has_option(key, "webhook_url")
+        ]
+        self.webhook_url_dict = {key: self.setting_file[key]["webhook_url"] for key in self.webhook_keys}
+        self.username_dict = {key: self.setting_file.get(key, "username", fallback="") for key in self.webhook_keys}
+        self.avatar_url_dict = {key: self.setting_file.get(key, "avatar_url", fallback="") for key in self.webhook_keys}
 
         self.res, self.status, self.chk_webhook_json = [], [], []
 
@@ -103,6 +106,9 @@ class Discord_Notify:
             elif stat == 200:
                 self._logger.info("Valid url")
                 return "DISCORD API Check OK!"
+        # 401 / 200 以外だけのときに None を返して str() がエラーになっていた(フォーク元 0.2.0 の修正)
+        self._logger.warning(f"Webhook check was not confirmed: {self.status}")
+        return "DISCORD API Check: not confirmed."
 
     def send_message(self, notification_message=None, image=None, keys="DISCORD_WEBHOOK"):
         """
@@ -189,7 +195,9 @@ class Discord_Notify:
                 self._logger.info(f"DISCORD API - Limit: {self.res[i].headers['X-RateLimit-Limit']}")
                 self._logger.info(f"DISCORD API - Remaining: {self.res[i].headers['X-RateLimit-Remaining']}")
                 self._logger.info(f"Reset time: {dt}")
-        except AttributeError as e:
+        # send_message の後は self.res が 1 つの応答になり、確認の応答が無いときは空のリストなので、
+        # TypeError / IndexError でも止めない(フォーク元 0.2.0 の修正)
+        except (AttributeError, TypeError, IndexError) as e:
             self._logger.error(e)
             pass
         except KeyError as e:

@@ -1,5 +1,6 @@
 """Window-less Poke-Controller: serves the browser UI and the MCP endpoint. MIT."""
 import argparse
+import logging
 import os
 from pathlib import Path
 import re
@@ -127,7 +128,11 @@ def main():
         while not core.exit_requested:
             if args.smoke_test and args.smoke_test.with_suffix('.stop').exists():
                 break
-            core.tick()
+            try:
+                core.tick()
+            except Exception:
+                logging.getLogger(__name__).exception('定期処理でエラーが発生しました')
+                time.sleep(1)
             time.sleep(.05)
     except KeyboardInterrupt:
         pass

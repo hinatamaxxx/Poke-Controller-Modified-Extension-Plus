@@ -13,12 +13,14 @@ from logging import getLogger, DEBUG, NullHandler
 if TYPE_CHECKING:
     import numpy
 
+# ロガーの設定は 1 回だけ行う(呼ぶたびに addHandler すると、ハンドラが増え続ける。フォーク元 0.2.0 と同じ原因の修正)
+_logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_logger.setLevel(DEBUG)
+_logger.propagate = True
+
 
 def imwrite(filename: str, img: numpy.ndarray, params: int = None):
-    _logger = getLogger(__name__)
-    _logger.addHandler(NullHandler())
-    _logger.setLevel(DEBUG)
-    _logger.propagate = True
     try:
         ext = os.path.splitext(filename)[1]
         result, n = cv2.imencode(ext, img, params)
@@ -154,7 +156,7 @@ class Camera:
 
     def saveCapture(self, filename: str = None, crop: int = None, crop_ax: List[int] = None, img: numpy.ndarray = None):
         if crop_ax is None:
-            crop_ax = [0, 0, 1280, 720]
+            crop_ax = [0, 0, self.capture_size[0], self.capture_size[1]]
         else:
             pass
             # print(crop_ax)
@@ -165,15 +167,15 @@ class Camera:
         else:
             filename = filename + ".png"
 
-        frame = self.image_bgr
-        if crop is None:
-            image = frame
+        # img を渡された場合は、カメラ画像の代わりにその画像を保存し、切り抜きもその画像に対して行う
+        # (以前は crop を指定しないとカメラ画像を保存していた。フォーク元 0.2.0 の修正)
+        frame = img if img is not None else self.image_bgr
+        if frame is None:
+            image = None
         elif crop == 1 or crop == "1":
             image = frame[crop_ax[1] : crop_ax[3], crop_ax[0] : crop_ax[2]]
         elif crop == 2 or crop == "2":
             image = frame[crop_ax[1] : crop_ax[1] + crop_ax[3], crop_ax[0] : crop_ax[0] + crop_ax[2]]
-        elif img is not None:
-            image = img
         else:
             image = frame
         if image is None:

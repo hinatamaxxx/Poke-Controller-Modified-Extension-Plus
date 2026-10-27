@@ -63,9 +63,15 @@ namespace PokeControllerTray
             File.Copy(Path.Combine(root, "uninstall.ps1"), Path.Combine(temp, "uninstall.ps1"));
             if (quiet)
             {
-                var p = RunScript(temp, root, keep);
-                p.WaitForExit();
-                return p.ExitCode;
+                // この exe はインストール先から動いているので、uninstall.ps1 はこのプロセスを止めずに、exe を temp へ移してから消す
+                int code;
+                using (var p = RunScript(temp, root, keep))
+                {
+                    p.WaitForExit();
+                    code = p.ExitCode;
+                }
+                ScheduleRemove(temp);
+                return code;
             }
             string copy = Path.Combine(temp, "PokeControllerUninstall.exe");
             File.Copy(Application.ExecutablePath, copy);
@@ -79,8 +85,20 @@ namespace PokeControllerTray
         {
             string arguments = "-NoProfile -ExecutionPolicy Bypass -File " + ServerHost.Quote(Path.Combine(temp, "uninstall.ps1")) +
                 " -InstallDir " + ServerHost.Quote(installDir) + " -ProgressLog " + ServerHost.Quote(Path.Combine(temp, "progress.log")) +
+                " -CallerPid " + Process.GetCurrentProcess().Id.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 (keep ? " -KeepSettings" : "");
             return Process.Start(new ProcessStartInfo("powershell.exe", arguments) { UseShellExecute = false, CreateNoWindow = true });
+        }
+
+        // 一時フォルダー（この exe を含むことがある）は、このプロセスが終わってから消す
+        public static void ScheduleRemove(string dir)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("cmd.exe", "/c timeout /t 2 /nobreak >nul & rmdir /s /q " + ServerHost.Quote(dir))
+                    { CreateNoWindow = true, UseShellExecute = false });
+            }
+            catch { }
         }
     }
 
@@ -90,6 +108,7 @@ namespace PokeControllerTray
         readonly ModernCheckBox keep;
         readonly Timer timer = new Timer { Interval = 300 };
         StepsLabel stepsLabel;
+        Process script;
         bool keepChosen;
 
         UninstallFlow(string dir, string installDir, bool keepDefault)
@@ -118,7 +137,7 @@ namespace PokeControllerTray
         void Start()
         {
             keepChosen = keep.Checked;
-            try { Uninstaller.RunScript(dir, installDir, keepChosen); }
+            try { script = Uninstaller.RunScript(dir, installDir, keepChosen); }
             catch (Exception ex)
             {
                 ShowFinished(new List<string>(), ex.Message);
@@ -132,15 +151,26 @@ namespace PokeControllerTray
 
         void Poll()
         {
-            string[] lines;
+            // 終わったかどうかを先に見る（見たあとに書かれた #done を読み落とさない）
+            bool exited = false;
+            int exitCode = 0;
             try
             {
-                if (!File.Exists(ProgressFile)) return;
-                using (var fs = new FileStream(ProgressFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                using (var r = new StreamReader(fs, Encoding.UTF8))
-                    lines = r.ReadToEnd().Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                if (script != null && script.HasExited) { exited = true; exitCode = script.ExitCode; }
             }
-            catch { return; }
+            catch { }
+            string[] lines = new string[0];
+            try
+            {
+                if (File.Exists(ProgressFile))
+                {
+                    using (var fs = new FileStream(ProgressFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var r = new StreamReader(fs, Encoding.UTF8))
+                        lines = r.ReadToEnd().Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                }
+                else if (!exited) return;
+            }
+            catch { if (!exited) return; }
             var steps = new List<string>();
             string error = null;
             bool done = false;
@@ -150,6 +180,9 @@ namespace PokeControllerTray
                 else if (l.StartsWith("#error")) error = l.Length > 7 ? l.Substring(7) : "";
                 else steps.Add(l);
             }
+            // PowerShell が印を書かずに終わった（実行ポリシー、構文エラーなど）ときも、画面を閉じられるようにする
+            if (!done && error == null && exited)
+                error = "アンインストールのスクリプトが途中で終了しました（終了コード " + exitCode + "）。";
             if (done || error != null) { timer.Stop(); ShowFinished(steps, error); return; }
             stepsLabel.SetSteps(steps, false);
         }
@@ -179,14 +212,12 @@ namespace PokeControllerTray
 
         public static int Run(string dir, string installDir, bool keepDefault)
         {
-            using (var d = new UninstallFlow(dir, installDir, keepDefault)) d.ShowDialog();
-            // 一時フォルダー（この exe を含む）は、このプロセスが終わってから消す
-            try
+            using (var d = new UninstallFlow(dir, installDir, keepDefault))
             {
-                Process.Start(new ProcessStartInfo("cmd.exe", "/c timeout /t 2 /nobreak >nul & rmdir /s /q " + ServerHost.Quote(dir))
-                    { CreateNoWindow = true, UseShellExecute = false });
+                d.ShowDialog();
+                if (d.script != null) d.script.Dispose();
             }
-            catch { }
+            Uninstaller.ScheduleRemove(dir);
             return 0;
         }
     }

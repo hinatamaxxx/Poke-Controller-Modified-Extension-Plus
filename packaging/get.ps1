@@ -8,11 +8,15 @@ $Base = 'https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/
 $Asset = 'PokeController-win64.zip'
 $Work = Join-Path $env:TEMP ('PokeController-setup-' + [DateTime]::Now.Ticks)
 New-Item -ItemType Directory $Work | Out-Null
+$failed = $false
 try {
     Write-Host 'Poke-Controller の最新版を取得しています'
     $zip = Join-Path $Work $Asset
     Invoke-WebRequest ($Base + $Asset) -OutFile $zip -UseBasicParsing
-    $expected = ((Invoke-WebRequest ($Base + $Asset + '.sha256') -UseBasicParsing).Content -split '\s+')[0].ToLower()
+    # PowerShell 5.1 returns .Content as byte[] for application/octet-stream, so read the hash from a file.
+    $hashFile = Join-Path $Work ($Asset + '.sha256')
+    Invoke-WebRequest ($Base + $Asset + '.sha256') -OutFile $hashFile -UseBasicParsing
+    $expected = ((Get-Content -LiteralPath $hashFile -Raw -Encoding ASCII).Trim() -split '\s+')[0].ToLower()
     if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower() -ne $expected) {
         throw 'ダウンロードしたファイルの SHA-256 が一致しません。'
     }
@@ -21,6 +25,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'インストールに失敗しました。表示された理由を確認してください。' }
 } catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
+    $failed = $true
 } finally {
     Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue
 }
+# irm | iex runs in the user's own session, where exit would close their window.
+if ($failed) { if ($MyInvocation.MyCommand.Path) { exit 1 } else { $global:LASTEXITCODE = 1 } }

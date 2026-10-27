@@ -17,10 +17,18 @@ class HostChannel:
         # (library banners, C-level output) to the console log instead of the tray.
         self._out = os.fdopen(os.dup(1), 'w', encoding='utf-8', newline='\n', buffering=1)
         self._in = os.fdopen(os.dup(0), 'r', encoding='utf-8')
+        # The original fd 0 (the tray's request pipe) is replaced, so child processes never inherit it and read requests.
+        null = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(null, 0)
+        os.close(null)
+        sys.stdin = open(0, 'r', encoding='utf-8', closefd=False)
+        # stderr (tracebacks, C-level warnings) goes to the console log too; the tray does not read it.
         log = os.open(str(log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT)
         os.dup2(log, 1)
+        os.dup2(log, 2)
         os.close(log)
         sys.stdout = open(1, 'w', encoding='utf-8', buffering=1, closefd=False)
+        sys.stderr = open(2, 'w', encoding='utf-8', errors='backslashreplace', buffering=1, closefd=False)
         self._lock = threading.Lock()
         self.closed = threading.Event()
 

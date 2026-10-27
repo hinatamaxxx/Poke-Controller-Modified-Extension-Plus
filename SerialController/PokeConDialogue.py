@@ -290,14 +290,12 @@ def generate_new_dialogue_list(dialogue_list: list, filename: str) -> list:
         return dialogue_list
     else:
         new_dialogue_list = []
+        positions = {'check': 2, 'entry': 2, 'combo': 3, 'radio': 3, 'spin': 3, 'scale': 4}
         for setting in dialogue_list:
-            if len(setting) < 2:
-                pass
-            else:
-                try:
-                    setting[-1] = settings[setting[1]]
-                except Exception:
-                    pass
+            setting = list(setting)  # do not change the script's own list
+            position = positions.get(str(setting[0]).lower()) if setting else None
+            if position is not None and len(setting) > position and setting[1] in settings:
+                setting[position] = settings[setting[1]]
             new_dialogue_list.append(setting)
     return new_dialogue_list
 

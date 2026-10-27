@@ -16,7 +16,8 @@ except Exception:
     import traceback
     log = root / 'startup-error.log'
     log.write_text(traceback.format_exc(), encoding='utf-8')
-    if script == 'app.py':
+    # Under the tray (--host) a modal box would keep this process alive while the tray waits; the tray reports the exit.
+    if script == 'app.py' and '--host' not in sys.argv:
         import ctypes
         ctypes.windll.user32.MessageBoxW(None, f'起動できませんでした。詳細は次のファイルを確認してください。\n{log}',
                                          'Poke-Controller', 0x10)
