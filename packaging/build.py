@@ -58,7 +58,7 @@ def build(out):
     # Only files tracked by git are shipped, so local profiles, logs and caches never leak into a release.
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     for name in tracked:
-        if not name or name.startswith(('.git', 'packaging/', 'tests/', 'Images/')) or set(Path(name).parts) & EXCLUDED_PARTS:
+        if not name or name.startswith(('.git', '.claude-plugin/', '.codex-plugin/', '.agents/', 'plugin/', 'packaging/', 'tests/', 'Images/')) or set(Path(name).parts) & EXCLUDED_PARTS:
             continue
         source = ROOT / name
         if source.is_file():

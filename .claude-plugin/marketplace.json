@@ -1,0 +1,16 @@
+{
+  "name": "poke-controller",
+  "owner": {
+    "name": "hinatamaxxx"
+  },
+  "metadata": {
+    "description": "Poke-Controller Modified Extension Plus（Nintendo Switch の自動操作）のプラグイン"
+  },
+  "plugins": [
+    {
+      "name": "poke-controller",
+      "source": "./",
+      "description": "Poke-Controller で Nintendo Switch を操作する。Windows 専用。"
+    }
+  ]
+}

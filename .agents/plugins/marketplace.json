@@ -1,0 +1,20 @@
+{
+  "name": "poke-controller",
+  "interface": {
+    "displayName": "Poke-Controller"
+  },
+  "plugins": [
+    {
+      "name": "poke-controller",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

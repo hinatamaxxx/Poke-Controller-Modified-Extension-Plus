@@ -45,7 +45,33 @@ Python の扱いはインストール時に選べます（`get.ps1` と `install
 - ログオン時の自動起動はしません。本体は起動している間、設定したカメラと COM ポートを使い続けるため、使うときだけ起動します（Claude からは MCP が自動で起動します）。
 - Claude から使うときは、アプリを開いておく必要はありません。MCP が本体を裏で起動します。`get_web_url` の URL を Claude の内蔵ブラウザで開くと、映像を見ながら操作できます。
 
-### MCP の登録
+### Claude Code・Codex のプラグイン
+
+Claude Code と Codex には、ポケコンをまとめて使えるようにするプラグインがあります。入れると、MCP の道具（映像・ボタン・スクリプトなど 40 個）と、使い方のスキル（`open` 操作画面を開く、`operate` 操作の決まり、`script` スクリプトを作る）が入ります。先にアプリ本体をインストールしてください。
+
+Claude Code:
+
+```bash
+claude plugin marketplace add hinatamaxxx/Poke-Controller-Modified-Extension-Plus
+```
+
+```bash
+claude plugin install poke-controller@poke-controller --scope user
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add hinatamaxxx/Poke-Controller-Modified-Extension-Plus
+```
+
+```bash
+codex plugin add poke-controller@poke-controller
+```
+
+入れたあと、新しいセッションで「ポケコンを開いて」と頼むと、操作画面が開きます。アプリを標準以外の場所に置いているときは、環境変数 `POKECONTROLLER_MCP` に `PokeControllerMCP.exe` のパスを設定します。
+
+### MCP の登録（プラグインを使わないとき）
 
 Claude Desktop: インストール時に `-RegisterClaudeDesktop` を付けるか、設定ファイルに次を追記します。Claude Code: `claude mcp add --scope user poke-controller -- "%LOCALAPPDATA%\Programs\PokeController\PokeControllerMCP.exe"`。
 

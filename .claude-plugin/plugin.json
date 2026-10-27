@@ -1,0 +1,17 @@
+{
+  "name": "poke-controller",
+  "description": "Poke-Controller（ポケコン）で Nintendo Switch を操作する。操作画面を開く、ボタン・スティック・スクリプト・映像・見張りの MCP の道具、スクリプトを作る手順。Windows 専用。Poke-Controller 本体のインストールが必要。",
+  "author": {
+    "name": "hinatamaxxx"
+  },
+  "repository": "https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus",
+  "license": "MIT",
+  "keywords": ["nintendo-switch", "poke-controller", "automation", "windows", "mcp"],
+  "skills": "./plugin/skills/",
+  "mcpServers": {
+    "poke-controller": {
+      "command": "cmd",
+      "args": ["/c", "${CLAUDE_PLUGIN_ROOT}\\plugin\\poke-controller-mcp.cmd"]
+    }
+  }
+}
