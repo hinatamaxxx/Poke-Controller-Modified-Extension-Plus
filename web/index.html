@@ -32,6 +32,31 @@ html, body { height: 100%; overflow: hidden; }
 body { margin: 0; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", "Yu Gothic UI", sans-serif; }
 header { flex: none; display: flex; gap: 6px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); background: var(--panel); overflow: hidden; white-space: nowrap; min-height: 30px; }
 header h1 { font-size: 14px; margin: 0 6px 0 0; flex: none; }
+/* Switch tabs: one per console; the dot is its state (running, stopped, starting). */
+.switches { display: flex; gap: 2px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; margin-right: 6px; }
+.sw { display: flex; align-items: center; gap: 5px; flex: none; font: inherit; font-size: 13px; color: var(--muted); background: none;
+      border: 1px solid transparent; border-radius: 6px; padding: 1px 6px 1px 8px; cursor: pointer; max-width: 14em; }
+.sw[aria-selected=true] { color: var(--text); background: var(--chip); border-color: var(--line); font-weight: 600; }
+.sw .label { overflow: hidden; text-overflow: ellipsis; }
+.sw .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.sw .dot.run { background: var(--ok); }
+.sw .dot.down { background: var(--danger); }
+.sw .dot.wait { background: var(--muted); animation: blink 1s steps(2, start) infinite; }
+.sw .x { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 0 2px; line-height: 1; cursor: pointer; visibility: hidden; }
+.sw[aria-selected=true] .x, .sw:hover .x { visibility: visible; }
+.sw input { font: inherit; width: 9em; padding: 0 2px; }
+.sw-add { flex: none; font: inherit; font-size: 15px; line-height: 1; color: var(--muted); background: none; border: 0; padding: 0 6px; cursor: pointer; }
+.sw-menu { position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px;
+           box-shadow: 0 4px 16px var(--shade); display: flex; flex-direction: column; min-width: 12em; }
+.sw-menu[hidden] { display: none; }
+.sw-menu button { font: inherit; text-align: left; background: none; border: 0; color: var(--text); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.sw-menu button:hover, .sw-menu button:focus { background: var(--chip); }
+.sw-menu hr { border: 0; border-top: 1px solid var(--line); margin: 3px 0; width: 100%; }
+/* A Switch whose process is starting or stopped: the video says why, the controls wait. */
+.down { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; justify-items: center; color: #ddd; text-align: center; padding: 16px; }
+.down[hidden] { display: none; }
+.down .why { font-size: 12px; color: #aaa; max-width: 40em; white-space: pre-wrap; }
+body.switch-down .area-pad, body.switch-down .area-tabs .tabpanel, body.switch-down .area-logs { opacity: .45; pointer-events: none; }
 .badge { padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .badge.ok { color: var(--ok); border-color: var(--ok); }
 .badge.bad { color: var(--danger); border-color: var(--danger); }
@@ -67,7 +92,7 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   .area-pad { padding: 0; border: 0; background: none; justify-content: center; }
   .area-logs { display: none; }
   .tab-logs { display: block; }
-  header h1, header #profile, header #run-state.idle { display: none; }
+  header h1, header #run-state.idle { display: none; }
   body .tabs button { padding: 2px 5px; font-size: 12px; }
   /* Camera and COM become coloured dots (name in the tooltip) so the run state and its buttons keep the room. */
   header #camera-state, header #serial-state { width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; border: 0; background: var(--muted); flex: none; }
@@ -299,8 +324,9 @@ table.notify input { margin: 1px 0; }
 </head>
 <body>
 <header>
-  <h1>Poke-Controller Web</h1>
-  <span class="badge" id="profile">-</span>
+  <nav class="switches" id="switches" role="tablist" aria-label="Switch"></nav>
+  <button class="sw-add" id="sw-add" aria-label="Switch を追加" aria-haspopup="menu">＋</button>
+  <span class="badge" id="profile" hidden>デモ</span>
   <span class="badge" id="camera-state">カメラ: -</span>
   <span class="badge" id="serial-state">COM: -</span>
   <span class="badge" id="run-state">停止中</span>
@@ -319,6 +345,7 @@ table.notify input { margin: 1px 0; }
     <div class="frame" id="frame">
       <img id="video" alt="キャプチャ映像" src="/stream.mjpg">
       <div class="empty" id="video-empty" hidden>映像がありません</div>
+      <div class="down" id="down" hidden><div id="down-text"></div><div class="why" id="down-why"></div><button class="cmd" id="down-restart" hidden>再起動</button></div>
       <div class="pick-info" id="pick-info" aria-live="polite"></div>
     </div>
   </div>
@@ -619,10 +646,14 @@ table.notify input { margin: 1px 0; }
   </form>
 </div>
 
+<div class="sw-menu" id="sw-menu" role="menu" hidden></div>
 <script>
 const $ = id => document.getElementById(id);
 let state = null, catalogKey = '', folderKey = '', selectedScript = '';
 const STREAM = '/stream.mjpg';
+// The Switch shown in this window (its session ID); kept per browser, the app falls back to the first Switch.
+let session = '', switches = [];
+try { session = localStorage.getItem('pokecon.session') || ''; } catch (error) { /* not persisted */ }
 
 async function call(method, params = {}) {
   // Retry dropped connections; a lost "release" would otherwise leave a button held.
@@ -631,7 +662,7 @@ async function call(method, params = {}) {
     try {
       response = await fetch('/api/call', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({method, params}),
+        body: JSON.stringify({method, params: {...params, session}}),
       });
       break;
     } catch (error) {
@@ -800,7 +831,9 @@ async function loadDevices(force = false) {
 }
 function renderConnection() {
   const camera = state.camera || {};
-  const cameras = [['', '使用しない'], ...devices.cameras.map(c => [c.path, c.name])];
+  const usedBy = (key, value) => (switches.find(item => item.open && item.id !== session && value && item[key] === value) || {}).label;
+  const marked = (label, user) => user ? `${label}（${user} で使用中）` : label;
+  const cameras = [['', '使用しない'], ...devices.cameras.map(c => [c.path, marked(c.name, usedBy('camera_path', c.path))])];
   if (camera.path && !devices.cameras.some(c => c.path === camera.path)) cameras.push([camera.path, `${camera.name || camera.path}（未接続）`]);
   fillSelect($('camera'), cameras, camera.path || '');
   $('camera-error').textContent = camera.error || '';
@@ -808,7 +841,7 @@ function renderConnection() {
 
   const serial = state.serial || {};
   const describe = p => (p.description || '').replace(` (${p.port})`, '').trim();
-  const ports = devices.ports.map(p => [p.port, describe(p) && describe(p) !== p.port ? `${p.port} — ${describe(p)}` : p.port]);
+  const ports = devices.ports.map(p => [p.port, marked(describe(p) && describe(p) !== p.port ? `${p.port} — ${describe(p)}` : p.port, usedBy('port', p.port))]);
   if (serial.port && !devices.ports.some(p => p.port === serial.port)) ports.push([serial.port, `${serial.port}（未接続）`]);
   if (!ports.length) ports.push(['', 'ポートがありません']);
   fillSelect($('port'), ports, serial.port || (ports[0] && ports[0][0]));
@@ -825,7 +858,7 @@ function renderConnection() {
 function renderVideo() {
   const show = !state.options || state.options.show_realtime !== false;
   const img = $('video');
-  if (show && !img.getAttribute('src')) img.src = STREAM + '?' + Date.now();
+  if (show && !img.getAttribute('src')) img.src = `${STREAM}?session=${encodeURIComponent(session)}&t=${Date.now()}`;
   if (!show && img.getAttribute('src')) img.removeAttribute('src');
   img.hidden = !show;
   $('video-empty').hidden = !show || state.camera_live;
@@ -896,7 +929,7 @@ $('key-clear').addEventListener('click', () => { if (assigning) assignKey(''); }
 function manualAllowed() { return !!state && !state.running && state.serial_open; }
 
 function render() {
-  setBadge('profile', 'プロファイル: ' + state.profile + (state.demo ? '（デモ）' : ''));
+  $('profile').hidden = !state.demo;
   setBadge('camera-state', state.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし', state.camera_live);
   const port = state.serial && state.serial.port ? ` ${state.serial.port}` : '';
   setBadge('serial-state', state.serial_open ? `COM:${port} 接続中` : 'COM: 未接続', state.serial_open);
@@ -941,15 +974,152 @@ function render() {
 
 async function refresh() {
   try {
-    const response = await fetch('/api/state', {cache: 'no-store'});
+    const asked = session;
+    const response = await fetch('/api/state?session=' + encodeURIComponent(asked), {cache: 'no-store'});
     const result = await response.json();
     if (!result.ok) throw new Error(result.error);
+    if (asked !== session) return;  // the user switched meanwhile
+    switches = result.switches || [];
+    if (result.result.id !== session) { forgetSwitch(); session = result.result.id; }
+    renderSwitches();
+    const down = result.result.ready === false;
+    document.body.classList.toggle('switch-down', down);
+    $('down').hidden = !down;
+    if (down) { renderDown(result.result); return; }
     state = result.result;
     render();
   } catch (error) {
     setBadge('run-state', 'アプリに接続できません', false);
   }
 }
+
+// Switch tabs. Each Switch runs in its own process; one that stops does not stop the others.
+function switchDot(item) {
+  if (['crashed', 'restarting'].includes(item.state)) return 'down';
+  if (item.state !== 'ready') return 'wait';
+  return item.running ? 'run' : '';
+}
+function switchTitle(item) {
+  if (item.state !== 'ready') return `${item.label}: ${item.state_text}${item.error ? '（' + item.error + '）' : ''}`;
+  return item.running ? `${item.label}: ${item.paused ? '一時停止中' : '実行中'} ${item.command}` : item.label;
+}
+let switchesKey = '', renaming = null;
+function renderSwitches() {
+  const open = switches.filter(item => item.open);
+  const key = JSON.stringify([open.map(i => [i.id, i.label, switchDot(i), switchTitle(i), i.primary]), session, renaming]);
+  if (key === switchesKey) return;
+  switchesKey = key;
+  $('switches').replaceChildren(...open.map(item => {
+    const tab = document.createElement('div');
+    tab.className = 'sw';
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(item.id === session));
+    tab.tabIndex = item.id === session ? 0 : -1;
+    tab.title = switchTitle(item);
+    tab.append(Object.assign(document.createElement('span'), {className: 'dot ' + switchDot(item)}));
+    if (renaming === item.id) {
+      const input = Object.assign(document.createElement('input'), {value: item.label, maxLength: 40});
+      input.setAttribute('aria-label', 'Switch の名前');
+      const done = save => {
+        if (renaming !== item.id) return;
+        renaming = null;
+        const label = input.value.trim();
+        if (save && label && label !== item.label) quiet(call('switch_rename', {switch: item.id, label}).catch(error => { $('message').textContent = error.message; }));
+        else { switchesKey = ''; renderSwitches(); }
+      };
+      input.addEventListener('keydown', event => { if (event.key === 'Enter') done(true); if (event.key === 'Escape') done(false); event.stopPropagation(); });
+      input.addEventListener('blur', () => done(true));
+      tab.append(input);
+      setTimeout(() => { input.focus(); input.select(); });
+    } else {
+      tab.append(Object.assign(document.createElement('span'), {className: 'label', textContent: item.label}));
+    }
+    if (!item.primary) {
+      const close = Object.assign(document.createElement('button'), {className: 'x', type: 'button', textContent: '×'});
+      close.setAttribute('aria-label', `${item.label} を閉じる`);
+      close.addEventListener('click', event => { event.stopPropagation(); closeSwitch(item); });
+      tab.append(close);
+    }
+    tab.addEventListener('click', () => selectSwitch(item.id));
+    tab.addEventListener('dblclick', () => { renaming = item.id; switchesKey = ''; renderSwitches(); });
+    tab.addEventListener('keydown', event => {
+      if (event.target !== tab) return;
+      const index = open.indexOf(item);
+      if (event.key === 'F2') { renaming = item.id; switchesKey = ''; renderSwitches(); }
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        const next = open[(index + (event.key === 'ArrowRight' ? 1 : open.length - 1)) % open.length];
+        selectSwitch(next.id);
+        setTimeout(() => $('switches').querySelector('[aria-selected=true]')?.focus());
+      }
+    });
+    return tab;
+  }));
+}
+function forgetSwitch() {
+  // Per-Switch view state; the next refresh draws the new Switch from scratch.
+  state = null;
+  catalogKey = folderKey = shortcutKey = keysKey = notesKey = activityKey = incidentsKey = '';
+  seenActivity = null;
+  selectedScript = '';
+  localLog.length = 0;
+  dialogShown = null;
+  $('dialog').hidden = true;
+  devicesAt = 0;
+  $('video').removeAttribute('src');
+}
+function selectSwitch(id) {
+  if (id === session) return;
+  // Let go of anything held on the Switch being left.
+  document.querySelectorAll('.ctl').forEach(release);
+  document.querySelectorAll('.stick').forEach(stick => stick.releaseAll());
+  releaseKeys();
+  forgetSwitch();
+  session = id;
+  try { localStorage.setItem('pokecon.session', id); } catch (error) { /* not persisted */ }
+  switchesKey = '';
+  renderSwitches();
+  refresh().then(() => loadDevices(true));
+}
+function closeSwitch(item) {
+  const running = item.running ? `\n実行中のスクリプト（${item.command}）は止まります。` : '';
+  if (!confirm(`${item.label} を閉じますか？${running}\n設定は残り、＋からまた開けます。`)) return;
+  if (item.id === session) selectSwitch(switches.find(other => other.open && other.primary).id);
+  quiet(call('switch_close', {switch: item.id}).catch(error => { $('message').textContent = error.message; }));
+}
+function renderDown(item) {
+  $('down-text').textContent = `${item.label}: ${(switches.find(s => s.id === item.id) || {}).state_text || ''}`;
+  $('down-why').textContent = item.switch_error || '';
+  $('down-restart').hidden = item.switch_state !== 'crashed';
+  setBadge('run-state', '停止中');
+  ['video-empty', 'video', 'run-controls', 'seq', 'assist', 'rec-mark'].forEach(id => $(id).hidden = true);
+  $('video').removeAttribute('src');
+}
+$('down-restart').addEventListener('click', () => quiet(call('switch_restart', {switch: session})));
+function hideSwitchMenu() { $('sw-menu').hidden = true; }
+$('sw-add').addEventListener('click', event => {
+  const closed = switches.filter(item => !item.open);
+  const add = () => call('switch_add', {}).then(item => { hideSwitchMenu(); selectSwitch(item.id); })
+    .catch(error => { $('message').textContent = error.message; });
+  if (!closed.length) { add(); return; }
+  const menu = $('sw-menu');
+  const item = (text, action) => {
+    const button = Object.assign(document.createElement('button'), {type: 'button', textContent: text});
+    button.setAttribute('role', 'menuitem');
+    button.addEventListener('click', action);
+    return button;
+  };
+  menu.replaceChildren(item('新しい Switch', add), document.createElement('hr'),
+    ...closed.map(entry => item(entry.label, () => call('switch_open', {switch: entry.id})
+      .then(() => { hideSwitchMenu(); selectSwitch(entry.id); }).catch(error => { $('message').textContent = error.message; }))));
+  const box = event.currentTarget.getBoundingClientRect();
+  menu.style.left = `${Math.min(box.left, innerWidth - 200)}px`;
+  menu.style.top = `${box.bottom + 4}px`;
+  menu.hidden = false;
+  menu.querySelector('button').focus();
+  event.stopPropagation();
+});
+document.addEventListener('click', event => { if (!$('sw-menu').contains(event.target)) hideSwitchMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') hideSwitchMenu(); });
 
 // Claude: status in the header and tab, notes (newest first), activity, and an unread dot for new activity.
 function ago(at) {
@@ -1322,7 +1492,7 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('pagehide', () => {
   if (pressed.size || keyHeld.size || $('latch').checked) fetch('/api/call', {method: 'POST', keepalive: true,
-    headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral'}})});
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify({method: 'command', params: {action: 'neutral', session}})});
 });
 
 // Narrow windows show the logs as a tab; wide ones keep them beside the video.
@@ -1353,12 +1523,12 @@ $('note-add').addEventListener('click', addNote);
 $('note-text').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); addNote(); } });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && shortQuery.matches && $('dialog').hidden && !assigning) closePanel(); });
 shortQuery.addEventListener('change', closePanel);
-document.querySelectorAll('[role=tab]').forEach(tab => tab.addEventListener('click', event => {
+document.querySelectorAll('.tabs [role=tab]').forEach(tab => tab.addEventListener('click', event => {
   if (shortQuery.matches && event.isTrusted !== false) {
     const reopen = tab.getAttribute('aria-selected') === 'true' && tabArea.classList.contains('open');
     tabArea.classList.toggle('open', !reopen);
   }
-  document.querySelectorAll('[role=tab]').forEach(other => {
+  document.querySelectorAll('.tabs [role=tab]').forEach(other => {
     const selected = other === tab;
     other.setAttribute('aria-selected', String(selected));
     $(other.getAttribute('aria-controls')).hidden = !selected;

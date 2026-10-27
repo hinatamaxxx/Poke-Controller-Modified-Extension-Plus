@@ -81,18 +81,20 @@ class QuietServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
-class LocalControl:
-    def __init__(self, core, runtime):
-        self.core = core
-        self.demo = core.demo
-        self.id = uuid.uuid4().hex
+class ApiServer:
+    """Token-authenticated browser page (HTTP) and local API (named pipe) with an endpoint file in `runtime`.
+
+    Subclasses answer requests (`handle`) and provide the page's state and video for a session."""
+
+    def __init__(self, runtime, endpoint_name, info=None, http=True):
         self.cache = {}
         self.cache_lock = threading.Lock()
         self.token = secrets.token_hex(32)
         self.web_token = secrets.token_hex(32)
-        self.held_at = {}
         self.streams = threading.BoundedSemaphore(MAX_STREAMS)
         self.closed = False
+        self.server = None
+        self.web_url = ''
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -127,6 +129,7 @@ class LocalControl:
             def do_GET(self):
                 self.connection.settimeout(5)
                 url = urlparse(self.path)
+                session = parse_qs(url.query).get('session', [''])[0]
                 if not self.local_host():
                     return self.reply(403, b'Forbidden', 'text/plain')
                 if url.path == '/':
@@ -144,20 +147,18 @@ class LocalControl:
                 if not self.browser_authorized():
                     return self.reply(403, b'Forbidden', 'text/plain')
                 if url.path == '/api/state':
-                    result, status = owner.submit({'method': 'sessions', 'params': {}, 'request_id': uuid.uuid4().hex})
-                    if result.get('ok'):
-                        result = {'ok': True, 'result': result['result'][0]}
+                    result, status = owner.page_state(session)
                     return self.reply(status, json.dumps(result).encode())
                 if url.path == '/frame.jpg':
-                    frame = owner.encode_frame()
+                    frame = owner.frame_jpeg(session)
                     if frame is None:
                         return self.reply(404, b'No live camera frame', 'text/plain')
                     return self.reply(200, frame, 'image/jpeg')
                 if url.path == '/stream.mjpg':
-                    return self.stream()
+                    return self.stream(session)
                 self.reply(404, b'Not found', 'text/plain')
 
-            def stream(self):
+            def stream(self, session):
                 if not owner.streams.acquire(blocking=False):
                     return self.reply(429, b'Too many streams', 'text/plain')
                 try:
@@ -166,16 +167,13 @@ class LocalControl:
                     self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
                     self.send_header('Cache-Control', 'no-store')
                     self.end_headers()
-                    last = None
-                    while not owner.closed:
-                        frame_at = getattr(owner.core.camera, 'frame_at', 0)
-                        frame = owner.encode_frame() if frame_at != last else None
+                    for frame in owner.stream_frames(session):
+                        if owner.closed:
+                            break
                         if frame is not None:
-                            last = frame_at
                             self.wfile.write(b'--frame\r\nContent-Type: image/jpeg\r\nContent-Length: '
                                              + str(len(frame)).encode() + b'\r\n\r\n' + frame + b'\r\n')
                             self.wfile.flush()
-                        time.sleep(1 / 20)
                 except OSError:
                     pass
                 finally:
@@ -204,8 +202,8 @@ class LocalControl:
                             payload = json.loads(body)
                             if not isinstance(payload, dict) or not isinstance(payload.get('params', {}), dict):
                                 raise ValueError('Request and params must be objects')
-                            params = dict(payload.get('params', {}), id=owner.id)
-                            result, status = owner.submit({'method': payload.get('method'), 'params': params,
+                            result, status = owner.submit({'method': payload.get('method'),
+                                                           'params': owner.browser_params(payload.get('params', {})),
                                                            'request_id': uuid.uuid4().hex})
                         except ValueError as exc:
                             result, status = {'ok': False, 'error': str(exc)}, 400
@@ -219,24 +217,27 @@ class LocalControl:
                         result, status = {'ok': False, 'error': str(exc)}, 400
                 self.reply(status, json.dumps(result).encode())
 
-        self.server = QuietServer(('127.0.0.1', 0), Handler)
-        self.server.daemon_threads = True
-        port = self.server.server_port
-        self.cookie = f'pokecon_{port}'
-        self.web_url = f'http://127.0.0.1:{port}/?token={self.web_token}'
         runtime = Path(runtime)
         runtime.mkdir(parents=True, exist_ok=True)
         remove_stale_endpoints(runtime)
-        self.path = runtime / f'controller-{os.getpid()}.json'
+        endpoint = {'url': '', 'web_url': '', 'pid': os.getpid(), **(info or {})}
+        if http:
+            self.server = QuietServer(('127.0.0.1', 0), Handler)
+            self.server.daemon_threads = True
+            port = self.server.server_port
+            self.cookie = f'pokecon_{port}'
+            self.web_url = f'http://127.0.0.1:{port}/?token={self.web_token}'
+            endpoint.update(url=f'http://127.0.0.1:{port}/', web_url=self.web_url)
+        self.path = runtime / endpoint_name
         # MCP and other local programs use a named pipe: some security software (e.g. AdGuard's
         # localhost filtering) breaks loopback TCP for Python clients, but leaves pipes alone.
         from multiprocessing.connection import Listener
         self.pipe = rf'\\.\pipe\PokeController-{os.getpid()}-{secrets.token_hex(8)}'
         self.listener = Listener(self.pipe, family='AF_PIPE', authkey=self.token.encode())
-        self.path.write_text(json.dumps({'url': f'http://127.0.0.1:{port}/', 'web_url': self.web_url, 'pipe': self.pipe,
-                                        'token': self.token, 'pid': os.getpid(), 'profile': core.profile}),
-                             encoding='utf-8')
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        endpoint.update(pipe=self.pipe, token=self.token)
+        self.path.write_text(json.dumps(endpoint), encoding='utf-8')
+        if http:
+            threading.Thread(target=self.server.serve_forever, daemon=True).start()
         threading.Thread(target=self.serve_pipe, daemon=True).start()
 
     def serve_pipe(self):
@@ -274,7 +275,7 @@ class LocalControl:
         try:
             if not isinstance(request_id, str) or len(request_id) != 32 or any(c not in '0123456789abcdef' for c in request_id):
                 raise ValueError('Invalid request ID')
-            signature = json.dumps(payload, sort_keys=True)
+            signature = json.dumps(payload, sort_keys=True, default=str)
             with self.cache_lock:
                 now = time.monotonic()
                 self.cache = {k: v for k, v in self.cache.items() if now - v[0] < 300}
@@ -287,29 +288,94 @@ class LocalControl:
                     # The browser sends many short-lived commands (sticks at 20/s); drop the oldest, never refuse.
                     self.cache.pop(next(iter(self.cache)))
             try:
-                params = payload.get('params', {})
-                unlocked = payload.get('method') in self.UNLOCKED or (
-                    payload.get('method') == 'command' and isinstance(params, dict) and params.get('action') in self.UNLOCKED_ACTIONS)
-                # Slow work that does not touch the controller runs outside core.lock, so button releases are not delayed.
-                with contextlib.nullcontext() if unlocked else self.core.lock:
-                    result = {'ok': True, 'result': self.execute(payload['method'], params)}
+                result = {'ok': True, 'result': self.handle(payload['method'], payload.get('params', {}), request_id)}
             except Exception as exc:
                 result = {'ok': False, 'error': str(exc)}
-            if payload.get('method') == 'command':
+            if self.cached(payload.get('method')):
                 with self.cache_lock:
                     self.cache[request_id] = (time.monotonic(), signature, result)
             return result, 200
         except Exception as exc:
             return {'ok': False, 'error': str(exc)}, 400
 
-    def encode_frame(self):
+    def cached(self, method):
+        return method == 'command'
+
+    def close(self):
+        self.closed = True
+        self.path.unlink(missing_ok=True)
+        self.listener.close()
+        if self.server is not None:
+            self.server.shutdown()
+            self.server.server_close()
+
+
+class LocalControl(ApiServer):
+    """One Switch: its controller, camera and scripts. Runs in a worker process; the hub routes the page and MCP here."""
+
+    def __init__(self, core, runtime, session_id=None, http=True):
+        self.core = core
+        self.demo = core.demo
+        self.id = session_id or uuid.uuid4().hex
+        self.held_at = {}
+        name = f'worker-{self.id}.json' if session_id else f'controller-{os.getpid()}.json'
+        super().__init__(runtime, name, {'profile': core.profile, 'session': self.id}, http=http)
+
+    def browser_params(self, params):
+        return dict(params, id=self.id)
+
+    def handle(self, method, params, request_id):
+        unlocked = method in self.UNLOCKED or (
+            method == 'command' and isinstance(params, dict) and params.get('action') in self.UNLOCKED_ACTIONS)
+        # Slow work that does not touch the controller runs outside core.lock, so button releases are not delayed.
+        with contextlib.nullcontext() if unlocked else self.core.lock:
+            return self.execute(method, params)
+
+    def page_state(self, session):
+        result, status = self.submit({'method': 'sessions', 'params': {}, 'request_id': uuid.uuid4().hex})
+        if result.get('ok'):
+            result = {'ok': True, 'result': result['result'][0]}
+        return result, status
+
+    def frame_jpeg(self, session):
+        return self.encode_frame()
+
+    def stream_frames(self, session):
+        last = None
+        while not self.closed:
+            frame_at = getattr(self.core.camera, 'frame_at', 0)
+            frame = self.encode_frame() if frame_at != last else None
+            if frame is not None:
+                last = frame_at
+            yield frame
+            time.sleep(1 / 20)
+
+    def encode_frame(self, width=None):
         import cv2
         camera = self.core.camera
         image = getattr(camera, 'image_bgr', None)
         if image is None or time.time() - getattr(camera, 'frame_at', 0) >= 2:
             return None
-        ok, encoded = cv2.imencode('.jpg', self.core.overlay.draw(image), [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if width:
+            image = cv2.resize(image, (width, int(image.shape[0] * width / image.shape[1])), interpolation=cv2.INTER_AREA)
+            ok, encoded = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        else:
+            ok, encoded = cv2.imencode('.jpg', self.core.overlay.draw(image), [cv2.IMWRITE_JPEG_QUALITY, 80])
         return encoded.tobytes() if ok else None
+
+    def summary(self):
+        """What the hub needs every second: health, what is running, and which devices this Switch holds."""
+        from Commands.CommandBase import Command
+        core = self.core
+        watch = core.watch.snapshot()
+        last = watch['incidents'][-1] if watch['incidents'] else None
+        return {'id': self.id, 'profile': core.profile, 'label': core.label, 'running': core.running,
+                'paused': bool(Command.isPause), 'command': Command.cur_command_name if core.running else '', 'camera_live': core.camera_live(),
+                'serial_open': core.serial_open(), 'port': core.serial_target() if core.serial_open() else '',
+                'camera_path': core.settings.camera_path, 'recording': bool(core.recorder.state()),
+                'script': watch['script'], 'auto_restart': watch['settings']['auto_restart'] and watch['settings']['enabled'],
+                'incident': last and {'kind': last['kind'], 'at': last['at']},
+                'dialog': bool(core.dialogs.current())}
 
     def snapshot(self):
         state = self.core.snapshot()
@@ -395,7 +461,7 @@ class LocalControl:
             self.held_at.pop(repr(b), None)
         keys.holdEnd(held)
 
-    UNLOCKED = {'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
+    UNLOCKED = {'frame', 'frame_raw', 'summary', 'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
                 'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices'}
     UNLOCKED_ACTIONS = {'notify_test', 'record_stop'}
 
@@ -438,6 +504,14 @@ class LocalControl:
             if frame is None:
                 raise ValueError('No live camera frame')
             return {'data': base64.b64encode(frame).decode(), 'mimeType': 'image/jpeg'}
+        if method == 'frame_raw':
+            camera = core.camera
+            at = getattr(camera, 'frame_at', 0)
+            if params.get('after') == at:
+                return {'jpeg': None, 'at': at}
+            return {'jpeg': self.encode_frame(width=640 if params.get('small') else None), 'at': at}
+        if method == 'summary':
+            return self.summary()
         if method == 'web_url':
             return {'url': self.web_url}
         if method == 'devices':
@@ -576,13 +650,8 @@ class LocalControl:
             core.watch.configure(values)
         elif action == 'quit':
             core.exit_requested = True
+        elif action == 'label':
+            core.label = str(values.get('label') or core.profile)[:40]
         else:
             raise ValueError('Unknown action')
         return {'accepted': True}
-
-    def close(self):
-        self.closed = True
-        self.path.unlink(missing_ok=True)
-        self.listener.close()
-        self.server.shutdown()
-        self.server.server_close()

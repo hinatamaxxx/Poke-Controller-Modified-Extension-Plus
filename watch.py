@@ -32,6 +32,8 @@ class Watch:
         except (OSError, ValueError, TypeError):
             pass
         self.incidents = collections.deque(maxlen=50)
+        from history import FrameHistory
+        self.history = FrameHistory()  # the last seconds of video, saved with each incident
         self.next_id = 1
         self.restarts = 0
         self._was_running = False
@@ -87,6 +89,8 @@ class Watch:
                 self.report('error', f'{type(error).__name__}: {error}', restart=True)
             elif not core.ser.last_error:
                 self.report('finished')
+        if self.history.due() and core.camera_live():
+            self.history.add_frame(core.camera.image_bgr)
         if not self.settings['enabled'] or time.monotonic() < self._next_check:
             return
         self._next_check = time.monotonic() + 1
@@ -122,15 +126,22 @@ class Watch:
         core = self.core
         script = self._script[1] if self._script else ''
         message = MESSAGES[kind].format(seconds=self.settings['freeze_seconds'])
-        incident = {'id': self.next_id, 'at': time.time(), 'kind': kind, 'message': message, 'detail': detail[:500],
-                    'script': script, 'image': '', 'restarted': False}
-        self.next_id += 1
+        # IDs are millisecond times, so they keep increasing when the hub restarts this Switch's process.
+        incident_id = max(self.next_id, int(time.time() * 1000))
+        incident = {'id': incident_id, 'at': time.time(), 'kind': kind, 'message': message, 'detail': detail[:500],
+                    'script': script, 'image': '', 'clip': '', 'restarted': False}
+        self.next_id = incident_id + 1
         frame = core.camera.image_bgr if core.camera_live() else None
         if frame is not None and kind != 'finished':
             try:
                 incident['image'] = self._save_image(frame, kind)
             except (OSError, ValueError) as exc:
                 print(f'見張り: 画面を保存できませんでした: {exc}')
+        if kind in NOTIFIED:
+            try:
+                incident['clip'] = self.history.save(core.recorder.root, f"{core.label}: {message}")
+            except OSError as exc:
+                print(f'見張り: 直前の映像を保存できませんでした: {exc}')
         self.incidents.append(incident)
         print(f'見張り: {message}' + (f'（{detail}）' if detail else ''))
         core.assist.record('watch', message + (f' — {script}' if script else ''))
@@ -163,7 +174,7 @@ class Watch:
         """Send to whatever the profile has set up: Discord (with the screen), LINE, and the Windows notification."""
         from product import NAME
         core = self.core
-        text = f"{NAME} (profile:{core.profile})\n{incident['script'] or 'スクリプトなし'}: {incident['message']}"
+        text = f"{NAME} ({core.label})\n{incident['script'] or 'スクリプトなし'}: {incident['message']}"
         if incident['detail']:
             text += f"\n{incident['detail']}"
         settings = core.notification_settings()
@@ -215,4 +226,5 @@ class Watch:
     def snapshot(self):
         still = (time.monotonic() - self._still_since) if self._still_since else 0
         return {'settings': dict(self.settings), 'incidents': [dict(i) for i in list(self.incidents)[-10:]],
-                'restarts': self.restarts, 'still_seconds': round(still), 'last_id': self.next_id - 1}
+                'restarts': self.restarts, 'still_seconds': round(still), 'last_id': self.next_id - 1,
+                'script': list(self._script) if self._script and self.core.running else None}

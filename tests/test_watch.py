@@ -27,7 +27,8 @@ class FakeCore:
         self.demo = False
         self.exit_requested = False
         self.dialogs = types.SimpleNamespace(current=lambda: [])
-        self.profile = 'test'
+        self.profile = self.label = 'test'
+        self.recorder = types.SimpleNamespace(root=os.path.join(os.getcwd(), 'Captures', 'recordings'))
         self.cur_command = None
         self.ser = types.SimpleNamespace(last_error='')
         self.camera = types.SimpleNamespace(image_bgr=np.zeros((72, 128, 3), np.uint8))
@@ -81,6 +82,20 @@ class WatchTest(unittest.TestCase):
         self.assertEqual(incident['kind'], 'error')
         self.assertIn('boom', incident['detail'])
         self.assertTrue(os.path.isfile(incident['image']))
+
+    def test_incident_keeps_the_last_seconds_of_video(self):
+        self.run_script()
+        for n in range(3):
+            self.watch.history._next = 0
+            self.core.camera.image_bgr = np.full((72, 128, 3), n * 50, np.uint8)
+            self.watch.tick()
+        self.end_script(ValueError('boom'))
+        clip = self.watch.since(0)[-1]['clip']
+        recorder = Recorder(self.core)
+        self.assertEqual(recorder.list()[0]['id'], clip)
+        self.assertEqual(recorder.list()[0]['frames'], 3)
+        image, _ = recorder.overview(clip)
+        self.assertEqual(image[:2], bytes([0xff, 0xd8]))
 
     def test_user_stop_is_not_an_incident(self):
         self.run_script()

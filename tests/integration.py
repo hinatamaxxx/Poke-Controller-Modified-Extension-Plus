@@ -30,7 +30,7 @@ async def protocol(command, args, endpoint):
     from mcp.client.stdio import StdioServerParameters
     async with Client(StdioServerParameters(command=command, args=args)) as client:
         tools = await client.list_tools()
-        assert len(tools.tools) == 36
+        assert len(tools.tools) == 40
         session = call(endpoint, 'sessions')[0]
         sid = session['id']
         demo_name = next(name for name in session['catalog']['python'] if name.startswith('PortableDemo /'))
@@ -57,10 +57,35 @@ async def protocol(command, args, endpoint):
         assert result.is_error
         result = await client.call_tool('get_capture', {'session_id': 'wrong'})
         assert result.is_error
+        await switches(client, endpoint, sid, demo_name)
         # Leave a script running to verify cooperative application shutdown.
         result = await client.call_tool('start_script', {'session_id': sid, 'name': demo_name})
         assert not result.is_error
         until(lambda: call(endpoint, 'sessions')[0]['running'])
+
+
+async def switches(client, endpoint, first, demo_name):
+    """A second Switch in its own process: a crash there is recovered and leaves the first one running."""
+    result = await client.call_tool('add_switch', {'label': 'QA 2'})
+    assert not result.is_error, result
+    second = json.loads(result.content[0].text)['session_id']
+    until(lambda: [s['label'] for s in call(endpoint, 'sessions')] == ['Switch 1', 'QA 2'], timeout=60)
+    call(endpoint, 'command', {'id': first, 'action': 'start', 'values': {'kind': 'python', 'name': demo_name}})
+    until(lambda: call(endpoint, 'sessions')[0]['running'])
+    worker = json.loads((ROOT / 'runtime' / 'workers' / f'worker-{second}.json').read_text(encoding='utf-8'))
+    subprocess.run(['taskkill', '/PID', str(worker['pid']), '/F'], capture_output=True)
+    until(lambda: call(endpoint, 'sessions')[1]['switch_state'] != 'ready', timeout=15)
+    assert call(endpoint, 'sessions')[0]['running'], 'the first Switch must keep running'
+    until(lambda: call(endpoint, 'sessions')[1]['switch_state'] == 'ready', timeout=60)
+    incidents = call(endpoint, 'incidents', {'id': second})['incidents']
+    assert incidents and incidents[-1]['kind'] == 'crash' and incidents[-1]['clip'], incidents
+    call(endpoint, 'command', {'id': first, 'action': 'stop'})
+    until(lambda: not call(endpoint, 'sessions')[0]['running'])
+    result = await client.call_tool('close_switch', {'session_id': second})
+    assert not result.is_error, result
+    until(lambda: len(call(endpoint, 'sessions')) == 1, timeout=30)
+    result = await client.call_tool('close_switch', {'session_id': first})
+    assert result.is_error, 'the first Switch cannot be closed'
 
 
 def browser(endpoint):
@@ -152,7 +177,7 @@ def main():
                 subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], capture_output=True)
                 raise
         asyncio.run(autostart(mcp_command, mcp_args))
-        print('PASS: window-less startup, authentication, browser UI, 36 MCP tools, capture, button input, '
+        print('PASS: window-less startup, authentication, browser UI, 40 MCP tools, separate Switch processes with crash recovery, capture, button input, '
               'start/pause/resume/stop, logs, error handling, background autostart', flush=True)
 
 
