@@ -478,7 +478,7 @@ class Hub(ApiServer):
         values = self.preferences.values if self.preferences else {}
         return {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
                 'auto_update': values.get('auto_update', False), 'prereleases': values.get('prereleases', False),
-                'update': update_service.read_state()}
+                'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()}}
 
     def placeholder(self, worker):
         """The page's state for a Switch whose process is not answering (starting, restarting or stopped)."""

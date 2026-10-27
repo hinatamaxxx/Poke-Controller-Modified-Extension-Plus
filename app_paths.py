@@ -42,6 +42,9 @@ PROFILES = CONFIG / 'profiles'
 RUNTIME = LOCAL / 'runtime'  # endpoint files for MCP and the browser page
 LOGS = WORKSPACE / 'log' if PORTABLE else LOCAL / 'log'
 APP_SETTINGS = (PROGRAM if PORTABLE else CONFIG) / 'app-settings.json'
+# Folders the user can open from the app (settings page, menus).
+FOLDERS = {'workspace': WORKSPACE, 'scripts': WORKSPACE / 'Commands' / 'PythonCommands', 'captures': WORKSPACE / 'Captures',
+           'settings': PROFILES, 'logs': LOGS}
 
 
 def prepare_workspace():
