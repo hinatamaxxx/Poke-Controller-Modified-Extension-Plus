@@ -291,6 +291,12 @@ class Core:
         self.console_mirror = console_mirror
         self.apply_options()
         self.camera = Camera(int(self.settings.fps.get() or 45))
+        # Screenshots go to the chosen capture folder (settings: フォルダー).
+        import app_paths
+        import Camera as camera_module
+        if app_paths.folder_choices().get('captures'):
+            camera_module.CAPTURE_DIR = str(app_paths.CAPTURES)
+            self.camera.capture_dir = str(app_paths.CAPTURES)
         self.camera_missing, self.next_camera_check = False, 0
         self.show_serial = Var(bool(self.settings.is_show_serial.get()))
         self.ser = Sender(self.show_serial)

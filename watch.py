@@ -160,7 +160,8 @@ class Watch:
     @staticmethod
     def _save_image(frame, kind):
         import cv2
-        folder = os.path.join(os.getcwd(), 'Captures', 'incidents')
+        import app_paths
+        folder = os.path.join(app_paths.captures_dir(), 'incidents')
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, f"{time.strftime('%Y%m%d-%H%M%S')}-{int(time.time() * 1000) % 1000:03d}-{kind}.png")
         ok, encoded = cv2.imencode('.png', frame)

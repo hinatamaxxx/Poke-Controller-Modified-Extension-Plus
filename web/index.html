@@ -10,6 +10,7 @@
 </script>
 <style>
 :root {
+  --folder-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z'/></svg>");
   --bg: #f0f0f0; --panel: #ffffff; --text: #1d2026; --muted: #5f6672; --line: #d4d7dc;
   --accent: #2563eb; --danger: #c62828; --ok: #2e7d32; --log: #ffffff; --chip: #eef1f5; --scroll: #c3c8cf; --claude: #c2410c;
   --joy-l: #5bcef2; --joy-r: #e85050; --btn: #343434; --btn-text: #ffffff;
@@ -142,7 +143,7 @@ table.notify th, table.notify td { padding: 4px 10px; }
 .folder-list button + button { border-top: 1px solid var(--line); }
 .folder-list button:hover { background: var(--chip); }
 .folder-list .icon { width: 20px; height: 20px; background: #e8b84a; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
-                     --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z'/></svg>"); }
+                     --icon: var(--folder-icon); }
 .folder-list .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
 /* About: one line per item, libraries in columns. */
 dl.about { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 0; font-size: 13px; }
@@ -152,6 +153,16 @@ dl.about.libs { grid-template-columns: repeat(3, max-content minmax(0, 1fr)); fo
 .license { margin: 0; font-size: 12px; color: var(--muted); }
 a.ext { color: var(--accent); font-size: 13px; }
 .folder-list button { padding: 4px 12px; }
+.folder-set { display: flex; flex-direction: column; gap: 10px; }
+.folder-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.folder-card .head { display: flex; align-items: center; gap: 8px; }
+.folder-card .head .state { color: var(--accent); font-size: 12px; }
+.folder-card .icon { width: 20px; height: 20px; background: #e8b84a; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+                     --icon: var(--folder-icon); }
+.folder-card .desc { color: var(--muted); font-size: 12px; }
+.folder-card .path { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left;
+                     background: var(--log); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
+.folder-card .row { margin-top: 2px; }
 #set-about h3 { margin-top: 6px; padding-top: 6px; }
 .settings-page h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .settings-page h2 + h3 { border-top: 0; padding-top: 0; margin-top: 0; }
@@ -693,6 +704,7 @@ table.notify input { margin: 1px 0; }
     <button type="button" data-page="set-watch">見張り</button>
     <button type="button" data-page="set-keys">キー設定</button>
     <button type="button" data-page="set-log">ログ</button>
+    <button type="button" data-page="set-folders">フォルダー</button>
     <hr>
     <hr>
     <button type="button" data-page="set-update">更新</button>
@@ -750,6 +762,11 @@ table.notify input { margin: 1px 0; }
       <h3>保存されたログ</h3>
       <div class="folder-list" id="log-folder" role="list"></div>
     </section>
+    <section class="settings-page" id="set-folders" hidden>
+      <h2>フォルダー</h2>
+      <p class="meta">保存する場所を変えられます。変えると、各 Switch を起動し直して新しい場所を使います。</p>
+      <div class="folder-set" id="folder-set"></div>
+    </section>
     <section class="settings-page" id="set-keys" hidden>
       <h2>キー設定</h2>
       <p class="meta">ボタンを選んでから、割り当てるキーを押します（Esc で取り消し）。</p>
@@ -771,8 +788,6 @@ table.notify input { margin: 1px 0; }
         <a href="#" class="ext" data-link="guide">使い方ガイド</a>
         <a href="#" class="ext" data-link="github">GitHub</a>
       </div>
-      <h3>ファイルの場所</h3>
-      <div class="folder-list" id="folder-list" role="list"></div>
       <h3>ライブラリ</h3>
       <dl class="about libs" id="about-libs"></dl>
       <h3>ライセンス</h3>
@@ -1071,7 +1086,7 @@ function renderSettings() {
   $('update-meta').textContent = `v${app.version || '-'} ・ ${checked}`;
   $('update-error').textContent = update.failures ? `更新に失敗しました（${update.failures}回）: ${update.last_error || ''}` : '';
   $('auto-update').disabled = $('update-now').disabled = !!app.portable;
-  renderFolderList(app.folders || {});
+  renderFolderList(app.folders || {}, app.chosen_folders || []);
   const note = state.notification || {};
   $('discord-set').hidden = !note.discord_webhook_set;
   // A service that is not linked yet is grey in 通知, with a button to its settings instead of a test.
@@ -2146,27 +2161,52 @@ $('watch-limit').addEventListener('change', () => {
   $('watch-limit').value = limit;
   quiet(command('watch', {restart_limit: limit}));
 });
-const FOLDER_NAMES = [['workspace', '作業フォルダー'], ['scripts', 'スクリプト'], ['captures', 'スクリーンショット・録画'], ['settings', '設定'], ['logs', 'ログ']];
 let folderListKey = '';
-function renderFolderList(folders) {
-  const key = JSON.stringify(folders);
+function folderPath(path) {
+  // As in Explorer's address bar (C: › Users › …); it reads right to left so a long one keeps its end in view, and
+  // the bidi marks keep it in order.
+  return '\u200e' + path.split(/[\\/]+/).filter(Boolean).join(' › ') + '\u200e';
+}
+const FOLDER_SETTINGS = [
+  ['workspace', '作業フォルダー', 'スクリプトとテンプレート画像を置く場所。空のフォルダーを選ぶと、今の中身をコピーします。'],
+  ['captures', 'スクリーンショット・録画', 'スクリーンショット、録画、見張りの記録を保存する場所。']];
+function renderFolderList(folders, chosen) {
+  const key = JSON.stringify([folders, chosen]);
   if (key === folderListKey) return;
   folderListKey = key;
-  const rows = FOLDER_NAMES.filter(([id]) => folders[id]).map(([id, name]) => {
-    const row = Object.assign(document.createElement('button'), {type: 'button', title: folders[id]});
-    row.setAttribute('role', 'listitem');
-    // The path as in Explorer's address bar (C: › Users › …); it reads right to left so a long one keeps its end in
-    // view, and the bidi marks keep it in order.
-    row.append(Object.assign(document.createElement('span'), {className: 'icon'}), Object.assign(document.createElement('span'), {textContent: name}),
-               Object.assign(document.createElement('span'), {className: 'path', textContent: '\u200e' + folders[id].split(/[\\/]+/).filter(Boolean).join(' › ') + '\u200e'}));
-    row.addEventListener('click', () => openFolder(id).catch(() => {}));
-    return row;
-  });
-  $('folder-list').replaceChildren(...rows);
-  // The log page lists the log folder the same way.
-  const logs = rows.find((row, index) => FOLDER_NAMES.filter(([id]) => folders[id])[index][0] === 'logs');
-  $('log-folder').replaceChildren(...(logs ? [logs.cloneNode(true)] : []));
-  $('log-folder').querySelector('button')?.addEventListener('click', () => openFolder('logs').catch(() => {}));
+  const make = (tag, className, text) => Object.assign(document.createElement(tag), {className, textContent: text || ''});
+  $('folder-set').replaceChildren(...FOLDER_SETTINGS.filter(([id]) => folders[id]).map(([id, name, description]) => {
+    const card = make('div', 'folder-card');
+    const head = make('div', 'head');
+    head.append(make('span', 'icon'), make('strong', '', name));
+    if (chosen.includes(id)) head.append(make('span', 'state', '変更済み'));
+    const path = make('div', 'path', folderPath(folders[id]));
+    path.title = folders[id];
+    const buttons = make('div', 'row');
+    const button = (text, action) => {
+      const element = Object.assign(make('button', 'cmd', text), {type: 'button'});
+      element.addEventListener('click', action);
+      return element;
+    };
+    const error = make('div', 'error');
+    const failed = failure => { error.textContent = failure.message; };
+    buttons.append(button('開く', () => openFolder(id).catch(failed)),
+                   button('変更…', () => {
+                     error.textContent = '';
+                     // The folder picker comes up in front of the app window.
+                     if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('foreground');
+                     call('command', {action: 'pick_folder', values: {folder: id}}).catch(failed);
+                   }));
+    if (chosen.includes(id)) buttons.append(button('元に戻す', () => call('command', {action: 'choose_folder', values: {folder: id, path: ''}}).catch(failed).finally(refresh)));
+    card.append(head, make('div', 'desc', description), path, buttons, error);
+    return card;
+  }));
+  // The log page shows where the logs are kept.
+  const row = Object.assign(make('button', ''), {type: 'button', title: folders.logs || ''});
+  row.setAttribute('role', 'listitem');
+  row.append(make('span', 'icon'), make('span', '', 'ログ'), make('span', 'path', folderPath(folders.logs || '')));
+  row.addEventListener('click', () => openFolder('logs').catch(() => {}));
+  $('log-folder').replaceChildren(...(folders.logs ? [row] : []));
 }
 $('clear-logs').addEventListener('click', () => Promise.all([1, 2].map(log => command('clear_log', {log})))
   .then(() => { localLog.length = 0; $('clear-logs').textContent = '消去しました'; setTimeout(() => { $('clear-logs').textContent = '画面のログを消去'; }, 1200); })

@@ -22,7 +22,8 @@ class Recorder:
 
     @property
     def root(self):
-        return os.path.join(os.getcwd(), 'Captures', 'recordings')
+        import app_paths
+        return os.path.join(app_paths.captures_dir(), 'recordings')
 
     def start(self, seconds=60, fps=5, label=''):
         import cv2
@@ -42,8 +43,13 @@ class Recorder:
                     'started': time.time(), 'frames': [], 'inputs': [], 'stop': threading.Event()}
             # OpenCV cannot open non-ASCII paths (a Japanese user name in Documents); the path relative to the
             # workspace is ASCII.
-            writer = cv2.VideoWriter(os.path.join('Captures', 'recordings', rec_id, 'video.mp4'),
-                                     cv2.VideoWriter_fourcc(*'mp4v'), fps, FRAME_SIZE)
+            # OpenCV cannot open non-ASCII paths; the video is written under an ASCII name in the work folder
+            # (the working directory) when needed and moved into place at the end.
+            video = os.path.join(folder, 'video.mp4')
+            temporary = None
+            if not os.path.relpath(video).isascii():
+                temporary = f'.recording-{rec_id}.mp4'
+            writer = cv2.VideoWriter(temporary or os.path.relpath(video), cv2.VideoWriter_fourcc(*'mp4v'), fps, FRAME_SIZE)
             self._hook_sender(info)
 
             def run():
@@ -64,6 +70,12 @@ class Recorder:
                         info['stop'].wait(1 / fps)
                 finally:
                     writer.release()
+                    if temporary:
+                        try:
+                            os.replace(temporary, video)
+                        except OSError:
+                            import shutil
+                            shutil.move(temporary, video)
                     self._unhook_sender()
                     self._save(info)
             info['thread'] = threading.Thread(target=run, daemon=True)
