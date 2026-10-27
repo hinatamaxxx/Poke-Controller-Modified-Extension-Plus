@@ -254,6 +254,18 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 pre { flex: 1; min-height: 24px; margin: 0; overflow: auto; background: var(--log); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font: 12px/1.4 Consolas, "BIZ UDGothic", monospace; white-space: pre-wrap; word-break: break-all; }
 
 .tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 6px; flex: none; }
+/* Screenshot and send-to-Discord at the right end of the bottom tabs. */
+.tab-actions { margin-left: auto; display: flex; gap: 2px; align-items: center; }
+.tabs .tab-action, .area-tabs .tabs .tab-action { width: 30px; height: 24px; padding: 0; margin: 0; border: 0; border-radius: 4px; background: none;
+                                                    display: grid; place-items: center; cursor: pointer; }
+.tab-action::before { content: ""; width: 17px; height: 17px; background: var(--muted); -webkit-mask: var(--icon) center / contain no-repeat;
+                      mask: var(--icon) center / contain no-repeat; transition: background-color .15s; }
+.tab-action.shot { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill-rule='evenodd' d='M9 4 7.5 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L15 4zm3 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'/></svg>"); }
+.tab-action.send { --icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M2.5 20.5 22 12 2.5 3.5v6.6L16 12 2.5 13.9z'/></svg>"); }
+.tabs .tab-action:hover:not(:disabled) { background: var(--chip); }
+.tab-action:hover:not(:disabled)::before { background: var(--text); }
+.tab-action.done::before { background: var(--ok); }
+.tabs .tab-action:disabled { opacity: .35; cursor: default; }
 .tabs button { flex: none; white-space: nowrap; font: inherit; color: var(--muted); background: none; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; padding: 2px 10px; cursor: pointer; margin-bottom: -1px; }
 .tabs button[aria-selected=true] { color: var(--text); background: var(--panel); border-color: var(--line); }
 .tabpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden; font-size: 13px; }
@@ -472,6 +484,10 @@ table.notify input { margin: 1px 0; }
       <button role="tab" id="tab-script" aria-controls="panel-script" aria-selected="true">スクリプト</button>
       <button role="tab" id="tab-claude" aria-controls="panel-claude" aria-selected="false">Claude</button>
       <button role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
+      <span class="tab-actions" id="tab-actions">
+        <button type="button" class="tab-action shot" id="act-capture" title="スクリーンショット" aria-label="スクリーンショット"></button>
+        <button type="button" class="tab-action send" id="act-discord" title="画面を Discord に送る" aria-label="画面を Discord に送る"></button>
+      </span>
     </div>
 
     <div class="tabpanel" role="tabpanel" id="panel-camera" aria-labelledby="tab-camera" hidden>
@@ -762,8 +778,6 @@ table.notify input { margin: 1px 0; }
 </div>
 <div class="sw-menu" id="sw-menu" role="menu" hidden></div>
 <div class="sw-menu" id="app-menu" role="menu" aria-label="メニュー" hidden>
-  <button type="button" role="menuitem" data-menu="capture">スクリーンショット</button>
-  <button type="button" role="menuitem" data-menu="discord">画面を Discord に送る</button>
   <button type="button" role="menuitem" data-menu="captures">保存先を開く</button>
   <hr>
   <button type="button" role="menuitem" data-menu="clear">ログを消去</button>
@@ -1103,6 +1117,7 @@ $('key-clear').addEventListener('click', () => { if (assigning) assignKey(''); }
 function manualAllowed() { return !!state && !state.running && state.serial_open; }
 
 function render() {
+  $('act-capture').disabled = $('act-discord').disabled = !state.camera_live;
   $('profile').hidden = !state.demo;
   const running = state.running ? (state.paused ? '一時停止中: ' : '実行中: ') + (state.command || '') : '停止中';
   setBadge('run-state', running, state.running ? true : undefined);
@@ -1153,6 +1168,7 @@ async function refresh() {
     switches = result.switches || [];
     if (result.result.id !== session) { forgetSwitch(); session = result.result.id; }
     renderSwitches();
+    if (!document.documentElement.classList.contains('loaded')) restoreBottomTab();
     document.documentElement.classList.add('loaded');
     const down = result.result.ready === false;
     document.body.classList.toggle('switch-down', down);
@@ -1251,6 +1267,17 @@ function forgetSwitch() {
   devicesAt = 0;
   stopStream();
 }
+// Each Switch keeps the bottom tab it was on (kept per browser).
+let bottomTabs = {};
+try { bottomTabs = JSON.parse(localStorage.getItem('pokecon.bottomTabs') || '{}') || {}; } catch (error) { /* start empty */ }
+function rememberBottomTab(id) {
+  bottomTabs[session] = id;
+  try { localStorage.setItem('pokecon.bottomTabs', JSON.stringify(bottomTabs)); } catch (error) { /* not persisted */ }
+}
+function restoreBottomTab() {
+  const tab = $(bottomTabs[session] || '');
+  if (tab && !tab.hidden && tab.parentElement.matches('.area-tabs .tabs')) tab.click();
+}
 function selectSwitch(id) {
   if (id === session) return;
   // Let go of anything held on the Switch being left.
@@ -1263,6 +1290,7 @@ function selectSwitch(id) {
   try { localStorage.setItem('pokecon.session', id); } catch (error) { /* not persisted */ }
   switchesKey = '';
   renderSwitches();
+  restoreBottomTab();
   refresh().then(() => loadDevices(true));
 }
 function closeSwitch(item) {
@@ -1412,9 +1440,14 @@ $('info-form').addEventListener('submit', event => {
     + '---------------------------ここまでコピペ---------------------------';
   showInfo('質問テンプレート', {text, desc: '添付資料（動作の動画、ポケコンのログ、エラーの出ている画面など）も用意してください。'});
 });
+// The screenshot and send-to-Discord buttons at the end of the bottom tabs turn green for a moment when done.
+function flashDone(button) {
+  button.classList.add('done');
+  setTimeout(() => button.classList.remove('done'), 900);
+}
+$('act-capture').addEventListener('click', () => command('capture').then(() => flashDone($('act-capture'))).catch(() => {}).finally(refresh));
+$('act-discord').addEventListener('click', () => command('discord_image').then(() => flashDone($('act-discord'))).catch(() => {}).finally(refresh));
 const menuActions = {
-  capture: () => command('capture'),
-  discord: () => command('discord_image'),
   captures: () => openFolder('captures'),
   clear: () => Promise.all([1, 2].map(log => command('clear_log', {log}))).then(() => { localLog.length = 0; }),
   settings: () => openSettings(),
@@ -1911,7 +1944,7 @@ function placeLogs() {
   if ($('tab-claude').parentElement === list) return;
   const leaving = pairs.some(([tab]) => $(tab).getAttribute('aria-selected') === 'true');
   pairs.forEach(([tab, panel]) => {
-    list.append($(tab));
+    if (wide) list.append($(tab)); else list.insertBefore($(tab), $('tab-actions'));
     if (wide) list.parentElement.append($(panel));
     else $('message').before($(panel));
     $(tab).setAttribute('aria-selected', 'false');
@@ -1959,6 +1992,7 @@ document.querySelectorAll('.tabs [role=tab]').forEach(tab => tab.addEventListene
     $(other.getAttribute('aria-controls')).hidden = !selected;
   });
   if (tab.id === 'tab-device' || tab.id === 'tab-camera') loadDevices(true);
+  if (tab.parentElement.matches('.area-tabs .tabs') && session) rememberBottomTab(tab.id);
   if (tab.parentElement.id === 'side-tabs') try { localStorage.setItem('pokecon.side', tab.id); } catch (error) { /* not kept */ }
 }));
 // Small view switches inside a tab.
