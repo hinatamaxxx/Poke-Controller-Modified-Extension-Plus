@@ -607,8 +607,16 @@ class Core:
             return result
 
     def catalog(self):
+        import app_paths
+        bundled = app_paths.PROGRAM / 'SerialController'
+
+        def is_sample(c):
+            # A script that came with the app (its file is in the program's copy), listed after the user's own.
+            module = c.__module__.split('.')
+            return module[:2] == ['Commands', 'PythonCommands'] and bundled.joinpath(*module).with_suffix('.py').is_file()
+
         def describe(classes):
-            return [{'name': c.NAME, 'tags': list(getattr(c, 'TAGS', []) or [])} for c in classes]
+            return [{'name': c.NAME, 'tags': list(getattr(c, 'TAGS', []) or []), 'sample': is_sample(c)} for c in classes]
         return {'python': describe(self.py_classes), 'mcu': describe(self.mcu_classes)}
 
     def start_script(self, kind, name, restart=False):

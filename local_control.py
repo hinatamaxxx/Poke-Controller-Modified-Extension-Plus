@@ -417,9 +417,10 @@ class LocalControl(ApiServer):
                         'auto_update': preferences.values['auto_update'] if preferences else False,
                         'prereleases': preferences.values['prereleases'] if preferences else False,
                         'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()}}
+        catalog = self.core.catalog()
         state.update(id=self.id, ready=True, exited=False,
-                     catalog={kind: [item['name'] for item in items] for kind, items in self.core.catalog().items()},
-                     tags=self.core.catalog())
+                     catalog={kind: [item['name'] for item in items] for kind, items in catalog.items()},
+                     tags=catalog)
         return state
 
     def check_manual_input(self):

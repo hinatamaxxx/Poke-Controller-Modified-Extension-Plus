@@ -927,12 +927,15 @@ function renderScripts() {
   const list = $('script-list');
   const nodes = [];
   let lastFolder = null;
+  // The user's own scripts first, the samples that came with the app after them.
   const sorted = items.map((item, index) => ({item, index, parts: splitName(item.name)}))
-    .sort((a, b) => a.parts.folder.localeCompare(b.parts.folder, 'ja') || a.index - b.index);
+    .sort((a, b) => Number(!!a.item.sample) - Number(!!b.item.sample) ||
+                    a.parts.folder.localeCompare(b.parts.folder, 'ja') || a.index - b.index);
   sorted.forEach(({item, parts}, index) => {
-    if (parts.folder !== lastFolder) {
-      lastFolder = parts.folder;
-      nodes.push(Object.assign(document.createElement('div'), {className: 'group', textContent: parts.folder || 'その他', role: 'presentation'}));
+    const group = (item.sample ? 'サンプル / ' : '') + (parts.folder || 'その他');
+    if (group !== lastFolder) {
+      lastFolder = group;
+      nodes.push(Object.assign(document.createElement('div'), {className: 'group', textContent: group, role: 'presentation'}));
     }
     const row = document.createElement('div');
     row.className = 'item' + (item.name === running ? ' running' : '');
