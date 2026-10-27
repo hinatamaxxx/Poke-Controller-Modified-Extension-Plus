@@ -1219,12 +1219,13 @@ function renderSwitches() {
     } else {
       tab.append(Object.assign(document.createElement('span'), {className: 'label', textContent: item.label}));
     }
-    if (item.state === 'ready') {
-      const icon = (kind, live, set, title) => Object.assign(document.createElement('span'),
-        {className: `ico ${kind} ${live ? 'ok' : set ? 'bad' : ''}`, title});
-      tab.append(icon('cam', item.camera_live, item.camera_path, item.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし'),
-                 icon('pad', item.serial_open, item.port, item.serial_open ? `コントローラー: ${item.port ? item.port + " " : ""}接続中` : 'コントローラー: 未接続'));
-    }
+    // Shown in every state; grey while the Switch is not ready (its devices are unknown then).
+    const ready = item.state === 'ready';
+    const icon = (kind, live, set, title) => Object.assign(document.createElement('span'),
+      {className: `ico ${kind} ${!ready ? '' : live ? 'ok' : set ? 'bad' : ''}`, title});
+    tab.append(icon('cam', item.camera_live, item.camera_path, !ready ? 'カメラ: 不明' : item.camera_live ? 'カメラ: 映像あり' : 'カメラ: 映像なし'),
+               icon('pad', item.serial_open, item.port, !ready ? 'コントローラー: 不明'
+                 : item.serial_open ? `コントローラー: ${item.port ? item.port + " " : ""}接続中` : 'コントローラー: 未接続'));
     if (open.length > 1) {
       const close = Object.assign(document.createElement('button'), {className: 'x', type: 'button', textContent: '×'});
       close.setAttribute('aria-label', `${item.label} を閉じる`);
