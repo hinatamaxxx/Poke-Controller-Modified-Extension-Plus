@@ -179,6 +179,7 @@ a.ext { color: var(--accent); font-size: 13px; }
   .settings-nav button { padding: 6px 8px; }
   .settings-main { padding: 14px 14px 16px; }
   .settings-close { top: 4px; right: 4px; }
+  dl.about.libs { grid-template-columns: repeat(2, max-content minmax(0, 1fr)); gap: 2px 8px; }
 }
 .modal .actions .grow { flex: 1; }
 .settings-page h3 .state { font-size: 12px; font-weight: normal; color: var(--ok); margin-left: 8px; }
@@ -1424,7 +1425,12 @@ function showSettingsPage(page) {
   });
   document.querySelectorAll('.settings-page').forEach(section => { section.hidden = section.id !== page; });
   if (page !== 'set-keys' && assigning) { assigning = null; renderKeymap(); }
-  if (page === 'set-about') call('about').then(result => {
+  document.querySelector('.settings-main').scrollTo(0, 0);
+}
+// Filled once when the page loads, so the settings window already has its final size when it opens.
+let aboutLoaded = null;
+function loadAbout() {
+  return aboutLoaded ||= call('about').then(result => {
     const pairs = (list) => list.flatMap(([name, value]) => [
       Object.assign(document.createElement('dt'), {textContent: name}), Object.assign(document.createElement('dd'), {textContent: value})]);
     $('about-env').replaceChildren(...pairs([['使用ツール', `${result.name} ${result.version}`], ['OS', result.os], ['Python', result.python]]));
@@ -1433,15 +1439,17 @@ function showSettingsPage(page) {
     const lines = (result.license || '').split(/\r?\n/).map(line => line.trim());
     const holders = lines.filter(line => /^Copyright/i.test(line)).map(line => line.replace(/^Copyright\s*(\(c\)|©)?\s*/i, ''));
     $('about-license').textContent = `${lines.find(Boolean) || ''}${holders.length ? ' — ' + holders.join('、') : ''}`;
-  }).catch(error => { $('about-env').textContent = error.message; });
-  document.querySelector('.settings-main').scrollTo(0, 0);
+  }).catch(error => { aboutLoaded = null; $('about-env').textContent = error.message; });
 }
-// The window is as tall as its tallest page, so no page scrolls and none leaves a large gap below.
+loadAbout();
+// Every page shares one window size: as tall as the tallest page (or the menu), with no extra room below.
 function fitSettings() {
   const win = document.querySelector('.settings-window');
   const main = document.querySelector('.settings-main');
   const nav = document.querySelector('.settings-nav');
   const pad = parseFloat(getComputedStyle(main).paddingTop) + parseFloat(getComputedStyle(main).paddingBottom);
+  // The menu stretches to the window, so measure its last item rather than the menu itself.
+  const items = nav.lastElementChild.offsetTop + nav.lastElementChild.offsetHeight + parseFloat(getComputedStyle(nav).paddingBottom);
   let tallest = 0;
   document.querySelectorAll('.settings-page').forEach(page => {
     const hidden = page.hidden;
@@ -1449,7 +1457,7 @@ function fitSettings() {
     tallest = Math.max(tallest, page.scrollHeight);
     page.hidden = hidden;
   });
-  const height = Math.max(nav.scrollHeight, tallest + pad);
+  const height = Math.max(items, tallest + pad);
   win.style.setProperty('--settings-h', Math.ceil(height + 2) + 'px');
 }
 window.addEventListener('resize', () => { if (!$('settings').hidden) fitSettings(); });
@@ -1457,6 +1465,7 @@ function openSettings(page) {
   $('settings').hidden = false;
   showSettingsPage(page || settingsPage);
   fitSettings();
+  loadAbout().then(fitSettings);
   document.querySelector('.settings-nav [aria-current=page]').focus();
 }
 function closeSettings() {
