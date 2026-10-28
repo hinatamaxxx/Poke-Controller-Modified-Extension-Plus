@@ -659,6 +659,8 @@ class LocalControl(ApiServer):
             if not isinstance(mapping, dict):
                 raise ValueError('mapping must be an object')
             core.set_keymap(mapping)
+        elif action == 'keymap_reset':
+            core.reset_keymap()
         elif action == 'notification':
             core.set_notification(values)
         elif action == 'notify_test':

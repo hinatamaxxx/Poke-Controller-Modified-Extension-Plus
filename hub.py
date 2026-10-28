@@ -392,7 +392,7 @@ class Hub(ApiServer):
     def shared_command(self, params):
         """The part of a command that every Switch takes, or None."""
         action, values = params.get('action'), params.get('values') or {}
-        if action in ('notification', 'watch', 'keymap'):
+        if action in ('notification', 'watch', 'keymap', 'keymap_reset'):
             return {'action': action, 'values': values}
         if action == 'options':
             shared = {k: v for k, v in values.items() if k in self.SHARED_OPTIONS}

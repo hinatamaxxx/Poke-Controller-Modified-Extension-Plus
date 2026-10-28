@@ -82,6 +82,29 @@ class SafeSettingsTests(unittest.TestCase):
         finally:
             root.destroy()
 
+    def test_keymap_reset_restores_defaults(self):
+        import threading
+        import tkinter as tk
+        import core
+        from Settings import DEFAULT_KEYMAPS, GuiSettings
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            with tempfile.TemporaryDirectory() as folder, patch.object(GuiSettings, 'SETTING_PATH', str(Path(folder) / 'settings.ini')):
+                owner = type('Owner', (), {'KEY_NAMES': core.Core.KEY_NAMES, 'HAT_NAMES': core.Core.HAT_NAMES,
+                                           'STICK_NAMES': core.Core.STICK_NAMES})()
+                owner.settings, owner.lock = GuiSettings(), threading.RLock()
+                core.Core.set_keymap(owner, {'A': 'z', 'LS_UP': 'i'})
+                self.assertEqual(core.Core.keymap(owner)['z'], 'A')
+                core.Core.reset_keymap(owner)
+                config = safe_settings.read_config(owner.settings.SETTING_PATH)
+                for section, values in DEFAULT_KEYMAPS.items():
+                    self.assertEqual(dict(config[section]), values)
+                self.assertEqual(core.Core.keymap(owner)['a'], 'A')
+                self.assertNotIn('i', core.Core.keymap(owner))
+        finally:
+            root.destroy()
+
 
 class ImageErrorTests(unittest.TestCase):
     def test_missing_and_invalid_images_name_the_file(self):

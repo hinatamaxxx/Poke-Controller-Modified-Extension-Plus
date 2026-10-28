@@ -882,6 +882,17 @@ class Core:
     KEY_NAMES = {'Key.up': 'ArrowUp', 'Key.down': 'ArrowDown', 'Key.left': 'ArrowLeft', 'Key.right': 'ArrowRight',
                  'Key.space': ' ', 'Key.enter': 'Enter', 'Key.tab': 'Tab', 'Key.backspace': 'Backspace'}
     HAT_NAMES = {'Hat.TOP': 'UP', 'Hat.BTM': 'DOWN', 'Hat.LEFT': 'LEFT', 'Hat.RIGHT': 'RIGHT'}
+    def reset_keymap(self):
+        """Put the keyboard mapping back to what a new profile starts with."""
+        from safe_settings import read_config, write_config
+        from Settings import DEFAULT_KEYMAPS
+        with self.lock:
+            config = read_config(self.settings.SETTING_PATH)
+            for section, values in DEFAULT_KEYMAPS.items():
+                config[section] = dict(values)
+            write_config(self.settings.SETTING_PATH, config)
+            self.settings.load()
+
     STICK_NAMES = {'Direction.UP': 'LS_UP', 'Direction.DOWN': 'LS_DOWN', 'Direction.LEFT': 'LS_LEFT', 'Direction.RIGHT': 'LS_RIGHT'}
 
     def keymap(self):
