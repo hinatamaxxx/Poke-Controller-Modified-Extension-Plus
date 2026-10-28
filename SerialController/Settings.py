@@ -11,6 +11,49 @@ from safe_settings import read_config, write_config
 from logging import getLogger  # , DEBUG, NullHandler
 
 
+# The keyboard mapping a new profile starts with (also what 初期設定に戻す restores).
+DEFAULT_KEYMAPS = {
+    "KeyMap-Button": {
+        "Button.Y": "y",
+        "Button.B": "b",
+        "Button.X": "x",
+        "Button.A": "a",
+        "Button.L": "l",
+        "Button.R": "r",
+        "Button.ZL": "k",
+        "Button.ZR": "e",
+        "Button.MINUS": "m",
+        "Button.PLUS": "p",
+        "Button.LCLICK": "q",
+        "Button.RCLICK": "w",
+        "Button.HOME": "h",
+        "Button.CAPTURE": "c",
+    },
+    "KeyMap-Direction": {
+        # The arrow keys play the D-pad (KeyMap-Hat); the left stick is unassigned until chosen in the key settings.
+        "Direction.UP": "20100",
+        "Direction.RIGHT": "20101",
+        "Direction.DOWN": "20110",
+        "Direction.LEFT": "20111",
+        "Direction.UP_RIGHT": "20001",
+        "Direction.DOWN_RIGHT": "20002",
+        "Direction.DOWN_LEFT": "20010",
+        "Direction.UP_LEFT": "20011",
+    },
+    "KeyMap-Hat": {
+        "Hat.TOP": "Key.up",
+        "Hat.TOP_RIGHT": "10001",
+        "Hat.RIGHT": "Key.right",
+        "Hat.BTM_RIGHT": "10011",
+        "Hat.BTM": "Key.down",
+        "Hat.BTM_LEFT": "10101",
+        "Hat.LEFT": "Key.left",
+        "Hat.TOP_LEFT": "10111",
+        "Hat.CENTER": "11000",
+    },
+}
+
+
 class Var:
     """Minimal stand-in for tkinter variables so settings work without a window."""
 
@@ -198,44 +241,8 @@ class GuiSettings:
             "Single or Double": "シングル",
         }
         # keyconfig
-        self.setting["KeyMap-Button"] = {
-            "Button.Y": "y",
-            "Button.B": "b",
-            "Button.X": "x",
-            "Button.A": "a",
-            "Button.L": "l",
-            "Button.R": "r",
-            "Button.ZL": "k",
-            "Button.ZR": "e",
-            "Button.MINUS": "m",
-            "Button.PLUS": "p",
-            "Button.LCLICK": "q",
-            "Button.RCLICK": "w",
-            "Button.HOME": "h",
-            "Button.CAPTURE": "c",
-        }
-        self.setting["KeyMap-Direction"] = {
-            # The arrow keys play the D-pad (KeyMap-Hat); the left stick is unassigned until chosen in the key settings.
-            "Direction.UP": "20100",
-            "Direction.RIGHT": "20101",
-            "Direction.DOWN": "20110",
-            "Direction.LEFT": "20111",
-            "Direction.UP_RIGHT": "20001",
-            "Direction.DOWN_RIGHT": "20002",
-            "Direction.DOWN_LEFT": "20010",
-            "Direction.UP_LEFT": "20011",
-        }
-        self.setting["KeyMap-Hat"] = {
-            "Hat.TOP": "Key.up",
-            "Hat.TOP_RIGHT": "10001",
-            "Hat.RIGHT": "Key.right",
-            "Hat.BTM_RIGHT": "10011",
-            "Hat.BTM": "Key.down",
-            "Hat.BTM_LEFT": "10101",
-            "Hat.LEFT": "Key.left",
-            "Hat.TOP_LEFT": "10111",
-            "Hat.CENTER": "11000",
-        }
+        for section, values in DEFAULT_KEYMAPS.items():
+            self.setting[section] = dict(values)
         self.setting["Shortcut"] = {
             "command_class_1": "None",
             "command_name_1": "(empty)",
