@@ -16,8 +16,9 @@ MESSAGES = {
     'camera': 'キャプチャーボードの映像が途切れました',
     'serial': 'マイコン（COMポート）との接続が切れました',
     'finished': 'スクリプトが終了しました',
+    'sleep': 'PCがスリープなどで止まっていたため、スクリプトを止めました（その間もSwitchは動いています）',
 }
-NOTIFIED = ('error', 'frozen', 'camera', 'serial')
+NOTIFIED = ('error', 'frozen', 'camera', 'serial', 'sleep')
 
 
 class Watch:

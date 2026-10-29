@@ -90,5 +90,33 @@ class DialogsTest(unittest.TestCase):
             Command.dialogue_handler = None
 
 
+class SleepTest(unittest.TestCase):
+    def test_a_running_script_is_stopped_after_the_pc_slept(self):
+        import threading
+        from unittest.mock import Mock
+        import core
+        owner = Mock(lock=threading.RLock(), running=True)
+        core.Core._resumed(owner, 600)
+        owner.watch.expect_stop.assert_called_once_with()
+        owner.watch.report.assert_called_once_with('sleep', '約600秒')
+        owner.cur_command.end.assert_called_once_with(owner.ser)
+        owner.reset_mock()
+        owner.running = False
+        core.Core._resumed(owner, 600)
+        owner.cur_command.end.assert_not_called()
+
+    def test_the_fork_origins_sleep_watch_sees_a_gap(self):
+        from services.sleep_watch import SleepWatch
+        now = [1000.0]
+        seen = []
+        watch = SleepWatch(seen.append, clock=lambda: now[0])
+        watch._last = now[0]
+        now[0] += 1.5
+        self.assertEqual(watch.check(), 0)
+        now[0] += 300
+        watch.check()
+        self.assertEqual(len(seen), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

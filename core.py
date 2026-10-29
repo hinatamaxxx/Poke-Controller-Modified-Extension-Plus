@@ -348,6 +348,10 @@ class Core:
         self._clip_pending = False
         Discord_Notify.after_send = self.discord_after_send
         self.recorder = Recorder(self)
+        # The fork origin's SleepWatch: after the PC slept, a running script is stopped (the Switch kept going).
+        from services.sleep_watch import SleepWatch
+        self.sleep_watch = SleepWatch(self._resumed)
+        self.sleep_watch.start()
         self.load_scripts()
         self.open_camera()
         self.open_serial()
@@ -814,6 +818,16 @@ class Core:
             command.start(self.ser, self._finished)
             self.watch.script_started(kind, name, restart)
 
+    def _resumed(self, seconds):
+        """The PC was suspended for this many seconds: stop the running script and say why."""
+        with self.lock:
+            if not self.running or self.cur_command is None:
+                return
+            self.watch.expect_stop()
+            self.watch.report('sleep', f'約{int(seconds)}秒')
+            self.dialogs.cancel_all()
+            self.cur_command.end(self.ser)
+
     def _finished(self):
         self.running = False
         self.dialogs.cancel_all()
@@ -1035,6 +1049,7 @@ class Core:
 
     def close(self):
         """Stop the script, release the port and camera, and save settings."""
+        self.sleep_watch.stop()
         self.stop_script()
         if self.recorder.current and self.recorder.current['thread'].is_alive():
             self.recorder.stop()

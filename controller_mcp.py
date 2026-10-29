@@ -428,7 +428,8 @@ def build_server(endpoint_path=None, autostart=True):
     @server.tool(annotations=read_only)
     def get_incidents(session_id: str, after: int = 0) -> dict:
         """Incidents after the given id: a script error, the picture frozen (game or Switch hung), the capture device
-        or COM port lost, or a script that finished. Each has a saved screen image path. Also returns watch settings."""
+        or COM port lost, a script stopped because the PC slept (kind sleep), or a script that finished. Each has a saved
+        screen image path. Also returns watch settings."""
         return call(session_id, 'incidents', {'after': after})
 
     @server.tool(annotations=read_only)
