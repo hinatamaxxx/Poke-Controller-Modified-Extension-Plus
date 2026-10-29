@@ -183,6 +183,7 @@ python -m venv .venv
 | `plus_audio.py` | 音声の入力が Windows の標準の方式で開けないときに、同じ機器を別の方式（WDM-KS など）で開く。開くのが固まっても待ち続けない |
 
 - `plus_runtime.py` は、起動したときにフォーク元の関数を包んで差し込みます。
+- 本体の `core.py` は、フォーク元の `services/app_core.py`（AppCore）の部品を少しずつ使う形に寄せています。今使っているもの: スクリプトの一覧と作成（`CommandService`）、実行リスト、予約、スリープの検知、キーボード入力、目隠し（`Mask`）、音声（`AudioService`）、Discord の送り先。カメラ・シリアル・画面の状態は、まだこのアプリのものです。
 - フォーク元の起動用の bat、`bootstrap/`、`pyproject.toml` などは、取り込みを楽にするためにリポジトリには残しています。インストールには含めません。
 
 フォーク元の更新を取り込む手順:
