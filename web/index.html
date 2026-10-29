@@ -318,6 +318,11 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .mask-row .name { flex: 1; min-width: 0; }
 .mask-row input[type=color] { width: 32px; height: 22px; padding: 0; border: 1px solid var(--line, #555); background: none; }
 .mask-hint { font-size: 12px; opacity: .8; }
+.audio[hidden] { display: none; }
+.audio-level { flex: 1; min-width: 60px; height: 6px; border-radius: 3px; background: rgba(127, 127, 127, .3); overflow: hidden; }
+.audio-level span { display: block; height: 100%; width: 0; background: #3fb950; }
+.audio-db { min-width: 5em; font-size: 12px; opacity: .8; }
+#audio-volume { width: 120px; }
 .mask-hint[hidden] { display: none; }
 .video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
 .video .empty[hidden] { display: none; }
@@ -652,6 +657,25 @@ table.notify input { margin: 1px 0; }
         <div class="error full" id="serial-error"></div>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
+      <h3>音声</h3>
+      <div class="audio" id="audio">
+        <div class="form">
+          <label for="audio-input">入力</label>
+          <div class="inline">
+            <select id="audio-input" aria-label="音声の入力"></select>
+            <button class="cmd" id="audio-rescan">再検索</button>
+          </div>
+          <label for="audio-output">再生先</label>
+          <div class="inline"><select id="audio-output" aria-label="音声の再生先"></select></div>
+          <label for="audio-volume">音量</label>
+          <div class="inline"><input type="range" id="audio-volume" min="0" max="100" step="1" aria-label="音量"><span class="audio-level" id="audio-level"><span></span></span><span class="audio-db" id="audio-db"></span></div>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="audio-use"> 音声を取り込む</label>
+          <label><input type="checkbox" id="audio-playback"> PC で鳴らす</label>
+        </div>
+      </div>
+      <div class="error full" id="audio-error"></div>
     </div>
 
     <div class="tabpanel" role="tabpanel" id="panel-pad" aria-labelledby="tab-pad" hidden>
@@ -1264,6 +1288,42 @@ $('sc-stop').addEventListener('click', () => scheduleCommand({stop: $('sc-stop-k
 $('sc-start-cancel').addEventListener('click', () => scheduleCommand({cancel: 'start'}));
 $('sc-stop-cancel').addEventListener('click', () => scheduleCommand({cancel: 'stop'}));
 
+// The capture board's sound (the fork origin's Audio tab): taken in by the app and played on this PC.
+function saveAudio(values) {
+  $('audio-error').textContent = '';
+  return call('command', {action: 'audio', values}).catch(error => { $('audio-error').textContent = error.message; });
+}
+function fillSelect(select, items, value) {
+  const key = JSON.stringify(items);
+  if (select.dataset.key !== key) {
+    select.dataset.key = key;
+    select.replaceChildren(...items.map(([v, text]) => Object.assign(document.createElement('option'), {value: v, textContent: text})));
+  }
+  if (document.activeElement !== select) select.value = value;
+}
+function renderAudio() {
+  const audio = state.audio || {};
+  $('audio').hidden = !audio.available;
+  if (audio.available === false) $('audio-error').textContent = '音声を扱うライブラリ（sounddevice）が使えません。';
+  if (!audio.available) return;
+  const inputs = audio.inputs.map(name => [name, name]);
+  if (!inputs.length) inputs.push(['', '見つかりません']);
+  fillSelect($('audio-input'), inputs, audio.input);
+  fillSelect($('audio-output'), audio.outputs.map(name => [name, name === 'Default' ? '既定の再生デバイス' : name]), audio.output);
+  $('audio-use').checked = audio.use;
+  $('audio-playback').checked = audio.playback;
+  if (document.activeElement !== $('audio-volume')) $('audio-volume').value = audio.volume;
+  const meter = audio.meter;
+  $('audio-level').firstElementChild.style.width = (meter ? meter.percent : 0) + '%';
+  $('audio-db').textContent = !audio.use ? '' : meter ? (meter.text === 'No signal' ? '音が来ていません' : meter.text) : '';
+}
+$('audio-use').addEventListener('change', () => saveAudio({use: $('audio-use').checked}));
+$('audio-playback').addEventListener('change', () => saveAudio({playback: $('audio-playback').checked}));
+$('audio-input').addEventListener('change', () => saveAudio({input: $('audio-input').value}));
+$('audio-output').addEventListener('change', () => saveAudio({output: $('audio-output').value}));
+$('audio-volume').addEventListener('change', () => saveAudio({volume: Number($('audio-volume').value)}));
+$('audio-rescan').addEventListener('click', () => saveAudio({refresh: true}));
+
 // Masks (the fork origin's Mask tab): shapes in camera pixels, drawn by the app on the picture this page shows.
 let maskItems = [], maskShape = null, maskDrag = null, maskKey = '';
 const MASK_NAMES = {Rectangle: '四角', Ellipse: '楕円'};
@@ -1725,6 +1785,7 @@ function render() {
   renderScriptWindows();
   renderSchedule();
   renderMasks();
+  renderAudio();
   $('switch-keys').hidden = !!state.keyboard || !state.serial_open;
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
