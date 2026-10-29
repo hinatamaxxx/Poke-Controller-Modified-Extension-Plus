@@ -31,6 +31,7 @@ Claude Code と Codex では、プラグインを入れると自動でつなが�
 | `set_status` | 画面の上部に、目標・ゲーム内で今していること・進み具合を表示 |
 | `add_note` / `get_assist` | 利用者向けのメモを残す／メモ・状況・Claude の操作の記録・連続操作の進み具合を読む |
 | `get_dialogs` / `answer_dialog` | スクリプトが待っているダイアログを読む／答える |
+| `list_windows` / `get_window` / `operate_window` | スクリプトが自分で出した窓（tkinter、cv2.imshow など）を一覧・画像で見て、クリック・入力・キーで操作する |
 | `list_devices` / `configure_devices` | キャプチャ機器と COM ポートの一覧／選択・接続 |
 | `start_recording` / `stop_recording` / `list_recordings` | 映像（640×360、最大10fps・600秒）と、その間のボタン入力・画像の確認を録画 |
 | `get_recording_overview` / `get_recording_frame` / `get_recording_inputs` | 録画の一覧画像（時刻つき）と入力の流れ／1コマ／入力の全記録 |

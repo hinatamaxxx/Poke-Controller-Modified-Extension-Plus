@@ -1,6 +1,6 @@
 {
   "name": "poke-controller",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Poke-Controller（ポケコン）で Nintendo Switch を操作する。操作画面を開く、ボタン・スティック・スクリプト・映像・見張りの MCP の道具、スクリプトを作る手順。Windows 専用。Poke-Controller 本体のインストールが必要。",
   "author": {
     "name": "hinatamaxxx"

@@ -423,6 +423,31 @@ class LocalControl(ApiServer):
                      tags=catalog)
         return state
 
+    def window_input(self, params, via_mcp):
+        """Operate a window a script opened: click / key / type / scroll / close / desktop."""
+        windows, window = self.core.windows, params.get('window')
+        kind = params.get('kind')
+        if kind == 'click':
+            windows.click(window, params.get('x', 0), params.get('y', 0), params.get('button', 'left'), bool(params.get('double')))
+        elif kind == 'key':
+            windows.key(window, str(params.get('key', '')))
+        elif kind == 'type':
+            windows.type(window, str(params.get('text', '')))
+        elif kind == 'scroll':
+            windows.scroll(window, params.get('x', 0), params.get('y', 0), params.get('delta', 0))
+        elif kind == 'close':
+            windows.close(window)
+        elif kind == 'desktop':
+            windows.show_on_desktop(window)
+        else:
+            raise ValueError('Unknown window input')
+        if via_mcp:
+            try:
+                self.core.assist.record('claude', 'スクリプトの窓を操作')
+            except Exception:
+                pass
+        return {'accepted': True}
+
     def check_manual_input(self):
         if self.core.running:
             raise ValueError('Stop the running script before manual input')
@@ -493,7 +518,8 @@ class LocalControl(ApiServer):
         keys.holdEnd(held)
 
     UNLOCKED = {'frame', 'frame_raw', 'summary', 'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
-                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices', 'about', 'discord_webhook'}
+                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices', 'about', 'discord_webhook',
+                'windows', 'window_frame', 'window_input'}
     UNLOCKED_ACTIONS = {'notify_test', 'record_stop'}
 
     def neutral(self):
@@ -543,6 +569,17 @@ class LocalControl(ApiServer):
             return {'jpeg': self.encode_frame(width=640 if params.get('small') else None), 'at': at}
         if method == 'about':
             return self.core.about()
+        if method == 'windows':
+            return {'windows': core.windows.list()}
+        if method == 'window_frame':
+            import hashlib
+            png = core.windows.png(params.get('window'))
+            digest = hashlib.sha1(png).hexdigest()[:16]
+            if params.get('after') == digest:
+                return {'data': None, 'at': digest}
+            return {'data': base64.b64encode(png).decode(), 'mimeType': 'image/png', 'at': digest}
+        if method == 'window_input':
+            return self.window_input(params, via_mcp)
         if method == 'discord_webhook':
             if via_mcp:
                 raise ValueError('Not available')

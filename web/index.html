@@ -464,6 +464,20 @@ table.notify input { margin: 1px 0; }
 .note-add { display: flex; gap: 4px; flex: none; }
 .note-add input { flex: 1; min-width: 0; }
 
+/* Windows a script opened itself (tkinter, cv2.imshow, ...): pictures of the real windows, operated from here. */
+.script-windows { position: fixed; inset: 0; z-index: 11; pointer-events: none; }
+.swin { position: absolute; pointer-events: auto; display: flex; flex-direction: column; max-width: calc(100vw - 16px);
+        background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.swin:focus-within { border-color: var(--accent); }
+.swin-head { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-bottom: 1px solid var(--line); touch-action: none; user-select: none; }
+.swin-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.swin-head button.close { font: inherit; font-size: 14px; width: 26px; height: 24px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
+.swin-head button.close:hover { background: var(--chip); color: var(--text); }
+.swin-body { position: relative; line-height: 0; }
+.swin-body img { display: block; max-width: calc(100vw - 18px); height: auto; image-rendering: auto; }
+.swin-body img.pop { position: absolute; max-width: none; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.swin-keys { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+
 /* Script dialog */
 .modal { position: fixed; inset: 0; background: var(--shade); display: grid; place-items: center; padding: 12px; z-index: 10; }
 .modal[hidden] { display: none; }
@@ -687,6 +701,7 @@ table.notify input { margin: 1px 0; }
   </section>
 </main>
 
+<div class="script-windows" id="script-windows"></div>
 <div class="modal" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
   <form class="box" id="dialog-form">
     <h2 id="dialog-title"></h2>
@@ -859,6 +874,135 @@ async function call(method, params = {}) {
   if (!result.ok) throw new Error(result.error || 'Operation failed');
   return result.result;
 }
+
+// ---- Windows a script opened itself ----
+// The app lists them in the state; each card shows the window's picture (refreshed only when it changes) and passes
+// clicks, wheel, keys and text back to it. Drop-downs of a window are drawn over its card where they really are.
+let windowTop = 1;
+const scriptWindows = new Map();  // main window id -> {card, image, pops: Map(id -> img), meta}
+let windowList = [];
+function windowInput(window, values) {
+  return call('window_input', {window, ...values}).catch(error => { $('message').textContent = error.message; });
+}
+function pointIn(image, event) {
+  const box = image.getBoundingClientRect();
+  const scale = image.naturalWidth / box.width || 1;
+  return {x: Math.round((event.clientX - box.left) * scale), y: Math.round((event.clientY - box.top) * scale)};
+}
+function bindWindowImage(image, card) {
+  image.addEventListener('mousedown', event => event.preventDefault());
+  image.addEventListener('click', event => {
+    card.querySelector('.swin-keys').focus({preventScroll: true});
+    windowInput(image.dataset.window, {kind: 'click', ...pointIn(image, event)}).then(() => { refresh(); pollWindows(); });
+  });
+  image.addEventListener('dblclick', event => windowInput(image.dataset.window, {kind: 'click', double: true, ...pointIn(image, event)}));
+  image.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    windowInput(image.dataset.window, {kind: 'click', button: 'right', ...pointIn(image, event)});
+  });
+  image.addEventListener('wheel', event => {
+    event.preventDefault();
+    windowInput(image.dataset.window, {kind: 'scroll', delta: event.deltaY > 0 ? -120 : 120, ...pointIn(image, event)});
+  }, {passive: false});
+}
+function makeScriptWindow(meta) {
+  const card = document.createElement('section');
+  card.className = 'swin';
+  card.setAttribute('aria-label', meta.title || 'スクリプトの窓');
+  card.addEventListener('pointerdown', () => { card.style.zIndex = ++windowTop; });
+  card.innerHTML = '<div class="swin-head"><span class="swin-title"></span>'
+    + '<button type="button" class="mini desktop">デスクトップに出す</button>'
+    + '<button type="button" class="close" aria-label="閉じる" title="閉じる">✕</button></div>'
+    + '<div class="swin-body"><img alt=""><input class="swin-keys" aria-label="スクリプトの窓への入力" autocomplete="off"></div>';
+  const image = card.querySelector('img');
+  image.dataset.window = meta.id;
+  bindWindowImage(image, card);
+  card.querySelector('.close').addEventListener('click', () => windowInput(meta.id, {kind: 'close'}).then(refresh));
+  card.querySelector('.desktop').addEventListener('click', () => windowInput(meta.id, {kind: 'desktop'}).then(refresh));
+  // Keys typed while the card has focus go to the window, not to the Switch (keyboard play skips inputs).
+  const keys = card.querySelector('.swin-keys');
+  const send = text => { if (text) windowInput(meta.id, {kind: 'type', text}).then(pollWindows); };
+  keys.addEventListener('keydown', event => {
+    if (event.isComposing || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (['Enter', 'Backspace', 'Tab', 'Escape', 'Delete', 'Home', 'End', 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'PageUp', 'PageDown'].includes(event.key)) {
+      event.preventDefault();
+      windowInput(meta.id, {kind: 'key', key: event.key}).then(pollWindows);
+    }
+  });
+  keys.addEventListener('input', event => { if (!event.isComposing) { send(keys.value); keys.value = ''; } });
+  keys.addEventListener('compositionend', () => { send(keys.value); keys.value = ''; });
+  // Move the card by its title bar.
+  const head = card.querySelector('.swin-head');
+  head.addEventListener('pointerdown', event => {
+    if (event.target.closest('button')) return;
+    const start = {x: event.clientX - card.offsetLeft, y: event.clientY - card.offsetTop};
+    head.setPointerCapture(event.pointerId);
+    const move = moveEvent => {
+      card.style.left = Math.max(0, Math.min(innerWidth - 60, moveEvent.clientX - start.x)) + 'px';
+      card.style.top = Math.max(0, Math.min(innerHeight - 30, moveEvent.clientY - start.y)) + 'px';
+    };
+    head.addEventListener('pointermove', move);
+    head.addEventListener('pointerup', () => head.removeEventListener('pointermove', move), {once: true});
+  });
+  // A new window opens in the middle, a little apart from the others.
+  const offset = scriptWindows.size * 24;
+  card.style.left = Math.max(8, (innerWidth - meta.width) / 2 + offset) + 'px';
+  card.style.top = Math.max(44, (innerHeight - meta.height) / 3 + offset) + 'px';
+  $('script-windows').append(card);
+  return {card, image, pops: new Map(), meta};
+}
+function renderScriptWindows() {
+  windowList = (state.windows || []).filter(w => !w.desktop);
+  const mains = windowList.filter(w => !w.popup);
+  for (const [id, entry] of scriptWindows) {
+    if (!mains.some(w => w.id === id)) { entry.card.remove(); scriptWindows.delete(id); }
+  }
+  for (const meta of mains) {
+    const entry = scriptWindows.get(meta.id) || makeScriptWindow(meta);
+    scriptWindows.set(meta.id, entry);
+    entry.meta = meta;
+    entry.card.querySelector('.swin-title').textContent = meta.title || 'スクリプトの窓';
+    const pops = windowList.filter(w => w.popup && w.parent === meta.id);
+    for (const [id, img] of entry.pops) {
+      if (!pops.some(w => w.id === id)) { img.remove(); entry.pops.delete(id); }
+    }
+    for (const pop of pops) {
+      let img = entry.pops.get(pop.id);
+      if (!img) {
+        img = Object.assign(document.createElement('img'), {className: 'pop', alt: ''});
+        img.dataset.window = pop.id;
+        bindWindowImage(img, entry.card);
+        entry.card.querySelector('.swin-body').append(img);
+        entry.pops.set(pop.id, img);
+      }
+      // Where the drop-down really is, in the card's (possibly scaled) picture.
+      const scale = entry.image.naturalWidth ? entry.image.getBoundingClientRect().width / entry.image.naturalWidth : 1;
+      Object.assign(img.style, {left: (pop.x - meta.x) * scale + 'px', top: (pop.y - meta.y) * scale + 'px', width: pop.width * scale + 'px'});
+    }
+  }
+  if (windowList.length) pollWindows();
+}
+const windowFrames = new Map();  // window id -> last picture's id, so an unchanged picture is not sent again
+let windowsBusy = false;
+async function pollWindows() {
+  if (windowsBusy) return;
+  windowsBusy = true;
+  try {
+    for (const entry of scriptWindows.values()) {
+      for (const img of [entry.image, ...entry.pops.values()]) {
+        const id = img.dataset.window;
+        const result = await call('window_frame', {window: id, after: windowFrames.get(id)}).catch(() => null);
+        if (result && result.data) {
+          img.src = `data:${result.mimeType};base64,${result.data}`;
+          windowFrames.set(id, result.at);
+        }
+      }
+    }
+  } finally {
+    windowsBusy = false;
+  }
+}
+setInterval(() => { if (scriptWindows.size && !document.hidden) pollWindows(); }, 250);
 
 function command(action, values = {}) {
   $('message').textContent = '';
@@ -1191,6 +1335,7 @@ function render() {
   renderRecording();
   renderWatch();
   renderDialog();
+  renderScriptWindows();
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
   fillLog('log1', state.log + (exec === 1 ? local : ''));
