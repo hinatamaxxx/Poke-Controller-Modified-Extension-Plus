@@ -118,6 +118,14 @@ class SleepTest(unittest.TestCase):
         self.assertEqual(len(seen), 1)
 
 
+class SerialBaudTest(unittest.TestCase):
+    def test_the_format_decides_the_baud_rate(self):
+        import core
+        bauds = core.serial_bauds()
+        self.assertEqual(bauds['Default'], 9600)
+        self.assertEqual({rate for name, rate in bauds.items() if name.startswith('3DS')}, {115200})
+
+
 class ScriptsTest(unittest.TestCase):
     def test_an_edited_script_is_read_again_once_also_inside_a_run_list(self):
         from types import SimpleNamespace

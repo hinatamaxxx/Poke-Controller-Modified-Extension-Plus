@@ -22,6 +22,12 @@ def serial_formats():
     return transport_names()
 
 
+def serial_bauds():
+    """Each Data Format's baud rate as the fork origin fixes it (None where the board has no baud rate)."""
+    from services.serial_service import forced_baud_rate
+    return {name: forced_baud_rate(name) for name in serial_formats()}
+
+
 class Mock_typer:
     """Just enough of KeyboardTyper for its unavailable_reason (which only looks at the port and the format)."""
 
@@ -1297,7 +1303,9 @@ class Core:
             fmt = fmt or self.settings.serial_data_format_name.get() or 'Default'
             if fmt not in serial_formats():
                 raise ValueError('Unknown serial format')
-            baud = int(baud or (115200 if '3DS Controller' in fmt else 9600))
+            from services.serial_service import forced_baud_rate
+            forced = forced_baud_rate(fmt)  # the fork origin: the format decides the baud rate (None: an FTDI board has none)
+            baud = forced if forced is not None else int(baud or 9600)
             port = str(port or '').strip()
             if self.ser.isOpened():
                 self.ser.closeSerial()
@@ -1409,6 +1417,7 @@ class Core:
                 'serial_open': self.serial_open(),
                 'serial': {'port': self.serial_target(), 'baud': int(self.settings.baud_rate.get() or 9600),
                            'format': self.settings.serial_data_format_name.get() or 'Default', 'formats': serial_formats(),
+                           'bauds': serial_bauds(),
                            'error': self.ser.last_error},
                 'held': [getattr(b, 'showName', None) or b.name for b in keys.holdButton],
                 'options': self.options(), 'dialogs': self.dialogs.current(), 'keymap': self.keymap(),
