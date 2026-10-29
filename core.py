@@ -283,6 +283,9 @@ class Core:
         self.settings = Settings.GuiSettings()
         self.log1, self.log2 = LogArea(), LogArea()
         self.overlay, self.dialogs = Overlay(), Dialogs()
+        import script_windows
+        script_windows.track_tkinter()
+        self.windows = script_windows.ScriptWindows()
         Command.text_area_1, Command.text_area_2 = self.log1, self.log2
         Command.canvas = self.overlay
         Command.app_name = f'{NAME} ver.{VERSION}'
@@ -303,6 +306,7 @@ class Core:
         KeyPress.serial_data_format_name = self.settings.serial_data_format_name.get() or 'Default'
         self.keys_software_controller = KeyPress(self.ser)
         self.cur_command, self.running = None, False
+        self.starting = None  # name of a script whose setup (e.g. its own settings window) is still open
         self.reported_error = ''
         from assist import Assist
         self.assist = Assist(self, profile_dir)
@@ -707,6 +711,18 @@ class Core:
                 raise ValueError('Demo mode only runs PortableDemo')
             if not self.serial_open():
                 raise ValueError('COM port is not connected')
+            if self.starting:
+                raise ValueError('A script is already starting')
+            self.starting = name
+        # A script may open its own settings window while it is created and wait there. Create it on its own thread,
+        # so the app keeps answering (and shows that window) until the user closes it.
+        threading.Thread(target=self._create_and_start, args=(cls, kind, name, restart), daemon=True,
+                         name='script-setup').start()
+
+    def _create_and_start(self, cls, kind, name, restart):
+        from Commands.CommandBase import Command
+        from Commands import PythonCommandBase
+        try:
             if kind == 'python' and issubclass(cls, PythonCommandBase.ImageProcPythonCommand):
                 try:
                     command = cls(self.camera, self.overlay)
@@ -714,6 +730,19 @@ class Core:
                     command = cls(self.camera)
             else:
                 command = cls()
+        except BaseException as error:
+            with self.lock:
+                if self.starting == name:
+                    self.starting = None
+                    print(f'開始できませんでした: {name}: {type(error).__name__}: {error}')
+            return
+        with self.lock:
+            if self.starting != name or self.running:
+                return  # stopped while its setup was open
+            self.starting = None
+            if not self.serial_open():
+                print(f'開始できませんでした: {name}: COM ポートがつながっていません')
+                return
             self.keys_software_controller.neutral()
             Command.isPause = False
             Command.cur_command_name = command.NAME
@@ -730,6 +759,10 @@ class Core:
         from Commands.CommandBase import Command
         with self.lock:
             self.assist.cancel_sequence()
+            if self.starting:
+                print('停止 ' + self.starting + '（開始前）')
+                self.starting = None
+                self.windows.close_all()
             if self.running and self.cur_command is not None:
                 self.watch.expect_stop()
                 print('停止 ' + self.cur_command.NAME)
@@ -927,6 +960,7 @@ class Core:
         from Commands.CommandBase import Command
         keys = self.keys_software_controller
         return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
+                'starting': self.starting or '', 'windows': self.windows.list(),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},

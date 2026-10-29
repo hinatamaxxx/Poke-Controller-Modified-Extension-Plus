@@ -58,6 +58,8 @@ def build_server(endpoint_path=None, autostart=True):
         'For manual play, use press_buttons (or run_sequence for timed series) and check the result with get_capture '
         'or find_template. Keep the user informed with set_status, and leave findings with add_note. '
         'Scripts may wait on dialogues: see get_dialogs and answer_dialog. '
+        'A script may also open windows of its own (a settings window when it starts, a status window, cv2.imshow): '
+        'the app shows them in its page instead of on the desktop; see list_windows, get_window and operate_window. '
         'The app has no window of its own: get_web_url returns the page to open in a browser to watch and operate it, '
         'including settings (camera, COM port) and dialogues that scripts show. '
         'To turn what the user describes into a script: start_recording, do it yourself step by step '
@@ -268,6 +270,44 @@ def build_server(endpoint_path=None, autostart=True):
     def answer_dialog(session_id: str, dialog_id: int, values: list | None) -> dict:
         """Answer a script dialogue: values in field order, skipping 'next' separators; null cancels it."""
         return call(session_id, 'command', {'action': 'answer', 'values': {'dialog': dialog_id, 'values': values}})
+
+    @server.tool(annotations=read_only)
+    def list_windows(session_id: str) -> list:
+        """Windows a script opened itself (tkinter, cv2.imshow, pygame, ...), top first: id, title, width, height.
+        popup=true is a drop-down list or menu that belongs to the window named in parent.
+        A script that opens a settings window while starting waits there until it is closed (e.g. its 開始 button)."""
+        return call(session_id, 'windows')['windows']
+
+    @server.tool(annotations=read_only, structured_output=False)
+    def get_window(session_id: str, window_id: str) -> list[ImageContent]:
+        """The picture of one script window. operate_window takes x and y in pixels of this picture."""
+        result = call(session_id, 'window_frame', {'window': window_id})
+        return [ImageContent(type='image', data=result['data'], mime_type=result['mimeType'])]
+
+    @server.tool(annotations=control)
+    def operate_window(session_id: str, window_id: str, action: str, x: int = 0, y: int = 0, text: str = '',
+                       key: str = '', delta: int = -120) -> dict:
+        """Use a script window like a mouse and keyboard.
+        action: click / double_click / right_click at x, y (pixels of get_window's picture; open a drop-down with
+        click, then click its item in the popup window from list_windows); type = text into the field chosen by a
+        click; key = Enter Backspace Tab Escape Delete Home End ArrowUp ArrowDown ArrowLeft ArrowRight PageUp PageDown;
+        scroll at x, y by delta (-120 = one step down); close; desktop = show the real window on the desktop instead.
+        Check the result with get_window."""
+        params = {'window': window_id}
+        if action in ('click', 'double_click', 'right_click'):
+            params.update(kind='click', x=x, y=y, button='right' if action == 'right_click' else 'left',
+                          double=action == 'double_click')
+        elif action == 'type':
+            params.update(kind='type', text=text)
+        elif action == 'key':
+            params.update(kind='key', key=key)
+        elif action == 'scroll':
+            params.update(kind='scroll', x=x, y=y, delta=delta)
+        elif action in ('close', 'desktop'):
+            params.update(kind=action)
+        else:
+            raise ValueError('action must be click, double_click, right_click, type, key, scroll, close or desktop')
+        return call(session_id, 'window_input', params)
 
     @server.tool(annotations=control)
     def configure_devices(session_id: str, camera_path: str | None = None, port: str | None = None,
