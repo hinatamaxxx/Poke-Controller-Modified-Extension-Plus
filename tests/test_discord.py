@@ -75,6 +75,40 @@ class WebhookTests(unittest.TestCase):
         self.assertEqual(post.call_args.kwargs['files']['file'], ('clip.mp4', b'data'))
 
 
+class DestinationTests(unittest.TestCase):
+    def setUp(self):
+        import threading
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.path = str(Path(folder.name) / 'discord_token.ini')
+        patcher = patch.object(DiscordNotify.Discord_Notify, 'DISCORD_SETTING_PATH', self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        Path(self.path).write_text('[DISCORD_WEBHOOK]\nwebhook_url = https://discord.com/api/webhooks/1/aaaa\nusername = ぼく\n',
+                                   encoding='utf-8')
+        import core
+        self.core, self.owner = core.Core, Mock(lock=threading.RLock())
+
+    def test_add_rename_delete_and_reject(self):
+        url = 'https://discord.com/api/webhooks/22/bbbbbbbb'
+        self.core.save_discord_destination(self.owner, 'ROM2', url)
+        self.assertEqual(self.core.discord_destinations(self.owner), [{'name': 'ROM2', 'url': url}])
+        self.core.save_discord_destination(self.owner, 'ROM3', url, 'ROM2')
+        self.assertEqual([d['name'] for d in self.core.discord_destinations(self.owner)], ['ROM3'])
+        for name, address, reason in (('ALL', url, '使えません'), ('X', 'https://example.com', 'Webhook URL'),
+                                      ('DISCORD_WEBHOOK', url, '上の'), ('ROM3', url, 'すでに')):
+            with self.assertRaisesRegex(ValueError, reason):
+                self.core.save_discord_destination(self.owner, name, address)
+        with quiet():
+            notify = DiscordNotify.Discord_Notify()
+        self.assertEqual(notify.resolve(0, 'ROM3'), 'ROM3')
+        self.assertEqual(notify.username_dict['ROM3'], 'ぼく')  # its own name is empty: the default webhook's name
+        self.core.delete_discord_destination(self.owner, 'ROM3')
+        self.assertEqual(self.core.discord_destinations(self.owner), [])
+        with self.assertRaises(ValueError):
+            self.core.delete_discord_destination(self.owner, 'DISCORD_WEBHOOK')
+
+
 class SwitchCaptureTests(unittest.TestCase):
     def make(self):
         from Commands import PythonCommandBase

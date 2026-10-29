@@ -11,7 +11,7 @@ description: Poke-Controller（ポケコン）の自動化スクリプト（Pyth
 2. **似たスクリプトを探す**: `list_script_files` と `read_script` で既存のスクリプトを見て、書き方（クラスの形、`self.press`、`self.wait`、`isContainTemplate` など）を合わせる。使えるものがあれば、それを直すほうを提案する。
 3. **1 手ずつ試す**: `start_recording` で録画を始め、`press_buttons` や `run_sequence` で実際に操作する。画面が変わるたびに `get_capture` で確かめる。待つべき画面（「はい」が出た、色違いの光など）は `save_template` で切り出し、`find_template` で照合する（照合も録画に残る）。
 4. **見直す**: 1 回分が通ったら `stop_recording`。`get_recording_overview` で流れを見直し、利用者のやりたいことと合っているかを、画面の写真を添えて確認する。
-5. **下書きを作る**: `draft_script_from_recording` で下書きを作る。下書きの待ち時間には考えていた時間も含まれるので、画面の照合（`isContainTemplate` を待つループ）に置き換える。終わりの条件、回数の表示、見つけたときの通知（`self.discord_image` など）を足す。Switch 本体の録画と直前の映像の添付は、設定「Discord 連携」のオプションでアプリが行うので、スクリプトには書かない。
+5. **下書きを作る**: `draft_script_from_recording` で下書きを作る。下書きの待ち時間には考えていた時間も含まれるので、画面の照合（`isContainTemplate` を待つループ）に置き換える。終わりの条件、回数の表示、見つけたときの通知（`self.discord_image` など）を足す。送り先を分けたいときは、設定「Discord 連携」の「スクリプトの送り先」の名前を `name='名前'` で渡す。Switch 本体の録画と直前の映像の添付は、設定「Discord 連携」のオプションでアプリが行うので、スクリプトには書かない。
 6. **保存する**: `write_script` で、1 本ごとのフォルダーに保存する（例 `SV/大量発生/大量発生.py`。パスは作業フォルダーの `スクリプト` から）。待つ画面の画像は `save_template` でそのフォルダーの `画像` に（例 `スクリプト/SV/大量発生/画像/hai.png`）、同じゲームのスクリプトで使い回す画像は `スクリプト/SV/画像` に置き、コードでは `isContainTemplate('hai.png')` と名前だけ書く。回数などを保存するファイルは `Path(__file__).parent` を基準にする。上書きの前の版は `Backups/scripts` に残る。読み込みエラーが返ったら直して保存し直す。
 7. **動かして確かめる**: `start_script` で動かし、1 周を映像で確かめてから利用者に任せる。長く回すなら、頼まれた場合に見張る（`operate` の「長時間の実行を見張る」）。
 
