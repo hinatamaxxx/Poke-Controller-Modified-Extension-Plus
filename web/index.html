@@ -309,6 +309,16 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .video img[hidden] { display: none; }
 .video img.waiting { visibility: hidden; }
 .video .frame.pick img { cursor: crosshair; }
+.video .mask-box { position: absolute; border: 2px dashed #ffd800; pointer-events: none; }
+.video .mask-box.ellipse { border-radius: 50%; }
+.video .mask-box[hidden] { display: none; }
+.video .frame.drawing img { touch-action: none; }
+.masks { display: flex; flex-direction: column; gap: 4px; }
+.mask-row { display: flex; align-items: center; gap: 8px; }
+.mask-row .name { flex: 1; min-width: 0; }
+.mask-row input[type=color] { width: 32px; height: 22px; padding: 0; border: 1px solid var(--line, #555); background: none; }
+.mask-hint { font-size: 12px; opacity: .8; }
+.mask-hint[hidden] { display: none; }
 .video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
 .video .empty[hidden] { display: none; }
 .video .pick-info { position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 4px; background: rgba(0, 0, 0, .65); color: #fff; font: 12px/1.4 Consolas, monospace; pointer-events: none; }
@@ -559,6 +569,7 @@ table.notify input { margin: 1px 0; }
       <div class="empty" id="video-empty" hidden>映像がありません</div>
       <div class="down" id="offline" hidden><div><span class="pulse"></span>アプリに接続できません</div></div>
       <div class="down" id="down" hidden><div id="down-text"></div><div class="why" id="down-why"></div><button class="cmd" id="down-restart" hidden>再起動</button></div>
+      <div class="mask-box" id="mask-box" hidden></div>
       <div class="pick-info" id="pick-info" aria-live="polite"></div>
     </div>
   </div>
@@ -607,6 +618,17 @@ table.notify input { margin: 1px 0; }
         <label><input type="checkbox" data-option="show_realtime"> 映像を表示</label>
         <label><input type="checkbox" data-option="show_value"> 座標と色の値</label>
         <label><input type="checkbox" data-option="show_guide"> ガイド</label>
+      </div>
+      <h3>目隠し</h3>
+      <div class="checks">
+        <label><input type="checkbox" id="mask-show"> 映像に表示</label>
+        <label><input type="checkbox" id="mask-apply"> スクリーンショットにも入れる</label>
+      </div>
+      <div class="masks" id="mask-list"></div>
+      <div class="row">
+        <button class="cmd" data-mask-add="Rectangle">＋ 四角</button>
+        <button class="cmd" data-mask-add="Ellipse">＋ 楕円</button>
+        <span class="mask-hint" id="mask-hint" hidden>映像の上をドラッグして範囲を決めます（Esc でやめる）</span>
       </div>
       <div class="row">
         <button class="cmd" id="capture">スクリーンショット</button>
@@ -1242,6 +1264,98 @@ $('sc-stop').addEventListener('click', () => scheduleCommand({stop: $('sc-stop-k
 $('sc-start-cancel').addEventListener('click', () => scheduleCommand({cancel: 'start'}));
 $('sc-stop-cancel').addEventListener('click', () => scheduleCommand({cancel: 'stop'}));
 
+// Masks (the fork origin's Mask tab): shapes in camera pixels, drawn by the app on the picture this page shows.
+let maskItems = [], maskShape = null, maskDrag = null, maskKey = '';
+const MASK_NAMES = {Rectangle: '四角', Ellipse: '楕円'};
+function saveMasks(values) {
+  return call('command', {action: 'masks', values}).catch(error => { $('message').textContent = error.message; });
+}
+function videoGeometry() {
+  const img = $('video'), width = img.naturalWidth, height = img.naturalHeight;
+  if (!width || !height) return null;
+  const frame = $('frame').getBoundingClientRect(), rect = img.getBoundingClientRect();
+  const scale = Math.min(rect.width / width, rect.height / height);
+  return {width, height, scale, left: rect.left - frame.left + (rect.width - width * scale) / 2,
+          top: rect.top - frame.top + (rect.height - height * scale) / 2, frame};
+}
+function showMaskBox(mask) {
+  const box = $('mask-box'), geo = mask && videoGeometry();
+  box.hidden = !geo;
+  if (!geo) return;
+  box.className = 'mask-box' + (mask.shape === 'Ellipse' ? ' ellipse' : '');
+  Object.assign(box.style, {left: geo.left + mask.x1 * geo.scale + 'px', top: geo.top + mask.y1 * geo.scale + 'px',
+                            width: (mask.x2 - mask.x1) * geo.scale + 'px', height: (mask.y2 - mask.y1) * geo.scale + 'px'});
+}
+function maskPoint(event, geo) {
+  const x = (event.clientX - geo.frame.left - geo.left) / geo.scale, y = (event.clientY - geo.frame.top - geo.top) / geo.scale;
+  return [Math.round(Math.min(Math.max(x, 0), geo.width)), Math.round(Math.min(Math.max(y, 0), geo.height))];
+}
+function stopMaskDrawing() {
+  maskShape = maskDrag = null;
+  $('frame').classList.remove('drawing');
+  $('mask-hint').hidden = true;
+  showMaskBox(null);
+}
+function renderMasks() {
+  const masks = state.masks || {show: true, apply: false, items: []};
+  $('mask-show').checked = masks.show;
+  $('mask-apply').checked = masks.apply;
+  $('mask-apply').disabled = !masks.show;
+  const key = JSON.stringify(masks.items);
+  if (key === maskKey) return;
+  maskKey = key;
+  maskItems = masks.items.map(item => ({...item}));
+  $('mask-list').replaceChildren(...maskItems.map((mask, index) => {
+    const row = document.createElement('div');
+    row.className = 'mask-row';
+    const on = Object.assign(document.createElement('input'), {type: 'checkbox', checked: mask.enabled});
+    const label = document.createElement('label');
+    label.className = 'name';
+    label.append(on, ` ${MASK_NAMES[mask.shape] || mask.shape} ${index + 1}`);
+    const color = Object.assign(document.createElement('input'), {type: 'color', value: mask.color});
+    color.setAttribute('aria-label', `目隠し ${index + 1} の色`);
+    const remove = Object.assign(document.createElement('button'), {type: 'button', className: 'mini', textContent: '✕', title: '消す'});
+    remove.setAttribute('aria-label', `目隠し ${index + 1} を消す`);
+    on.addEventListener('change', () => { mask.enabled = on.checked; saveMasks({items: maskItems}); });
+    color.addEventListener('change', () => { mask.color = color.value; saveMasks({items: maskItems}); });
+    remove.addEventListener('click', () => { showMaskBox(null); saveMasks({items: maskItems.filter(item => item !== mask)}); });
+    row.addEventListener('mouseenter', () => { if (!maskShape) showMaskBox(mask); });
+    row.addEventListener('mouseleave', () => { if (!maskShape) showMaskBox(null); });
+    row.append(label, color, remove);
+    return row;
+  }));
+}
+$('mask-show').addEventListener('change', () => saveMasks({show: $('mask-show').checked}));
+$('mask-apply').addEventListener('change', () => saveMasks({apply: $('mask-apply').checked}));
+document.querySelectorAll('[data-mask-add]').forEach(button => button.addEventListener('click', () => {
+  maskShape = button.dataset.maskAdd;
+  $('frame').classList.add('drawing');
+  $('mask-hint').hidden = false;
+}));
+$('frame').addEventListener('pointerdown', event => {
+  const geo = maskShape && videoGeometry();
+  if (!geo || event.button !== 0) return;
+  event.preventDefault();
+  $('frame').setPointerCapture(event.pointerId);
+  const [x, y] = maskPoint(event, geo);
+  maskDrag = {geo, x, y};
+  showMaskBox({shape: maskShape, x1: x, y1: y, x2: x, y2: y});
+});
+$('frame').addEventListener('pointermove', event => {
+  if (!maskDrag) return;
+  const [x, y] = maskPoint(event, maskDrag.geo);
+  showMaskBox({shape: maskShape, x1: Math.min(x, maskDrag.x), y1: Math.min(y, maskDrag.y), x2: Math.max(x, maskDrag.x), y2: Math.max(y, maskDrag.y)});
+});
+$('frame').addEventListener('pointerup', event => {
+  if (!maskDrag) return;
+  const [x, y] = maskPoint(event, maskDrag.geo);
+  const mask = {shape: maskShape, x1: Math.min(x, maskDrag.x), y1: Math.min(y, maskDrag.y), x2: Math.max(x, maskDrag.x),
+                y2: Math.max(y, maskDrag.y), color: '#000000', enabled: true};
+  stopMaskDrawing();
+  if (mask.x2 - mask.x1 >= 2 && mask.y2 - mask.y1 >= 2) saveMasks({items: [...maskItems, mask], show: true});
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && maskShape) stopMaskDrawing(); });
+
 // Typing on the Switch's own keyboard (the fork origin's Keyboard window), when the Data Format supports it.
 function switchKeys(values) {
   return call('command', {action: 'switch_keyboard', values}).catch(error => { $('message').textContent = error.message; throw error; });
@@ -1610,6 +1724,7 @@ function render() {
   renderDialog();
   renderScriptWindows();
   renderSchedule();
+  renderMasks();
   $('switch-keys').hidden = !!state.keyboard || !state.serial_open;
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
