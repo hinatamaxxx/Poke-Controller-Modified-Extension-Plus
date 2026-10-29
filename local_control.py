@@ -416,6 +416,7 @@ class LocalControl(ApiServer):
         state['app'] = {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
                         'auto_update': preferences.values['auto_update'] if preferences else False,
                         'prereleases': preferences.values['prereleases'] if preferences else False,
+                        'pad_colors': preferences.values['pad_colors'] if preferences else 'Default',
                         'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()}}
         catalog = self.core.catalog()
         state.update(id=self.id, ready=True, exited=False,
@@ -664,7 +665,7 @@ class LocalControl(ApiServer):
         elif action == 'clear_log':
             core.clear_log(1 if values.get('log') == 1 else 2)
         elif action == 'app_options':
-            for key in ('auto_update', 'prereleases'):
+            for key in ('auto_update', 'prereleases', 'pad_colors'):
                 if key in values:
                     core.preferences.set(key, values[key])
         elif action == 'update_now':
