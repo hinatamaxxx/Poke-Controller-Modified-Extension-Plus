@@ -481,7 +481,7 @@ class Hub(ApiServer):
         values = self.preferences.values if self.preferences else {}
         return {'version': VERSION, 'portable': app_paths.PORTABLE, 'workspace': str(app_paths.WORKSPACE),
                 'auto_update': values.get('auto_update', False), 'prereleases': values.get('prereleases', False),
-                'pad_colors': values.get('pad_colors', 'Default'),
+                'pad_colors': values.get('pad_colors', 'Default'), 'pad_stick_click': values.get('pad_stick_click', False),
                 'update': update_service.read_state(), 'folders': {k: str(v) for k, v in app_paths.FOLDERS.items()},
                 'chosen_folders': sorted(app_paths.folder_choices())}
 
@@ -580,7 +580,7 @@ class Hub(ApiServer):
 
     def app_command(self, action, values):
         if action == 'app_options':
-            for key in ('auto_update', 'prereleases', 'pad_colors'):
+            for key in ('auto_update', 'prereleases', 'pad_colors', 'pad_stick_click'):
                 if key in values:
                     self.preferences.set(key, values[key])
         elif action == 'update_now':

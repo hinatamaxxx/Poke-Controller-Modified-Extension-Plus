@@ -7,7 +7,7 @@ from safe_settings import read_checked, write_text
 class Preferences:
     def __init__(self, path):
         self.path = Path(path)
-        self.values = {'auto_update': True, 'prereleases': True, 'pad_colors': 'Default'}
+        self.values = {'auto_update': True, 'prereleases': True, 'pad_colors': 'Default', 'pad_stick_click': False}
         if self.path.exists() or self.path.with_name(self.path.name + '.bak').exists():
             def parse(text):
                 data = json.loads(text)

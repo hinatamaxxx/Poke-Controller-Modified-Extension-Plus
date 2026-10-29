@@ -432,7 +432,8 @@ table.notify input { margin: 1px 0; }
 .pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
 .pad-slot:empty { display: none; }
 .pad-slot .pad-wrap { --pad-w: min(calc(100cqw - 12px), calc((100cqh - 30px) * 2), 640px); }
-.manual-options { justify-content: center; font-size: 12px; margin-top: 6px; }
+.manual-options { justify-content: center; align-items: center; font-size: 12px; margin-top: 6px; }
+.manual-options .pad-colors { font: inherit; font-size: 12px; padding: 0 4px; }
 #side-pad-option[hidden] { display: none; }
 
 /* Claude: what it is doing now (header and tab), notes, and what it did. */
@@ -686,6 +687,8 @@ table.notify input { margin: 1px 0; }
     <div class="pad" id="pad" aria-label="コントローラー"></div>
     <div class="checks manual-options">
       <label><input type="checkbox" data-option="keyboard"> キーボードで操作</label>
+      <label><input type="checkbox" id="pad-stick-click"> スティックは押し込みだけ</label>
+      <select id="pad-colors" class="pad-colors" aria-label="コントローラーの色" title="コントローラーの色"></select>
       <label id="side-pad-option"><input type="checkbox" id="opt-side-pad"> コントローラーを映像の横に並べる</label>
     </div>
     </div>
@@ -715,7 +718,7 @@ table.notify input { margin: 1px 0; }
     <h2 class="settings-title">設定</h2>
     <button type="button" data-page="set-notify" aria-current="page">Discord 連携</button>
     <button type="button" data-page="set-watch">見張り</button>
-    <button type="button" data-page="set-keys">コントローラー</button>
+    <button type="button" data-page="set-keys">キー設定</button>
     <button type="button" data-page="set-log">ログ</button>
     <button type="button" data-page="set-folders">フォルダー</button>
     <hr>
@@ -785,10 +788,7 @@ table.notify input { margin: 1px 0; }
       <div class="folder-set" id="folder-set"></div>
     </section>
     <section class="settings-page" id="set-keys" hidden>
-      <h2>コントローラー</h2>
-      <h3>色</h3>
-      <div class="row"><select id="pad-colors" aria-label="コントローラーの色"></select></div>
-      <h3>キー</h3>
+      <h2>キー設定</h2>
       <p class="meta">ボタンを選んでから、割り当てるキーを押します（Esc で取り消し）。</p>
       <div class="keymap-pad-box"><div class="keymap-pad" id="keys" aria-label="キー設定"></div></div>
       <div class="row"><button class="cmd" id="key-reset">初期設定に戻す</button></div>
@@ -1308,6 +1308,7 @@ function renderSettings() {
   const app = state.app || {};
   if (document.activeElement !== $('auto-update')) $('auto-update').checked = !!app.auto_update;
   if (document.activeElement !== $('pad-colors')) $('pad-colors').value = app.pad_colors || 'Default';
+  $('pad-stick-click').checked = !!app.pad_stick_click;
   const update = app.update || {};
   const checked = update.last_check ? new Date(update.last_check * 1000).toLocaleString('ja-JP') : '未確認';
   $('update-meta').textContent = `v${app.version || '-'} ・ ${checked}`;
@@ -1371,6 +1372,10 @@ $('pad-colors').addEventListener('change', () => {
   applyPadColors($('pad-colors').value);
   quiet(command('app_options', {pad_colors: $('pad-colors').value}));
 });
+$('pad-stick-click').addEventListener('change', () => {
+  stickClickOnly = $('pad-stick-click').checked;
+  quiet(command('app_options', {pad_stick_click: stickClickOnly}));
+});
 $('key-reset').addEventListener('click', () => { assigning = null; renderKeymap(); quiet(command('keymap_reset')); });
 
 function manualAllowed() { return !!state && !state.running && state.serial_open; }
@@ -1387,6 +1392,7 @@ function render() {
   const manual = manualAllowed();
   $('pad').classList.toggle('disabled', !manual);
   applyPadColors((state.app || {}).pad_colors);
+  stickClickOnly = !!(state.app || {}).pad_stick_click;
   if (!manual && latched.size) {
     // A script or a lost port lets go of every input; show that.
     latched.clear();
@@ -2136,6 +2142,8 @@ document.querySelectorAll('#pad .ctl:not(.hold)').forEach(key => {
 
 // Sticks: drag inside a circle; values are sent at about 20 Hz and return to center on release.
 const SEND_INTERVAL = 50, TAP_DISTANCE = .12, TAP_TIME = 300;
+// Settings → コントローラー: the sticks only click (held while pressed) and never tilt.
+let stickClickOnly = false;
 function setupStick(stick) {
   const knob = stick.querySelector('.knob');
   const which = stick.dataset.stick;
@@ -2182,21 +2190,35 @@ function setupStick(stick) {
     if (sent.x !== 0 || sent.y !== 0) send();
   }
 
+  let clicking = false;
+  function clickEnd() {
+    if (!clicking) return;
+    clicking = false;
+    stick.classList.remove('on');
+    command('release', {buttons: [stick.dataset.click]}).catch(() => {}).finally(refresh);
+  }
   stick.addEventListener('pointerdown', event => {
     if (!manualAllowed()) return;
     event.preventDefault();
     stick.focus({preventScroll: true});
     try { stick.setPointerCapture(event.pointerId); } catch (error) { /* synthetic or already released pointer */ }
     pointer = event.pointerId;
+    if (stickClickOnly) {
+      clicking = true;
+      stick.classList.add('on');
+      command('hold', {buttons: [stick.dataset.click]}).catch(() => { clicking = false; stick.classList.remove('on'); });
+      return;
+    }
     stick.classList.add('dragging');
     startAt = performance.now();
     maxDistance = 0;
     move(event.clientX, event.clientY);
   });
-  stick.addEventListener('pointermove', event => { if (event.pointerId === pointer) move(event.clientX, event.clientY); });
+  stick.addEventListener('pointermove', event => { if (event.pointerId === pointer && !clicking) move(event.clientX, event.clientY); });
   const finish = (event, cancelled) => {
     if (event.pointerId !== pointer) return;
     pointer = null;
+    if (clicking) { clickEnd(); return; }
     stick.classList.remove('dragging');
     const tap = !cancelled && maxDistance < TAP_DISTANCE && performance.now() - startAt < TAP_TIME;
     center();
@@ -2217,7 +2239,7 @@ function setupStick(stick) {
   }
   stick.addEventListener('keydown', event => {
     if (!manualAllowed()) return;
-    if (arrows[event.key]) {
+    if (arrows[event.key] && !stickClickOnly) {
       event.preventDefault();
       event.stopPropagation();
       if (!keys.has(event.key)) { keys.add(event.key); fromKeys(); }
@@ -2230,7 +2252,7 @@ function setupStick(stick) {
   stick.addEventListener('keyup', event => { if (keys.delete(event.key)) { event.stopPropagation(); fromKeys(); } });
   stick.addEventListener('blur', () => { if (keys.size) { keys.clear(); fromKeys(); } });
   window.addEventListener('resize', draw);
-  stick.releaseAll = () => { keys.clear(); if (pointer === null) center(); };
+  stick.releaseAll = () => { keys.clear(); clickEnd(); if (pointer === null) center(); };
   stick.setAttribute('aria-roledescription', 'スティック');
 }
 document.querySelectorAll('.stick').forEach(setupStick);
