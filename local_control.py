@@ -571,6 +571,8 @@ class LocalControl(ApiServer):
             return {'jpeg': self.encode_frame(width=640 if params.get('small') else None), 'at': at}
         if method == 'about':
             return self.core.about()
+        if method == 'run_lists':
+            return {'lists': core.run_lists()}
         if method == 'windows':
             return {'windows': core.windows.list()}
         if method == 'window_frame':
@@ -704,6 +706,12 @@ class LocalControl(ApiServer):
             core.set_keymap(mapping)
         elif action == 'keymap_reset':
             core.reset_keymap()
+        elif action == 'run_list_save':
+            core.save_run_list(values.get('list') or {}, str(values.get('original') or ''))
+        elif action == 'run_list_delete':
+            core.delete_run_list(str(values.get('name') or ''))
+        elif action == 'schedule':
+            core.set_schedule(values)
         elif action == 'notification':
             core.set_notification(values)
         elif action == 'notify_test':

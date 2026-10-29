@@ -130,7 +130,7 @@ header #gamepad-state { width: 18px; height: 18px; padding: 0; border: 0; border
 .keymap-pad button.round { border-radius: 50%; }
 .keymap-pad button.corner { display: none; }
 .keymap-pad button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-width: 0; padding: 0; overflow: hidden;
-                     border: 0; border-radius: 3px; background: var(--btn); color: var(--btn-text); font: 600 clamp(7px, 2.3cqw, 11px)/1 system-ui, "Segoe UI", sans-serif; cursor: pointer; }
+                     border: 0; border-radius: 3px; background: var(--btn); color: var(--btn-text); font: 600 clamp(7px, 2.3cqw, 11px)/1 system-ui, "Segoe UI", sans-serif; }
 .keymap-pad button kbd { font: clamp(7px, 2.5cqw, 12px)/1 Consolas, monospace; color: #ffe066; }
 /* Too small for two lines: the key alone, the button known by its place on the controller. */
 @container (max-width: 340px) { .keymap-pad button span { display: none; } }
@@ -390,6 +390,17 @@ table.notify input { margin: 1px 0; }
 .links a { color: var(--accent); margin-right: 10px; white-space: nowrap; }
 .keys button[aria-pressed=true] { border-color: var(--accent); }
 .keys button[aria-pressed=true] kbd { color: var(--accent); }
+.runlists, .schedule { gap: 6px; }
+.rl-head, .rl-item { display: grid; grid-template-columns: minmax(0, 1fr) 64px 92px auto; gap: 6px; align-items: center; }
+.rl-head { font-size: 11px; color: var(--muted); }
+.rl-items { display: flex; flex-direction: column; gap: 4px; }
+.rl-item select, .rl-item input { min-width: 0; }
+.rl-item .moves { display: flex; gap: 2px; }
+.rl-opts { flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
+.rl-opts input[type=number] { width: 64px; }
+.schedule h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 6px 0 0; }
+.sc-now { font-size: 12px; min-height: 22px; }
+.sc-now:has(span:empty) { display: none; }
 .shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 3px 10px; flex: none; }
 .shortcut { display: flex; gap: 3px; min-width: 0; }
 .shortcut .go { display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0; text-align: left; overflow: hidden; font: inherit; font-size: 12px; color: var(--text); background: var(--chip); border: 1px solid transparent; border-radius: 4px; padding: 0 6px; min-height: 22px; cursor: pointer; white-space: nowrap; }
@@ -408,7 +419,7 @@ table.notify input { margin: 1px 0; }
 .pad > *, .keymap-pad > * { position: absolute; left: calc(var(--x) / 380 * 100%); top: calc(var(--y) / 190 * 100%);
        width: calc(var(--w) / 380 * 100%); height: calc(var(--h) / 190 * 100%); }
 .ctl { border: 0; border-radius: 1.6cqw; padding: 0; font: 700 clamp(7px, 2.4cqw, 14px)/1 system-ui, "Segoe UI", sans-serif;
-       color: var(--btn-text); background: var(--btn); cursor: pointer; touch-action: none; min-width: 0; overflow: hidden; }
+       color: var(--btn-text); background: var(--btn); touch-action: none; min-width: 0; overflow: hidden; }
 .ctl.round { border-radius: 50%; font-size: clamp(8px, 3cqw, 16px); }
 .ctl.corner { background: transparent; }
 .ctl.corner.on { background: color-mix(in srgb, var(--btn-on) 45%, transparent); }
@@ -419,14 +430,13 @@ table.notify input { margin: 1px 0; }
 .ctl.on { background: var(--btn-on); color: var(--btn-on-text); }
 .ctl.latched { background: var(--btn-on); color: var(--btn-on-text); box-shadow: inset 0 0 0 .5cqw var(--btn-on-text); }
 .ctl.hold.active { background: var(--btn-on); color: var(--btn-on-text); }
-.pad.disabled .ctl, .pad.disabled .stick { opacity: .45; cursor: not-allowed; }
+.pad.disabled .ctl, .pad.disabled .stick { opacity: .45; }
 .stick-cell { display: grid; place-items: center; }
-.stick { border-radius: 50%; background: var(--stick-base, var(--well)); cursor: grab; touch-action: none; }
+.stick { border-radius: 50%; background: var(--stick-base, var(--well)); touch-action: none; }
 .stick[data-stick=L], .keymap-pad .well[data-label=L] { box-shadow: inset 0 0 0 1.2cqw var(--ring-l, transparent); }
 .stick[data-stick=R], .keymap-pad .well[data-label=R] { box-shadow: inset 0 0 0 1.2cqw var(--ring-r, transparent); }
 .stick .knob { position: absolute; left: 50%; top: 50%; width: 56%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: var(--btn); pointer-events: none; transition: transform .12s ease-out;
                display: grid; place-items: center; color: var(--btn-text); font: 700 clamp(7px, 2.4cqw, 14px)/1 system-ui, "Segoe UI", sans-serif; }
-.stick.dragging { cursor: grabbing; }
 .stick.dragging .knob { transition: none; }
 .stick.on .knob { background: var(--btn-on); }
 .pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
@@ -627,6 +637,8 @@ table.notify input { margin: 1px 0; }
       <div class="seg" role="group" aria-label="スクリプトの表示">
         <button data-view="script-main" aria-pressed="true">一覧</button>
         <button data-view="script-shortcuts" aria-pressed="false">ショートカット</button>
+        <button data-view="script-runlists" aria-pressed="false">実行リスト</button>
+        <button data-view="script-schedule" aria-pressed="false">予約</button>
       </div>
       <div class="view" id="script-main">
         <div class="row">
@@ -650,6 +662,43 @@ table.notify input { margin: 1px 0; }
       </div>
       <div class="view" id="script-shortcuts" hidden>
         <div class="shortcuts" id="shortcuts" aria-label="ショートカット"></div>
+      </div>
+      <div class="view runlists" id="script-runlists" hidden>
+        <div class="row">
+          <select id="rl-pick" class="grow" aria-label="実行リスト"></select>
+          <button class="cmd" id="rl-delete">削除</button>
+        </div>
+        <div class="row"><input id="rl-name" class="grow" maxlength="50" placeholder="実行リストの名前" aria-label="実行リストの名前"></div>
+        <div class="rl-head" aria-hidden="true"><span>スクリプト</span><span>回数</span><span>制限時間（分）</span><span></span></div>
+        <div class="rl-items" id="rl-items" aria-label="実行するスクリプト（上から順に）"></div>
+        <div class="row"><button class="cmd" id="rl-add">＋ 行を足す</button></div>
+        <div class="row rl-opts">
+          <label>間の待ち時間 <input type="number" id="rl-interval" min="0" max="3600" step="0.5" aria-label="スクリプトの間の待ち時間（秒）"> 秒</label>
+          <label>エラーのとき <select id="rl-onerror"><option value="stop">中止する</option><option value="next">次へ進む</option></select></label>
+          <label title="0 は停止を押すまで">全体を <input type="number" id="rl-loops" min="0" max="9999" step="1" aria-label="リスト全体の繰り返し（0 は停止を押すまで）"> 回</label>
+        </div>
+        <div class="row">
+          <button class="cmd primary" id="rl-save">保存</button>
+          <span class="error" id="rl-error"></span>
+        </div>
+      </div>
+      <div class="view schedule" id="script-schedule" hidden>
+        <h3>開始</h3>
+        <div class="row">
+          <input type="time" id="sc-start-time" aria-label="開始する時刻">
+          <select id="sc-start-name" class="grow" aria-label="開始するスクリプト"></select>
+          <button class="cmd" id="sc-start">予約</button>
+        </div>
+        <div class="row sc-now"><span id="sc-start-now"></span><button class="mini" id="sc-start-cancel">取り消す</button></div>
+        <h3>停止</h3>
+        <div class="row">
+          <select id="sc-stop-kind" aria-label="停止の決め方"><option value="time">時刻</option><option value="minutes">開始から</option></select>
+          <input type="time" id="sc-stop-time" aria-label="停止する時刻">
+          <label id="sc-stop-minutes-box" hidden><input type="number" id="sc-stop-minutes" min="1" step="1" aria-label="開始から止めるまでの分"> 分</label>
+          <button class="cmd" id="sc-stop">予約</button>
+        </div>
+        <div class="row sc-now"><span id="sc-stop-now"></span><button class="mini" id="sc-stop-cancel">取り消す</button></div>
+        <div class="error" id="sc-error"></div>
       </div>
     </div>
 
@@ -1073,6 +1122,110 @@ async function pollWindows() {
 }
 setInterval(() => { if (scriptWindows.size && !document.hidden) pollWindows(); }, 250);
 
+// ---- 実行リスト and 予約 (the fork origin's run lists and schedule) ----
+const RUN_LIST_SUFFIX = ' (実行リスト)';
+let runLists = [], runListShown = null;
+function scriptChoices(withLists) {
+  const python = (state.catalog || {}).python || [], mcu = (state.catalog || {}).mcu || [];
+  return [...python.filter(n => withLists || !n.endsWith(RUN_LIST_SUFFIX)).map(n => ['python', n]), ...mcu.map(n => ['mcu', n])];
+}
+function fillScriptSelect(select, value, withLists) {
+  const choices = scriptChoices(withLists);
+  select.replaceChildren(...choices.map(([kind, name]) => {
+    const option = new Option(kind === 'mcu' ? `${name} [MCU]` : name, `${kind}\t${name}`);
+    return option;
+  }));
+  if (value) select.value = value;
+}
+function runItemRow(item) {
+  const row = document.createElement('div');
+  row.className = 'rl-item';
+  row.innerHTML = '<select aria-label="スクリプト"></select><input type="number" min="1" max="9999" step="1" aria-label="回数">'
+    + '<input type="number" min="0" step="1" placeholder="終わるまで" aria-label="制限時間（分）">'
+    + '<span class="moves"><button class="mini" data-move="-1" aria-label="上へ">↑</button><button class="mini" data-move="1" aria-label="下へ">↓</button>'
+    + '<button class="mini" data-remove aria-label="この行を消す">✕</button></span>';
+  const [pick, repeat, limit] = row.querySelectorAll('select, input');
+  fillScriptSelect(pick, item ? `${item.type === 'Mcu' ? 'mcu' : 'python'}\t${item.name}` : selectedValue(), false);
+  repeat.value = item ? item.repeat : 1;
+  limit.value = item && item.limit_minutes != null ? item.limit_minutes : '';
+  row.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', () => {
+    const sibling = button.dataset.move === '-1' ? row.previousElementSibling : row.nextElementSibling;
+    if (sibling) button.dataset.move === '-1' ? sibling.before(row) : sibling.after(row);
+  }));
+  row.querySelector('[data-remove]').addEventListener('click', () => row.remove());
+  return row;
+}
+function selectedValue() {
+  const kind = $('kind').value || 'python';
+  return selectedScript ? `${kind}\t${selectedScript}` : '';
+}
+function showRunList(list) {
+  runListShown = list ? list.name : null;
+  $('rl-name').value = list ? list.name : '';
+  $('rl-items').replaceChildren(...(list ? list.items : [null]).map(runItemRow));
+  $('rl-interval').value = list ? list.interval_seconds : 1;
+  $('rl-onerror').value = list ? list.on_error : 'stop';
+  $('rl-loops').value = list ? list.loops : 1;
+  $('rl-delete').disabled = !list;
+  $('rl-error').textContent = '';
+}
+async function loadRunLists(select) {
+  runLists = (await call('run_lists').catch(() => ({lists: []}))).lists;
+  $('rl-pick').replaceChildren(new Option('新しい実行リスト', ''), ...runLists.map(l => new Option(l.name, l.name)));
+  const name = select !== undefined ? select : runListShown;
+  $('rl-pick').value = runLists.some(l => l.name === name) ? name : '';
+  showRunList(runLists.find(l => l.name === $('rl-pick').value) || null);
+}
+$('rl-pick').addEventListener('change', () => showRunList(runLists.find(l => l.name === $('rl-pick').value) || null));
+$('rl-add').addEventListener('click', () => $('rl-items').append(runItemRow(null)));
+$('rl-delete').addEventListener('click', () => {
+  if (!runListShown) return;
+  command('run_list_delete', {name: runListShown}).then(() => loadRunLists('')).then(refresh).catch(() => {});
+});
+$('rl-save').addEventListener('click', () => {
+  const items = [...$('rl-items').children].map(row => {
+    const [pick, repeat, limit] = row.querySelectorAll('select, input');
+    const [kind, name] = (pick.value || '\t').split('\t');
+    return {type: kind === 'mcu' ? 'Mcu' : 'Python', name, repeat: parseInt(repeat.value || '1', 10),
+            limit_minutes: limit.value === '' ? null : parseFloat(limit.value)};
+  });
+  const list = {name: $('rl-name').value.trim(), items, interval_seconds: parseFloat($('rl-interval').value || '0'),
+                on_error: $('rl-onerror').value, loops: parseInt($('rl-loops').value || '1', 10)};
+  call('command', {action: 'run_list_save', values: {list, original: runListShown || ''}})
+    .then(() => loadRunLists(list.name)).then(refresh)
+    .catch(error => { $('rl-error').textContent = error.message; });
+});
+document.querySelector('[data-view="script-runlists"]').addEventListener('click', () => loadRunLists());
+
+function renderSchedule() {
+  const schedule = state.schedule || {};
+  $('sc-start-now').textContent = schedule.start || '';
+  $('sc-stop-now').textContent = schedule.stop || '';
+  const select = $('sc-start-name');
+  const key = JSON.stringify(scriptChoices(true));
+  if (select.dataset.key !== key && document.activeElement !== select) {
+    select.dataset.key = key;
+    fillScriptSelect(select, select.value || selectedValue(), true);
+  }
+}
+function scheduleCommand(values) {
+  $('sc-error').textContent = '';
+  return call('command', {action: 'schedule', values}).then(refresh).catch(error => { $('sc-error').textContent = error.message; });
+}
+$('sc-start').addEventListener('click', () => {
+  const [kind, name] = ($('sc-start-name').value || '\t').split('\t');
+  scheduleCommand({start: {time: $('sc-start-time').value, kind, name}});
+});
+$('sc-stop-kind').addEventListener('change', () => {
+  const minutes = $('sc-stop-kind').value === 'minutes';
+  $('sc-stop-time').hidden = minutes;
+  $('sc-stop-minutes-box').hidden = !minutes;
+});
+$('sc-stop').addEventListener('click', () => scheduleCommand({stop: $('sc-stop-kind').value === 'minutes'
+  ? {minutes: $('sc-stop-minutes').value} : {time: $('sc-stop-time').value}}));
+$('sc-start-cancel').addEventListener('click', () => scheduleCommand({cancel: 'start'}));
+$('sc-stop-cancel').addEventListener('click', () => scheduleCommand({cancel: 'stop'}));
+
 function command(action, values = {}) {
   $('message').textContent = '';
   return call('command', {action, values}).catch(error => { $('message').textContent = error.message; throw error; });
@@ -1398,16 +1551,17 @@ function render() {
     latched.clear();
     document.querySelectorAll('#pad .ctl.latched').forEach(key => key.classList.remove('latched'));
   }
-  if (!manual) holdMode = false;
+  if (!manual) { holdMode = false; litHere.clear(); }
   renderHold();
+  const held = heldNow();
   document.querySelectorAll('.ctl').forEach(key => {
     key.disabled = !manual;
-    key.classList.toggle('on', pressed.has(key.dataset.btn) || keyNames.has(key.dataset.btn) || state.held.includes(key.dataset.btn));
+    key.classList.toggle('on', pressed.has(key.dataset.btn) || keyNames.has(key.dataset.btn) || held.includes(key.dataset.btn));
   });
   document.querySelectorAll('.stick').forEach(stick => {
     stick.setAttribute('aria-disabled', String(!manual));
     const prefix = stick.dataset.stick === 'L' ? 'LS_' : 'RS_';
-    stick.classList.toggle('on', state.held.includes(stick.dataset.click) || [...keyNames, ...state.held].some(name => name.startsWith(prefix)));
+    stick.classList.toggle('on', held.includes(stick.dataset.click) || [...keyNames, ...held].some(name => name.startsWith(prefix)));
   });
   $('start').disabled = state.running;
   $('stop').disabled = !state.running;
@@ -1426,6 +1580,7 @@ function render() {
   renderWatch();
   renderDialog();
   renderScriptWindows();
+  renderSchedule();
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
   fillLog('log1', state.log + (exec === 1 ? local : ''));
@@ -2085,6 +2240,22 @@ function answer(id, values) {
 }
 $('dialog').addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelector('[data-dialog=cancel]').click(); });
 
+// An input pressed or let go on this page lights (or unlights) every part that sends it at once, e.g. a stick and
+// its L-C / R-C button. Until the app's state has caught up, it does not light again from the older state.
+const letGo = new Map();  // input -> time until which the app's "held" for it is not believed
+const litHere = new Set();  // inputs held from this page
+function lightInput(names, on) {
+  for (const name of names) {
+    document.querySelectorAll(`#pad .ctl[data-btn="${name}"]`).forEach(key => key.classList.toggle('on', on));
+    document.querySelectorAll(`#pad .stick[data-click="${name}"]`).forEach(stick => stick.classList.toggle('on', on));
+    if (on) { letGo.delete(name); litHere.add(name); } else { letGo.set(name, performance.now() + 1500); litHere.delete(name); }
+  }
+}
+function heldNow() {
+  const now = performance.now();
+  return [...(state.held || []).filter(name => !(letGo.get(name) > now)), ...litHere];
+}
+
 // Buttons: press while the pointer is down. As in the Fork origin's Software-Controller, HOLD (or a right click, or
 // Shift when letting go) keeps a button pressed; pressing it again lets it go, and a yellow HOLD lets everything go.
 const pressed = new Set();
@@ -2104,11 +2275,13 @@ function release(key, latch = false) {
     return;
   }
   key.classList.remove('on');
+  lightInput(namesOf(key), false);
   command('release', {buttons: namesOf(key)}).catch(() => {}).finally(refresh);
 }
 function unlatch(key) {
   latched.delete(key.dataset.btn);
   key.classList.remove('latched', 'on');
+  lightInput(namesOf(key), false);
   renderHold();
   command('release', {buttons: namesOf(key)}).catch(() => {}).finally(refresh);
 }
@@ -2130,6 +2303,7 @@ document.querySelectorAll('#pad .ctl:not(.hold)').forEach(key => {
     try { key.setPointerCapture(event.pointerId); } catch (error) { /* synthetic or already released pointer */ }
     pressed.add(key.dataset.btn);
     key.classList.add('on');
+    lightInput(namesOf(key), true);
     command('hold', {buttons: namesOf(key)}).catch(() => { pressed.delete(key.dataset.btn); key.classList.remove('on'); });
   });
   key.addEventListener('pointerup', event => release(key, latchOnRelease || event.shiftKey));
@@ -2194,7 +2368,7 @@ function setupStick(stick) {
   function clickEnd() {
     if (!clicking) return;
     clicking = false;
-    stick.classList.remove('on');
+    lightInput([stick.dataset.click], false);
     command('release', {buttons: [stick.dataset.click]}).catch(() => {}).finally(refresh);
   }
   stick.addEventListener('pointerdown', event => {
@@ -2205,7 +2379,7 @@ function setupStick(stick) {
     pointer = event.pointerId;
     if (stickClickOnly) {
       clicking = true;
-      stick.classList.add('on');
+      lightInput([stick.dataset.click], true);
       command('hold', {buttons: [stick.dataset.click]}).catch(() => { clicking = false; stick.classList.remove('on'); });
       return;
     }
