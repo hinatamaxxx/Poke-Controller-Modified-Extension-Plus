@@ -118,6 +118,44 @@ class SleepTest(unittest.TestCase):
         self.assertEqual(len(seen), 1)
 
 
+class MaskTest(unittest.TestCase):
+    def owner(self):
+        import threading
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import core
+        owner = Mock(lock=threading.RLock(), camera=SimpleNamespace(capture_filter=None),
+                     settings=Mock(masks=[], is_show_mask=True, is_mask_apply_to_capture=False))
+        for name in ('masks', 'mask_image', '_apply_mask_filter'):
+            setattr(owner, name, getattr(core.Core, name).__get__(owner))
+        owner.MAX_MASKS = core.Core.MAX_MASKS
+        return owner
+
+    def test_masks_cover_the_shown_picture_but_not_the_camera_image(self):
+        import core
+        owner = self.owner()
+        core.Core.set_masks(owner, {'items': [{'shape': 'Rectangle', 'x1': 30, 'y1': 30, 'x2': 10, 'y2': 10,
+                                               'color': '#ff0000', 'enabled': True},
+                                              {'shape': 'Ellipse', 'x1': 0, 'y1': 0, 'x2': 1, 'y2': 1}]})
+        self.assertEqual(owner.settings.masks, ['Rectangle,10,10,30,30,#ff0000,1'])  # too small one dropped
+        owner.settings.save.assert_called_once_with()
+        image = np.zeros((40, 40, 3), np.uint8)
+        shown = owner.mask_image(image)
+        self.assertEqual(tuple(shown[20, 20]), (0, 0, 255))
+        self.assertEqual(image[20, 20].sum(), 0)
+        self.assertIsNone(owner.camera.capture_filter)
+        core.Core.set_masks(owner, {'apply': True})
+        self.assertIsNotNone(owner.camera.capture_filter)
+        core.Core.set_masks(owner, {'show': False})
+        self.assertIsNone(owner.camera.capture_filter)
+        self.assertIs(owner.mask_image(image), image)
+
+    def test_a_wrong_shape_is_refused(self):
+        import core
+        with self.assertRaises(ValueError):
+            core.Core.set_masks(self.owner(), {'items': [{'shape': 'Star', 'x2': 9, 'y2': 9}]})
+
+
 class SwitchKeyboardTest(unittest.TestCase):
     def test_why_text_cannot_be_typed(self):
         from unittest.mock import Mock

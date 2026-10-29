@@ -365,6 +365,7 @@ class Core:
             camera_module.CAPTURE_DIR = str(app_paths.CAPTURES)
             self.camera.capture_dir = str(app_paths.CAPTURES)
         self.camera_missing, self.next_camera_check = False, 0
+        self._apply_mask_filter()
         self.show_serial = Var(bool(self.settings.is_show_serial.get()))
         self.ser = plus_runtime.make_sender(self.show_serial.get())
         if demo:
@@ -991,6 +992,60 @@ class Core:
         start, stop = self.schedule.describe()
         return {'start': start if self.schedule.start_at else '', 'stop': stop if (self.schedule.stop_at or self.schedule.stop_after_minutes) else ''}
 
+    # ---- covering parts of the picture (the fork origin's Mask tab: settings.ini [Mask]). The camera image itself is
+    # not changed, so scripts still see everything; the masks are drawn on what the page shows and, when chosen, on
+    # screenshots.
+    MAX_MASKS = 20
+
+    def masks(self):
+        from Mask import Mask
+        result = []
+        for text in self.settings.masks:
+            try:
+                result.append(Mask.from_text(text))
+            except ValueError:
+                pass
+        return result
+
+    def masks_state(self):
+        from dataclasses import asdict
+        return {'show': bool(self.settings.is_show_mask), 'apply': bool(self.settings.is_mask_apply_to_capture),
+                'items': [asdict(mask) for mask in self.masks()]}
+
+    def set_masks(self, values):
+        """values: show, apply (bool) and/or items [{shape, x1, y1, x2, y2, color, enabled}] (camera image pixels)."""
+        from Mask import MASK_SHAPES, Mask, hex_to_bgr
+        with self.lock:
+            if 'items' in values:
+                items = []
+                for item in list(values['items'] or [])[:self.MAX_MASKS]:
+                    shape, color = str(item.get('shape', '')), str(item.get('color', '#000000'))
+                    if shape not in MASK_SHAPES:
+                        raise ValueError('目隠しの形が正しくありません。')
+                    hex_to_bgr(color)
+                    mask = Mask(shape, *(int(item.get(key, 0)) for key in ('x1', 'y1', 'x2', 'y2')), color,
+                                bool(item.get('enabled', True))).normalized()
+                    if mask.x2 - mask.x1 >= 2 and mask.y2 - mask.y1 >= 2:
+                        items.append(mask)
+                self.settings.masks = [mask.to_text() for mask in items]
+            if 'show' in values:
+                self.settings.is_show_mask = bool(values['show'])
+            if 'apply' in values:
+                self.settings.is_mask_apply_to_capture = bool(values['apply'])
+            self._apply_mask_filter()
+            self.settings.save()
+
+    def _apply_mask_filter(self):
+        on = self.settings.is_show_mask and self.settings.is_mask_apply_to_capture
+        self.camera.capture_filter = self.mask_image if on else None
+
+    def mask_image(self, image):
+        """The picture as the page shows it (with the masks, when they are shown)."""
+        from Mask import draw_masks
+        if image is None or not self.settings.is_show_mask:
+            return image
+        return draw_masks(image, self.masks())
+
     # ---- typing on the Switch's keyboard (the fork origin's KeyboardSession; the microcontroller types as a USB keyboard)
     def keyboard_unavailable(self):
         """Why text cannot be typed on the Switch now ('' when it can)."""
@@ -1238,7 +1293,7 @@ class Core:
         keys = self.keys_software_controller
         return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
                 'starting': self.starting or '', 'windows': self.windows.list(), 'schedule': self.schedule_state(),
-                'keyboard': self.keyboard_unavailable(),
+                'keyboard': self.keyboard_unavailable(), 'masks': self.masks_state(),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},

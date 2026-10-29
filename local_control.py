@@ -386,6 +386,7 @@ class LocalControl(ApiServer):
         image = getattr(camera, 'image_bgr', None)
         if image is None or time.time() - getattr(camera, 'frame_at', 0) >= 2:
             return None
+        image = self.core.mask_image(image)
         if width:
             image = cv2.resize(image, (width, int(image.shape[0] * width / image.shape[1])), interpolation=cv2.INTER_AREA)
             ok, encoded = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -718,6 +719,8 @@ class LocalControl(ApiServer):
             core.delete_run_list(str(values.get('name') or ''))
         elif action == 'schedule':
             core.set_schedule(values)
+        elif action == 'masks':
+            core.set_masks(values)
         elif action == 'notification':
             core.set_notification(values)
         elif action == 'notify_test':
