@@ -22,6 +22,21 @@ def serial_formats():
     return transport_names()
 
 
+class RunListService:
+    """What the fork origin's run lists (services/run_list) need from the app: find a script and create it."""
+
+    def __init__(self, core):
+        self.core = core
+
+    def find_class(self, command_type, name):
+        kind = 'python' if command_type == 'Python' else 'mcu'
+        entry = self.core.find_entry(name, kind)
+        return None if entry is None else self.core.script_class(entry, kind)
+
+    def create(self, command_type, command_class):
+        return self.core.create_command(command_class, 'python' if command_type == 'Python' else 'mcu')
+
+
 class ScriptLoader:
     """Scripts in the workspace's スクリプト folder, named after their folder (BDSP/固定シンボル/エンテイ) rather than
     the fork origin's file-based name."""
@@ -352,6 +367,9 @@ class Core:
         from services.sleep_watch import SleepWatch
         self.sleep_watch = SleepWatch(self._resumed)
         self.sleep_watch.start()
+        # The fork origin's schedule: start a script at a time, stop at a time or after some minutes.
+        from services.run_schedule import RunSchedule
+        self.schedule = RunSchedule(self._scheduled_start, self.stop_script, lambda: self.running, print)
         self.load_scripts()
         self.open_camera()
         self.open_serial()
@@ -677,8 +695,10 @@ class Core:
         from CommandLoader import CommandLoader, CombinedLoader
         from Commands import PythonCommandBase, McuCommandBase
         import Paths
+        from services.run_list import RunListLoader
+        self.run_loader = RunListLoader(RunListService(self))
         self.py_loader = CombinedLoader(CommandLoader(util.ospath('Commands/PythonCommands'), PythonCommandBase.PythonCommand),
-                                        ScriptLoader(Paths.SCRIPTS, PythonCommandBase.PythonCommand))
+                                        ScriptLoader(Paths.SCRIPTS, PythonCommandBase.PythonCommand), self.run_loader)
         self.mcu_loader = CommandLoader(util.ospath('Commands/McuCommands'), McuCommandBase.McuCommand)
         self.py_entries = self.py_loader.load()
         self.mcu_entries = self.mcu_loader.load()
@@ -773,7 +793,7 @@ class Core:
             entry = self.find_entry(name, kind)
             if entry is None:
                 raise ValueError('Script not found')
-            if self.demo and entry.module_name != DEMO_SCRIPT:
+            if self.demo and not self._demo_allows(entry):
                 raise ValueError('Demo mode only runs PortableDemo')
             if not self.serial_open():
                 raise ValueError('COM port is not connected')
@@ -785,18 +805,28 @@ class Core:
         threading.Thread(target=self._create_and_start, args=(entry, kind, name, restart), daemon=True,
                          name='script-setup').start()
 
+    def _demo_allows(self, entry):
+        """The demo runs PortableDemo, and run lists made only of it."""
+        if entry.module_name:
+            return entry.module_name == DEMO_SCRIPT
+        run_list = self.run_loader._lists.get(entry.name)
+        demo = [e.name for e in self.py_entries if e.module_name == DEMO_SCRIPT]
+        return run_list is not None and all(item.name in demo for item in run_list.items)
+
+    def create_command(self, cls, kind):
+        """An instance of a script class (an image script gets the camera and the overlay)."""
+        from Commands import PythonCommandBase
+        if kind == 'python' and issubclass(cls, PythonCommandBase.ImageProcPythonCommand):
+            try:
+                return cls(self.camera, self.overlay)
+            except TypeError:
+                return cls(self.camera)
+        return cls()
+
     def _create_and_start(self, entry, kind, name, restart):
         from Commands.CommandBase import Command
-        from Commands import PythonCommandBase
         try:
-            cls = self.script_class(entry, kind)
-            if kind == 'python' and issubclass(cls, PythonCommandBase.ImageProcPythonCommand):
-                try:
-                    command = cls(self.camera, self.overlay)
-                except TypeError:
-                    command = cls(self.camera)
-            else:
-                command = cls()
+            command = self.create_command(self.script_class(entry, kind), kind)
         except BaseException as error:
             with self.lock:
                 if self.starting == name:
@@ -817,6 +847,84 @@ class Core:
             print('開始 ' + name)
             command.start(self.ser, self._finished)
             self.watch.script_started(kind, name, restart)
+
+    # ---- run lists and the schedule (the fork origin's services/run_list and run_schedule) ----
+    def run_lists(self):
+        from services import run_list
+        return [run_list._to_dict(r) for r in run_list.load_lists()]
+
+    def save_run_list(self, data, original=''):
+        """Add or replace a run list (original: its name before this edit). Raises ValueError with the reason."""
+        from services import run_list
+        try:
+            new = run_list._from_dict(data)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise ValueError('実行リストの形が正しくありません。')
+        with self.lock:
+            lists = run_list.load_lists()
+            error = run_list.check_list(new, [r.name for r in lists if r.name != original])
+            for index, item in enumerate(new.items, start=1):
+                kind = 'python' if item.command_type == run_list.PYTHON else 'mcu'
+                if not error and not run_list.is_list_name(item.command_type, item.name) and self.find_entry(item.name, kind) is None:
+                    error = f'{index} 行目: スクリプトが見つかりません（{item.name}）。'
+            if error:
+                raise ValueError(error)
+            names = [r.name for r in lists]
+            target = original if original in names else new.name
+            if target in names:
+                lists[names.index(target)] = new
+            else:
+                lists.append(new)
+            run_list.save_lists(lists)
+            self._reload_run_lists()
+
+    def delete_run_list(self, name):
+        from services import run_list
+        with self.lock:
+            run_list.save_lists([r for r in run_list.load_lists() if r.name != name])
+            self._reload_run_lists()
+
+    def _reload_run_lists(self):
+        """Show saved run lists in the script list (the scripts themselves are not read again)."""
+        self.py_entries = [e for e in self.py_entries if e.module_name] + self.run_loader.load()
+
+    def _scheduled_start(self, command_type, name):
+        try:
+            self.start_script('python' if command_type == 'Python' else 'mcu', name)
+            return True
+        except ValueError as error:
+            print(f'予約: {error}')
+            return False
+
+    def set_schedule(self, values):
+        """values: start {time 'HH:MM', kind, name} / stop {time 'HH:MM'} or {minutes} / cancel 'start'|'stop'."""
+        import datetime
+        from services import run_schedule
+        with self.lock:
+            cancel = values.get('cancel')
+            if cancel == 'start':
+                self.schedule.cancel_start()
+            elif cancel == 'stop':
+                self.schedule.cancel_stop()
+            if 'start' in values:
+                start = values['start'] or {}
+                kind, name = start.get('kind', 'python'), str(start.get('name', ''))
+                if self.find_entry(name, kind) is None:
+                    raise ValueError('スクリプトを選んでください。')
+                when = run_schedule.parse_clock(str(start.get('time', '')), datetime.datetime.now())
+                self.schedule.reserve_start(when, 'Python' if kind == 'python' else 'Mcu', name)
+            if 'stop' in values:
+                stop = values['stop'] or {}
+                if stop.get('time'):
+                    self.schedule.reserve_stop_at(run_schedule.parse_clock(str(stop['time']), datetime.datetime.now()))
+                else:
+                    error = self.schedule.reserve_stop_after(run_schedule.parse_minutes(str(stop.get('minutes', ''))))
+                    if error:
+                        raise ValueError(error)
+
+    def schedule_state(self):
+        start, stop = self.schedule.describe()
+        return {'start': start if self.schedule.start_at else '', 'stop': stop if (self.schedule.stop_at or self.schedule.stop_after_minutes) else ''}
 
     def _resumed(self, seconds):
         """The PC was suspended for this many seconds: stop the running script and say why."""
@@ -975,6 +1083,7 @@ class Core:
             if self.running and not self.script_alive():
                 self.running = False
             self.watch.tick()
+            self.schedule.tick()
             self.reconnect_camera()
 
     def reconnect_camera(self):
@@ -1033,7 +1142,7 @@ class Core:
         from Commands.CommandBase import Command
         keys = self.keys_software_controller
         return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
-                'starting': self.starting or '', 'windows': self.windows.list(),
+                'starting': self.starting or '', 'windows': self.windows.list(), 'schedule': self.schedule_state(),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},
