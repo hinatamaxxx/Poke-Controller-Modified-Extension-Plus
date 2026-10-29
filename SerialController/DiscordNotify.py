@@ -38,7 +38,8 @@ class Discord_Notify:
     def __init__(self, webhook_url="webhook_url", username="username", avatar_url="", token_name="token"):
         self._logger = _logger
 
-        self.default_username = f"Poke-Controller Modified Extension (profile: {os.path.basename(os.path.dirname(self.DISCORD_SETTING_PATH))})"
+        # The name a message is posted under when the settings leave it empty.
+        self.default_username = "Pokecon"
 
         self.res = None
         self.setting_file = configparser.ConfigParser(comment_prefixes="#", allow_no_value=True, interpolation=None)
