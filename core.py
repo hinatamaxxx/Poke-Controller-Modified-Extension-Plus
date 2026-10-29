@@ -466,6 +466,17 @@ class Core:
                 'discord_webhook_set': bool(str(hook.get('webhook_url', '')).strip()),
                 'discord_username': str(hook.get('username', ''))}
 
+    def discord_webhook(self):
+        """The saved webhook URL, for the settings page only (not part of the state sent with every update)."""
+        import configparser
+        from DiscordNotify import Discord_Notify
+        config = configparser.ConfigParser(interpolation=None)
+        try:
+            config.read(Discord_Notify.DISCORD_SETTING_PATH, encoding='utf-8-sig')
+        except (OSError, configparser.Error):
+            return ''
+        return config.get('DISCORD_WEBHOOK', 'webhook_url', fallback='').strip()
+
     def set_notification(self, values):
         """Write LINE / Discord settings into the profile's token files, keeping other entries."""
         import configparser

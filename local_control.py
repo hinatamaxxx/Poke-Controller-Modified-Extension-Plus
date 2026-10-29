@@ -493,7 +493,7 @@ class LocalControl(ApiServer):
         keys.holdEnd(held)
 
     UNLOCKED = {'frame', 'frame_raw', 'summary', 'recordings', 'recording_overview', 'recording_frame', 'recording_inputs', 'recording_draft',
-                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices', 'about'}
+                'script_files', 'read_script', 'incidents', 'templates', 'web_url', 'devices', 'about', 'discord_webhook'}
     UNLOCKED_ACTIONS = {'notify_test', 'record_stop'}
 
     def neutral(self):
@@ -543,6 +543,10 @@ class LocalControl(ApiServer):
             return {'jpeg': self.encode_frame(width=640 if params.get('small') else None), 'at': at}
         if method == 'about':
             return self.core.about()
+        if method == 'discord_webhook':
+            if via_mcp:
+                raise ValueError('Not available')
+            return {'url': self.core.discord_webhook()}
         if method == 'summary':
             return self.summary()
         if method == 'web_url':

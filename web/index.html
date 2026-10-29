@@ -741,10 +741,11 @@ table.notify input { margin: 1px 0; }
       <h3>Discord <span class="state" id="discord-set" hidden>連携済み</span></h3>
       <div class="form">
         <label for="discord-url">Webhook URL</label>
-        <input type="password" id="discord-url" autocomplete="off" placeholder="変えるときだけ入力" aria-label="DiscordのWebhook URL">
+        <input type="text" id="discord-url" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…" aria-label="DiscordのWebhook URL">
         <label for="discord-name">ユーザー名</label>
-        <input type="text" id="discord-name" autocomplete="off" aria-label="Discordのユーザー名">
+        <input type="text" id="discord-name" autocomplete="off" placeholder="Pokecon" aria-label="Discordのユーザー名">
       </div>
+      <div class="error" id="discord-error"></div>
       <div class="row">
         <button type="button" class="cmd primary" id="save-discord">保存</button>
         <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
@@ -1468,19 +1469,21 @@ function openSettings(page) {
   showSettingsPage(page || settingsPage);
   fitSettings();
   loadAbout().then(fitSettings);
+  loadWebhook();
   document.querySelector('.settings-nav [aria-current=page]').focus();
 }
 function closeSettings() {
   $('settings').hidden = true;
   if (assigning) { assigning = null; renderKeymap(); }
   settingsPage = 'set-notify';
-  $('discord-url').value = '';
+  delete $('discord-url').dataset.edited;
+  $('discord-error').textContent = '';
   delete $('discord-name').dataset.edited;
 }
 document.querySelectorAll('.settings-nav [data-page]').forEach(button => button.addEventListener('click', () => showSettingsPage(button.dataset.page)));
 $('settings-close').addEventListener('click', closeSettings);
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) closeSettings(); });
-// Discord and LINE pages: Enter saves. Saved secrets are never shown again.
+// Discord page: Enter saves.
 [['discord-url', 'save-discord'], ['discord-name', 'save-discord']].forEach(([field, save]) =>
   $(field).addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) $(save).click(); }));
 document.addEventListener('keydown', event => {
@@ -2270,10 +2273,44 @@ document.querySelectorAll('a.ext[data-link]').forEach(link => link.addEventListe
   command('open_url', {link: link.dataset.link}).catch(() => {});
 }));
 $('discord-name').addEventListener('input', () => { $('discord-name').dataset.edited = '1'; });
+// The saved webhook URL stays in its field. Out of focus its secret part is hidden (…/1234…abcd); in focus the
+// whole URL shows so it can be edited. Emptying the field and saving unlinks Discord.
+let discordWebhook = '';
+function maskWebhook(url) {
+  const match = /^https:\/\/([^/]+)\/api\/webhooks\/(\d+)\/([\w-]{12,})$/.exec(url);
+  if (!match) return url;
+  const [, host, id, secret] = match;
+  return `${host}/…${id.slice(-4)}/${secret.slice(0, 4)}••••${secret.slice(-4)}`;
+}
+function showWebhook() {
+  const field = $('discord-url');
+  if (field.dataset.edited) return;
+  const editing = document.activeElement === field;
+  field.value = editing ? discordWebhook : maskWebhook(discordWebhook);
+  if (!editing) field.scrollLeft = 0;
+}
+function loadWebhook() {
+  return call('discord_webhook').then(result => { discordWebhook = result.url || ''; showWebhook(); }).catch(() => {});
+}
+$('discord-url').addEventListener('focus', showWebhook);
+$('discord-url').addEventListener('blur', showWebhook);
+$('discord-url').addEventListener('input', () => { $('discord-url').dataset.edited = '1'; $('discord-error').textContent = ''; });
 $('save-discord').addEventListener('click', () => {
   const values = {discord_username: $('discord-name').value.trim()};
-  if ($('discord-url').value.trim()) values.discord_webhook_url = $('discord-url').value.trim();
-  quiet(command('notification', values).then(() => { $('discord-url').value = ''; delete $('discord-name').dataset.edited; }));
+  const url = $('discord-url').value.trim();
+  if ($('discord-url').dataset.edited) {
+    if (url && !/^https:\/\/(\w+\.)?discord(app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(url)) {
+      $('discord-error').textContent = 'Discord の Webhook URL（https://discord.com/api/webhooks/… ）を入力してください';
+      return;
+    }
+    values.discord_webhook_url = url;
+  }
+  command('notification', values).then(() => {
+    delete $('discord-url').dataset.edited;
+    delete $('discord-name').dataset.edited;
+    $('discord-error').textContent = '';
+    return loadWebhook();
+  }).catch(error => { $('discord-error').textContent = error.message; }).finally(refresh);
 });
 
 // Controller placement is kept per browser; storage may be unavailable, so the default must work without it.
