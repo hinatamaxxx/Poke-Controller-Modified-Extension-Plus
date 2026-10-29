@@ -14,7 +14,7 @@ PACKAGING = ROOT / 'packaging'
 EXCLUDED_PARTS = {'profiles', 'log', 'runtime', 'Captures', 'Controller_Log', '__pycache__'}
 # The fork origin's own launchers, uv setup, docs and tests stay in the repository (so its updates merge cleanly)
 # but are not part of this app's install.
-UPSTREAM_ONLY = ('bootstrap/', 'docs/', 'SerialController/tests/', 'pyproject.toml', 'uv.lock', 'ruff.toml',
+UPSTREAM_ONLY = ('bootstrap/', 'docs/', 'DirectShowLib/', 'SerialController/tests/', 'pyproject.toml', 'uv.lock', 'ruff.toml',
                  'requirements-web.txt', '.python-version', 'CONTRIBUTING.md')
 
 
