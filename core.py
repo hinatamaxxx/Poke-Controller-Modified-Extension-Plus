@@ -29,6 +29,24 @@ class Mock_typer:
         self.ser = ser
 
 
+class AudioSettings:
+    """The fork origin's AudioService reads and writes plain values; this profile keeps them as Var."""
+
+    def __init__(self, settings):
+        object.__setattr__(self, '_settings', settings)
+
+    def __getattr__(self, name):
+        value = getattr(self._settings, name)
+        return value.get() if isinstance(value, Var) else value
+
+    def __setattr__(self, name, value):
+        current = getattr(self._settings, name)
+        if isinstance(current, Var):
+            current.set(value)
+        else:
+            setattr(self._settings, name, value)
+
+
 class DemoPort:
     """The demo's sender as open (like serial_open()): its writes go nowhere."""
 
@@ -366,6 +384,7 @@ class Core:
             self.camera.capture_dir = str(app_paths.CAPTURES)
         self.camera_missing, self.next_camera_check = False, 0
         self._apply_mask_filter()
+        self.audio = None
         self.show_serial = Var(bool(self.settings.is_show_serial.get()))
         self.ser = plus_runtime.make_sender(self.show_serial.get())
         if demo:
@@ -389,6 +408,7 @@ class Core:
         from services.sleep_watch import SleepWatch
         self.sleep_watch = SleepWatch(self._resumed)
         self.sleep_watch.start()
+        threading.Thread(target=self.apply_audio, name='audio', daemon=True).start()
         # The fork origin's schedule: start a script at a time, stop at a time or after some minutes.
         from services.run_schedule import RunSchedule
         self.schedule = RunSchedule(self._scheduled_start, self.stop_script, lambda: self.running, print)
@@ -992,6 +1012,73 @@ class Core:
         start, stop = self.schedule.describe()
         return {'start': start if self.schedule.start_at else '', 'stop': stop if (self.schedule.stop_at or self.schedule.stop_after_minutes) else ''}
 
+    # ---- the capture board's sound (the fork origin's Audio tab: AudioService with sounddevice). Heard on this PC's
+    # speakers, with a level meter on the page.
+    AUDIO_FIELDS = ('is_use_audio', 'audio_device', 'audio_output_device', 'is_audio_playback', 'audio_volume')
+
+    def _audio(self):
+        if self.audio is None:
+            import plus_audio
+            from services.audio_service import AudioService
+            plus_audio.install()
+            self.audio = AudioService(AudioSettings(self.settings))
+            if self.audio.available:
+                self.audio.refresh(self._audio_cameras())
+        return self.audio
+
+    def _audio_cameras(self):
+        """The camera this Switch uses, as the fork origin's {number: device path} (to find the same board's sound)."""
+        path = self.settings.camera_path
+        return {0: path} if path else {}
+
+    def apply_audio(self):
+        audio = self._audio()
+        if audio.available:
+            with self.lock:
+                audio.apply(self._audio_cameras(), 0)
+
+    def audio_state(self):
+        audio = self.audio
+        if audio is None:
+            return {'available': None}
+        if not audio.available:
+            from Audio import AUDIO_IMPORT_ERROR
+            return {'available': False, 'error': str(AUDIO_IMPORT_ERROR or '')}
+        settings = AudioSettings(self.settings)
+        from services.audio_service import OUTPUT_DEFAULT
+        return {'available': True, 'use': bool(settings.is_use_audio), 'running': audio.is_running,
+                'input': settings.audio_device, 'inputs': list(audio.inputs),  # this Switch's capture board first
+                'playback': bool(settings.is_audio_playback), 'output': settings.audio_output_device or OUTPUT_DEFAULT,
+                'outputs': [OUTPUT_DEFAULT] + list(audio.outputs), 'volume': int(settings.audio_volume or 0),
+                'meter': audio.meter()}
+
+    def set_audio(self, values):
+        """values: use, input, playback, output, volume (0-100), refresh (list the devices again)."""
+        audio = self._audio()
+        if not audio.available:
+            raise ValueError('音声を扱うライブラリ（sounddevice）が使えません。')
+        settings = AudioSettings(self.settings)
+        with self.lock:
+            if values.get('refresh'):
+                audio.refresh(self._audio_cameras())
+            restart = False
+            if 'input' in values and str(values['input']) != settings.audio_device:
+                settings.audio_device, restart = str(values['input']), True
+            if 'use' in values and bool(values['use']) != bool(settings.is_use_audio):
+                settings.is_use_audio, restart = bool(values['use']), True
+            if restart:
+                audio.apply(self._audio_cameras(), 0)
+            if 'output' in values:
+                settings.audio_output_device = str(values['output'])
+                audio.apply_output_device()
+            if 'playback' in values:
+                settings.is_audio_playback = bool(values['playback'])
+                audio.apply_playback()
+            if 'volume' in values:
+                settings.audio_volume = min(max(int(values['volume']), 0), 100)
+                audio.apply_volume()
+            self.settings.save()
+
     # ---- covering parts of the picture (the fork origin's Mask tab: settings.ini [Mask]). The camera image itself is
     # not changed, so scripts still see everything; the masks are drawn on what the page shows and, when chosen, on
     # screenshots.
@@ -1293,7 +1380,7 @@ class Core:
         keys = self.keys_software_controller
         return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
                 'starting': self.starting or '', 'windows': self.windows.list(), 'schedule': self.schedule_state(),
-                'keyboard': self.keyboard_unavailable(), 'masks': self.masks_state(),
+                'keyboard': self.keyboard_unavailable(), 'masks': self.masks_state(), 'audio': self.audio_state(),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},
@@ -1310,6 +1397,8 @@ class Core:
     def close(self):
         """Stop the script, release the port and camera, and save settings."""
         self.sleep_watch.stop()
+        if self.audio is not None:
+            self.audio.stop()
         if self.keyboard_session is not None:
             self.keyboard_session.close()
         self.stop_script()

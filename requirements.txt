@@ -13,3 +13,4 @@ PyAudio==0.2.14
 pygame==2.6.1
 pynput==1.8.1
 mcp==2.2.0
+sounddevice==0.5.6

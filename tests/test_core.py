@@ -156,6 +156,41 @@ class MaskTest(unittest.TestCase):
             core.Core.set_masks(self.owner(), {'items': [{'shape': 'Star', 'x2': 9, 'y2': 9}]})
 
 
+class AudioTest(unittest.TestCase):
+    def test_the_fork_origins_audio_service_reads_and_writes_the_profiles_values(self):
+        from types import SimpleNamespace
+        import core
+        from plus_settings import Var
+        settings = SimpleNamespace(is_use_audio=Var(False), audio_volume=Var(100), masks=[])
+        view = core.AudioSettings(settings)
+        self.assertIs(view.is_use_audio, False)
+        view.is_use_audio = True
+        view.audio_volume = 40
+        view.masks = ['x']
+        self.assertEqual((settings.is_use_audio.get(), settings.audio_volume.get(), settings.masks), (True, 40, ['x']))
+
+    def test_changing_the_input_restarts_the_capture(self):
+        import threading
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import core
+        from plus_settings import Var
+        settings = SimpleNamespace(is_use_audio=Var(True), audio_device=Var('a'), audio_output_device=Var(''),
+                                   is_audio_playback=Var(True), audio_volume=Var(100), camera_path='cam', save=Mock())
+        audio = Mock(available=True)
+        owner = Mock(lock=threading.RLock(), settings=settings)
+        owner._audio.return_value = audio
+        owner._audio_cameras.return_value = {0: 'cam'}
+        core.Core.set_audio(owner, {'input': 'b', 'volume': 150})
+        audio.apply.assert_called_once_with({0: 'cam'}, 0)
+        self.assertEqual((settings.audio_device.get(), settings.audio_volume.get()), ('b', 100))
+        audio.reset_mock()
+        core.Core.set_audio(owner, {'playback': False})
+        audio.apply.assert_not_called()
+        audio.apply_playback.assert_called_once_with()
+        settings.save.assert_called()
+
+
 class SwitchKeyboardTest(unittest.TestCase):
     def test_why_text_cannot_be_typed(self):
         from unittest.mock import Mock

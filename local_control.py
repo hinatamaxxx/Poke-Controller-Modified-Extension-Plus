@@ -721,6 +721,8 @@ class LocalControl(ApiServer):
             core.set_schedule(values)
         elif action == 'masks':
             core.set_masks(values)
+        elif action == 'audio':
+            core.set_audio(values)
         elif action == 'notification':
             core.set_notification(values)
         elif action == 'notify_test':
