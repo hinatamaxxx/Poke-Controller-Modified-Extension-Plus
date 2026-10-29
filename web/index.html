@@ -422,6 +422,8 @@ table.notify input { margin: 1px 0; }
 .pad.disabled .ctl, .pad.disabled .stick { opacity: .45; cursor: not-allowed; }
 .stick-cell { display: grid; place-items: center; }
 .stick { border-radius: 50%; background: var(--stick-base, var(--well)); cursor: grab; touch-action: none; }
+.stick[data-stick=L], .keymap-pad .well[data-label=L] { box-shadow: inset 0 0 0 1.2cqw var(--ring-l, transparent); }
+.stick[data-stick=R], .keymap-pad .well[data-label=R] { box-shadow: inset 0 0 0 1.2cqw var(--ring-r, transparent); }
 .stick .knob { position: absolute; left: 50%; top: 50%; width: 56%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: var(--btn); pointer-events: none; transition: transform .12s ease-out;
                display: grid; place-items: center; color: var(--btn-text); font: 700 clamp(7px, 2.4cqw, 14px)/1 system-ui, "Segoe UI", sans-serif; }
 .stick.dragging { cursor: grabbing; }
@@ -896,18 +898,24 @@ function buildPad() {
 buildPad();
 
 // Controller colours: the Fork origin's Joy-Con presets (ControllerColors.SWITCH_JOYCON), shared by the whole app.
-const PAD_COLORS = [['Default', '#56CCF2', '#E9514E'], ['Neon Blue / Neon Red', '#0AB9E6', '#FF3C28'], ['Gray', '#828282', '#828282'],
+// Besides the Joy-Con colours, a preset may set the buttons, the stick bases and the rings round the sticks.
+const PAD_COLORS = [['Default', '#56CCF2', '#E9514E'],
+  ['Switch 2', '#2D2E33', '#2D2E33', {btn: '#1D1E21', 'btn-text': '#C9CACD', 'stick-base': '#202124', 'ring-l': '#6FD3CF', 'ring-r': '#F25C4A'}],
+  ['Neon Blue / Neon Red', '#0AB9E6', '#FF3C28'], ['Gray', '#828282', '#828282'],
   ['Neon Yellow', '#E6FF00', '#E6FF00'], ['Neon Green / Neon Pink', '#1EDC00', '#FF3278'], ['Neon Purple / Neon Orange', '#B400E6', '#FAA005'],
   ['Blue / Neon Yellow', '#4655F5', '#E6FF00'], ['Pastel Pink / Pastel Yellow', '#FFAFAF', '#F5FF82'],
   ['Pastel Purple / Pastel Green', '#F0CBEB', '#BCFFC8'], ['Brown / Yellow', '#C88D32', '#FFDC00']];
 let padColorsShown = '';
 function applyPadColors(name) {
-  const [, left, right] = PAD_COLORS.find(c => c[0] === name) || PAD_COLORS[0];
-  if (padColorsShown === left + right) return;
-  padColorsShown = left + right;
+  const [shown, left, right, parts = {}] = PAD_COLORS.find(c => c[0] === name) || PAD_COLORS[0];
+  if (padColorsShown === shown) return;
+  padColorsShown = shown;
   const root = document.documentElement.style;
   root.setProperty('--joy-l', left);
   root.setProperty('--joy-r', right);
+  for (const part of ['btn', 'btn-text', 'stick-base', 'ring-l', 'ring-r']) {
+    if (parts[part]) root.setProperty('--' + part, parts[part]); else root.removeProperty('--' + part);
+  }
 }
 let state = null, catalogKey = '', folderKey = '', selectedScript = '';
 const STREAM = '/stream.mjpg';
