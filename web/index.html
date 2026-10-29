@@ -1293,14 +1293,6 @@ function saveAudio(values) {
   $('audio-error').textContent = '';
   return call('command', {action: 'audio', values}).catch(error => { $('audio-error').textContent = error.message; });
 }
-function fillSelect(select, items, value) {
-  const key = JSON.stringify(items);
-  if (select.dataset.key !== key) {
-    select.dataset.key = key;
-    select.replaceChildren(...items.map(([v, text]) => Object.assign(document.createElement('option'), {value: v, textContent: text})));
-  }
-  if (document.activeElement !== select) select.value = value;
-}
 function renderAudio() {
   const audio = state.audio || {};
   $('audio').hidden = !audio.available;
@@ -1465,6 +1457,17 @@ function fillSelect(select, items, value) {
   if (document.activeElement !== select && value !== undefined) select.value = String(value);
 }
 
+// The Data Format decides the baud rate (the fork origin's transports); the list only shows it.
+function renderBaud() {
+  const serial = (state && state.serial) || {};
+  const forced = (serial.bauds || {})[$('format').value];
+  const bauds = [...new Set([9600, 19200, 38400, 57600, 115200, serial.baud || 9600])].sort((a, b) => a - b);
+  fillSelect($('baud'), forced === null ? [['', '—']] : bauds.map(b => [b, String(b)]));
+  $('baud').value = forced === null ? '' : String(forced === undefined ? serial.baud || 9600 : forced);
+  $('baud').disabled = state.running || forced !== undefined;
+}
+$('format').addEventListener('change', renderBaud);
+
 // Scripts
 function scriptItems() { return (state && state.tags && state.tags[$('kind').value]) || []; }
 // Script names look like "名前 (Folder/Sub/module)"; show the name and the folder separately.
@@ -1602,11 +1605,10 @@ function renderConnection() {
   if (!ports.length) ports.push(['', 'ポートがありません']);
   fillSelect($('port'), ports, serial.port || (ports[0] && ports[0][0]));
   fillSelect($('format'), (serial.formats || ['Default']).map(f => [f, f]), serial.format);
-  const bauds = [...new Set([9600, 19200, 38400, 57600, 115200, serial.baud || 9600])].sort((a, b) => a - b);
-  fillSelect($('baud'), bauds.map(b => [b, String(b)]), serial.baud || 9600);
+  renderBaud();
   $('serial-error').textContent = serial.error || '';
   const busy = state.running;
-  ['port', 'format', 'baud', 'connect'].forEach(id => $(id).disabled = busy);
+  ['port', 'format', 'connect'].forEach(id => $(id).disabled = busy);
   $('disconnect').disabled = busy || !state.serial_open;
 }
 
