@@ -136,8 +136,8 @@ def run_hub(args):
         sys.stderr = console
     if sys.stdout is None:
         sys.stdout = console
-    import PokeConLogger
-    PokeConLogger.root_logger()
+    import plus_logger
+    plus_logger.root_logger()
     from plus_preferences import Preferences
     import update_service
     from hub import Hub
@@ -203,11 +203,8 @@ def run_worker(args):
     except OSError as error:
         print(f'設定フォルダーを開けません（ほかで使用中）: {error}', file=sys.stderr, flush=True)
         return 3
-    if args.demo:
-        from demo_camera import install
-        install()
-    import PokeConLogger
-    PokeConLogger.root_logger()
+    import plus_logger
+    plus_logger.root_logger()
     from core import Core
     from local_control import LocalControl, process_alive
     from plus_preferences import Preferences

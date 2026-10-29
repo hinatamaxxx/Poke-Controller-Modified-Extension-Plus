@@ -12,6 +12,10 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGING = ROOT / 'packaging'
 EXCLUDED_PARTS = {'profiles', 'log', 'runtime', 'Captures', 'Controller_Log', '__pycache__'}
+# The fork origin's own launchers, uv setup, docs and tests stay in the repository (so its updates merge cleanly)
+# but are not part of this app's install.
+UPSTREAM_ONLY = ('bootstrap/', 'docs/', 'DirectShowLib/', 'SerialController/tests/', 'pyproject.toml', 'uv.lock', 'ruff.toml',
+                 'requirements-web.txt', '.python-version', 'CONTRIBUTING.md')
 
 
 def version():
@@ -58,7 +62,8 @@ def build(out):
     # Only files tracked by git are shipped, so local profiles, logs and caches never leak into a release.
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     for name in tracked:
-        if not name or name.startswith(('.git', '.claude-plugin/', '.codex-plugin/', '.agents/', 'plugin/', 'packaging/', 'tests/', 'Images/')) or set(Path(name).parts) & EXCLUDED_PARTS:
+        if not name or name.startswith(('.git', '.claude-plugin/', '.codex-plugin/', '.agents/', 'plugin/', 'packaging/', 'tests/', 'Images/')) or set(Path(name).parts) & EXCLUDED_PARTS \
+                or name.startswith(UPSTREAM_ONLY) or (name.endswith('.bat') and '/' not in name):
             continue
         source = ROOT / name
         if source.is_file():

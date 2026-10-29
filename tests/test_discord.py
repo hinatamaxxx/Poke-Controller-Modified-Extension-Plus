@@ -13,6 +13,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'SerialController')]
 
+import plus_runtime  # noqa: E402
+
+plus_runtime.install()
 import DiscordNotify  # noqa: E402
 from history import FrameHistory  # noqa: E402
 
@@ -35,44 +38,40 @@ class WebhookTests(unittest.TestCase):
 
     def make(self, text):
         Path(self.path).write_text(text, encoding='utf-8')
-        return DiscordNotify.Discord_Notify()
-
-    def test_new_file_has_only_the_webhook(self):
         with quiet():
-            DiscordNotify.Discord_Notify()
-        text = Path(self.path).read_text(encoding='utf-8')
-        self.assertIn('[DISCORD_WEBHOOK]', text)
-        self.assertNotIn('token', text)
+            return DiscordNotify.Discord_Notify()
 
-    def test_unknown_or_empty_keys_go_to_the_settings_webhook(self):
+    def test_created_without_contacting_discord(self):
+        with patch('requests.get') as get, quiet():
+            notify = self.make('[DISCORD_WEBHOOK]\nwebhook_url = https://example.invalid/a\n')
+        get.assert_not_called()
+        self.assertEqual(notify.default_username, 'Pokecon')
+
+    def test_unknown_or_empty_names_go_to_the_settings_webhook(self):
         notify = self.make('[DISCORD_WEBHOOK]\nwebhook_url = https://example.invalid/a\n'
                            '[DISCORD_WEBHOOK2]\nwebhook_url =\n[DISCORD_WEBHOOK3]\nwebhook_url = https://example.invalid/c\n')
-        self.assertEqual(notify.resolve_keys('DISCORD_WEBHOOK5'), ['DISCORD_WEBHOOK'])
-        self.assertEqual(notify.resolve_keys('DISCORD_WEBHOOK2'), ['DISCORD_WEBHOOK'])
-        self.assertEqual(notify.resolve_keys(['DISCORD_WEBHOOK3', 'X', 'DISCORD_WEBHOOK']),
-                         ['DISCORD_WEBHOOK3', 'DISCORD_WEBHOOK'])
-        self.assertEqual(notify.resolve_keys('ALL'), ['DISCORD_WEBHOOK', 'DISCORD_WEBHOOK3'])
+        self.assertEqual(notify.resolve(0, 'DISCORD_WEBHOOK5'), 'DISCORD_WEBHOOK')
+        self.assertEqual(notify.resolve(0, 'DISCORD_WEBHOOK3'), 'DISCORD_WEBHOOK3')
 
     def test_nothing_set_sends_nothing(self):
         notify = self.make('[DISCORD_WEBHOOK]\nwebhook_url =\n')
-        with patch('requests.post') as post, quiet():
-            self.assertEqual(notify.send_message('x', keys='DISCORD_WEBHOOK2'), [])
-        post.assert_not_called()
+        self.assertIsNone(notify.resolve(0, None))
 
     def test_after_send_runs_only_for_real_notifications(self):
         notify = self.make('[DISCORD_WEBHOOK]\nwebhook_url = https://example.invalid/a\n')
         hook = Mock()
         with patch.object(DiscordNotify.Discord_Notify, 'after_send', hook), \
                 patch('requests.post', return_value=Mock(status_code=204)) as post, quiet():
-            self.assertEqual(notify.send_message('found', keys='DISCORD_WEBHOOK9'), ['DISCORD_WEBHOOK'])
+            self.assertTrue(notify.send_message('found'))
             notify.send_message('test', follow_up=False)
         self.assertEqual(post.call_args_list[0].args[0], 'https://example.invalid/a')
-        hook.assert_called_once_with(notify, ['DISCORD_WEBHOOK'])
+        self.assertEqual(post.call_args_list[0].kwargs['timeout'], 15)
+        hook.assert_called_once_with(notify, 'DISCORD_WEBHOOK')
 
     def test_send_file(self):
         notify = self.make('[DISCORD_WEBHOOK]\nwebhook_url = https://example.invalid/a\n')
         with patch('requests.post', return_value=Mock(status_code=200)) as post, quiet():
-            self.assertEqual(notify.send_file(['DISCORD_WEBHOOK'], 'clip.mp4', b'data'), ['DISCORD_WEBHOOK'])
+            self.assertTrue(notify.send_file(['DISCORD_WEBHOOK'], 'clip.mp4', b'data'))
         self.assertEqual(post.call_args.kwargs['files']['file'], ('clip.mp4', b'data'))
 
 
@@ -90,14 +89,14 @@ class SwitchCaptureTests(unittest.TestCase):
             script = Script()
         script.keys = Mock()
         script.Discord = Mock()
-        script.Discord.resolve_keys.return_value = ['DISCORD_WEBHOOK']
+        script.Discord.resolve.return_value = 'DISCORD_WEBHOOK'
         PythonCommandBase.PythonCommand._last_switch_capture = None
         self.addCleanup(setattr, PythonCommandBase.PythonCommand, '_last_switch_capture', None)
         return script, Button, PythonCommandBase
 
     def test_holds_capture_long_enough_for_a_video(self):
         script, Button, base = self.make()
-        with patch.object(base, 'sleep') as sleep, quiet():
+        with patch.object(plus_runtime.time, 'sleep') as sleep, quiet():
             self.assertTrue(script.switch_capture())
             self.assertFalse(script.switch_capture())  # the video already covers the last 30 seconds
             self.assertTrue(script.switch_capture(force=True))
@@ -108,7 +107,7 @@ class SwitchCaptureTests(unittest.TestCase):
 
     def test_discord_text_records_only_when_turned_on(self):
         script, Button, base = self.make()
-        with patch.object(base, 'sleep'), quiet():
+        with patch.object(plus_runtime.time, 'sleep'), quiet():
             with patch.object(base.PythonCommand, 'isDiscordSwitchCapture', False):
                 script.discord_text('found')
             script.keys.hold.assert_not_called()
@@ -119,10 +118,21 @@ class SwitchCaptureTests(unittest.TestCase):
         script.keys.hold.assert_called_once_with(Button.CAPTURE)
         self.assertEqual(script.Discord.send_message.call_count, 3)
 
+    def test_start_and_stop_notifications_do_not_record(self):
+        script, Button, base = self.make()
+        with patch.object(plus_runtime.time, 'sleep'), patch.object(base.PythonCommand, 'isDiscordSwitchCapture', True), \
+                quiet():
+            script._discordNotify('started')
+            script.keys.hold.assert_not_called()
+            script.finished_itself = True
+            script._discordNotify('finished')
+        script.keys.hold.assert_called_once_with(Button.CAPTURE)
+
     def test_no_webhook_no_recording(self):
         script, Button, base = self.make()
-        script.Discord.resolve_keys.return_value = []
-        with patch.object(base, 'sleep'), patch.object(base.PythonCommand, 'isDiscordSwitchCapture', True), quiet():
+        script.Discord.resolve.return_value = None
+        with patch.object(plus_runtime.time, 'sleep'), patch.object(base.PythonCommand, 'isDiscordSwitchCapture', True), \
+                quiet():
             script.discord_text('found')
         script.keys.hold.assert_not_called()
 

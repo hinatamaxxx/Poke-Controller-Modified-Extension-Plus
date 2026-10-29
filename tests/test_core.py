@@ -77,10 +77,9 @@ class DialogsTest(unittest.TestCase):
         dialogs.cancel_all()
 
     def test_script_dialogue_api_uses_browser_answers(self):
-        import PokeConDialogue
         from Commands.CommandBase import Command
         dialogs = Dialogs()
-        PokeConDialogue.DIALOGUE_PROVIDER = dialogs.ask
+        Command.dialogue_handler = dialogs.handle
         try:
             command = Command.__new__(Command)
             command.message_dialogue = None
@@ -88,7 +87,7 @@ class DialogsTest(unittest.TestCase):
             result = Command.dialogue6widget(command, 'title', [['Check', 'c', False], ['Spin', 's', ['1', '3'], '1']])
             self.assertEqual(result, [True, '3'])
         finally:
-            PokeConDialogue.DIALOGUE_PROVIDER = None
+            Command.dialogue_handler = None
 
 
 if __name__ == '__main__':

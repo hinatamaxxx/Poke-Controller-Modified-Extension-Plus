@@ -1,3 +1,4 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from product import NAME, VERSION
+NAME = "Poke-Controller Modified Extension"
+VERSION = "0.2.0"

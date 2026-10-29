@@ -5,28 +5,39 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'SerialController'))
+sys.path[:0] = [str(ROOT), str(ROOT / 'SerialController')]
+import plus_runtime  # noqa: E402
+
+plus_runtime.install()
 
 
 class SerialFailureTest(unittest.TestCase):
     def test_failed_open_is_not_treated_as_disconnect(self):
         import serial
-        from Commands.Sender import Sender
-        sender = Sender(Mock())
+        sender = plus_runtime.make_sender(False)
         with patch('serial.Serial', side_effect=serial.SerialException('missing')):
             self.assertFalse(sender.openSerial(3))
         self.assertEqual(sender.last_error, '')
 
-    def test_write_timeout_keeps_port_open(self):
+    def test_a_write_timeout_keeps_port_open_and_repeated_failures_report_it(self):
         import serial
-        from Commands.Sender import Sender
-        sender = Sender(Mock())
+        from Commands.Keys import Button, KeyPress
+        sender = plus_runtime.make_sender(False)
         port = Mock()
+        port.format_name = None
         port.write.side_effect = serial.SerialTimeoutException('busy')
         sender.ser = port
-        self.assertFalse(sender._write(b'abcd'))
+        keys = KeyPress(sender)
+        keys.input([Button.A])
         self.assertEqual(sender.last_error, '')
         port.close.assert_not_called()
+        for _ in range(6):
+            keys.input([Button.B])
+            keys.inputEnd([Button.B])
+        self.assertIn('シリアルに送れません', sender.last_error)
+        port.write.side_effect = None
+        keys.input([Button.X])
+        self.assertEqual(sender.last_error, '')
 
 
 class CameraIdentityTest(unittest.TestCase):

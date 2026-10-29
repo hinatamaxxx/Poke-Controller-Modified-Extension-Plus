@@ -67,9 +67,12 @@ class ScriptFolderTest(unittest.TestCase):
                          os.path.join(os.path.realpath('スクリプト'), '共通', '画像'))
 
     def test_both_folders_are_loaded_with_their_own_names(self):
-        from CommandLoader import CommandLoader
+        from CommandLoader import CommandLoader, CombinedLoader
         from Commands.PythonCommandBase import PythonCommand
-        names = sorted(c.NAME for c in CommandLoader([os.path.join('Commands', 'PythonCommands'), 'スクリプト'], PythonCommand).load())
+        from core import ScriptLoader
+        loader = CombinedLoader(CommandLoader(os.path.join('Commands', 'PythonCommands'), PythonCommand),
+                                ScriptLoader('スクリプト', PythonCommand))
+        names = sorted(e.name for e in loader.load())
         self.assertEqual(names, ['エンテイ厳選 (BDSP/エンテイ)', '古い (Old/old)'])
 
     def test_script_files_use_スクリプト_unless_named_otherwise(self):

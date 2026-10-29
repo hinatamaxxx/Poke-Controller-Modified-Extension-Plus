@@ -3,7 +3,11 @@
 Any visible top-level window of this worker process (or a process it started) is listed. Its picture is taken with
 PrintWindow, so it works whatever library drew it, and clicks, keys and text are posted to it as window messages.
 While the app shows a window, the real one is made fully transparent and click-through, so nothing appears on the
-desktop; "デスクトップに出す" puts it back as it was."""
+desktop; "デスクトップに出す" puts it back as it was.
+
+The windows belong to the script's threads, which may answer window messages only now and then (a status window that a
+script updates once a minute). Nothing here waits for them: titles are read without asking the window, changes to the
+windows are made on a helper thread, and a picture that does not come in time is the last one taken."""
 
 import ctypes
 import os
@@ -109,6 +113,8 @@ if user32:
     user32.ReleaseDC.argtypes = [wt.HWND, wt.HDC]
     user32.PrintWindow.argtypes = [wt.HWND, wt.HDC, wt.UINT]
     user32.SetForegroundWindow.argtypes = [wt.HWND]
+    user32.InternalGetWindowText.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
+    user32.ShowWindowAsync.argtypes = [wt.HWND, ctypes.c_int]
     user32.ShowWindow.argtypes = [wt.HWND, ctypes.c_int]
     user32.RedrawWindow.argtypes = [wt.HWND, ctypes.c_void_p, ctypes.c_void_p, wt.UINT]
     user32.MapVirtualKeyW.argtypes = [wt.UINT, wt.UINT]
@@ -280,6 +286,33 @@ def _tk_type(interp, toplevel, text):
     interp.call(widget, 'insert', 'insert', text)
 
 
+class _Helper:
+    """One thread that makes changes to the script's windows (they may wait until the window's thread answers)."""
+
+    def __init__(self):
+        import queue
+        self.jobs = queue.Queue()
+        self.thread = None
+
+    def run(self, job):
+        if self.thread is None or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self._work, name='script-windows', daemon=True)
+            self.thread.start()
+        self.jobs.put(job)
+
+    def _work(self):
+        while True:
+            job = self.jobs.get()
+            try:
+                job()
+            except Exception:
+                pass
+
+
+_helper = _Helper()
+CAPTURE_WAIT = .5  # seconds a picture may take before the last one is shown
+
+
 def _text(function, hwnd):
     buffer = ctypes.create_unicode_buffer(256)
     function(hwnd, buffer, 256)
@@ -329,6 +362,8 @@ class ScriptWindows:
         self.concealed = {}   # hwnd -> extended style before it was hidden from the desktop
         self.on_desktop = set()  # windows the user chose to see on the desktop
         self.ignore = set(ignore)
+        self.pictures = {}  # hwnd -> (BGR image, when)
+        self.taking = {}    # hwnd -> Event of the capture in progress
 
     def available(self):
         return user32 is not None
@@ -355,12 +390,12 @@ class ScriptWindows:
             if user32.IsIconic(hwnd):
                 if hwnd in self.on_desktop:
                     continue
-                user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)  # a minimized window draws nothing for the app to show
+                user32.ShowWindowAsync(hwnd, SW_SHOWNOACTIVATE)  # a minimized window draws nothing for the app to show
             x, y, w, h = _client_box(hwnd)
             if w < 8 or h < 8:
                 continue
             style = user32.GetWindowLongPtrW(hwnd, GWL_STYLE)
-            windows.append({'id': str(hwnd), 'title': _text(user32.GetWindowTextW, hwnd),
+            windows.append({'id': str(hwnd), 'title': _text(user32.InternalGetWindowText, hwnd),
                             'class': _text(user32.GetClassNameW, hwnd), 'x': x, 'y': y, 'width': w, 'height': h,
                             'popup': not (style & WS_CAPTION), 'desktop': hwnd in self.on_desktop})
         mains = [w for w in windows if not w['popup']]
@@ -388,8 +423,11 @@ class ScriptWindows:
                     continue
                 ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
                 self.concealed[hwnd] = ex
-                user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED | WS_EX_TRANSPARENT)
-                user32.SetLayeredWindowAttributes(hwnd, 0, 0, LWA_ALPHA)
+
+                def conceal(hwnd=hwnd, ex=ex):
+                    user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+                    user32.SetLayeredWindowAttributes(hwnd, 0, 0, LWA_ALPHA)
+                _helper.run(conceal)
 
     def show_on_desktop(self, window_id):
         """Put a window back on the desktop as it was, in front."""
@@ -397,14 +435,17 @@ class ScriptWindows:
         with self.lock:
             ex = self.concealed.pop(hwnd, None)
             self.on_desktop.add(hwnd)
-        if ex is not None:
-            user32.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)
-            user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex)
-            user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
-        if user32.IsIconic(hwnd):
-            user32.ShowWindow(hwnd, SW_RESTORE)
-        user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN)
-        user32.SetForegroundWindow(hwnd)
+
+        def reveal():
+            if ex is not None:
+                user32.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)
+                user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex)
+                user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+            if user32.IsIconic(hwnd):
+                user32.ShowWindowAsync(hwnd, SW_RESTORE)
+            user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN)
+            user32.SetForegroundWindow(hwnd)
+        _helper.run(reveal)
 
     def _known(self, window_id):
         try:
@@ -416,9 +457,31 @@ class ScriptWindows:
         return hwnd
 
     def capture(self, window_id):
-        """The window's client area as a BGR image (numpy)."""
-        import numpy as np
+        """The window's client area as a BGR image (numpy). A window that is slow to draw gives its last picture."""
         hwnd = self._known(window_id)
+        with self.lock:
+            done = self.taking.get(hwnd)
+            if done is None:
+                done = self.taking[hwnd] = threading.Event()
+
+                def take():
+                    try:
+                        self.pictures[hwnd] = (self._print(hwnd), time.monotonic())
+                    except Exception:
+                        pass
+                    finally:
+                        with self.lock:
+                            self.taking.pop(hwnd, None)
+                        done.set()
+                threading.Thread(target=take, name='script-window-picture', daemon=True).start()
+        done.wait(CAPTURE_WAIT)
+        picture = self.pictures.get(hwnd)
+        if picture is None:
+            raise ValueError('The window is not drawn yet')
+        return picture[0]
+
+    def _print(self, hwnd):
+        import numpy as np
         _, _, w, h = _client_box(hwnd)
         if w <= 0 or h <= 0:
             raise ValueError('The window has no size')

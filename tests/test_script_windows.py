@@ -74,6 +74,37 @@ class ScriptWindowsTest(unittest.TestCase):
         wait_for(lambda: result)
         self.assertEqual(result, {'name': 'ミュウツー', 'entry': '0.88', 'flag': True})
 
+    def test_a_busy_window_never_holds_up_the_app(self):
+        # A status window that its script updates only now and then: its thread does not answer window messages.
+        script_windows.track_tkinter()
+        shown, finish = threading.Event(), threading.Event()
+
+        def gui():
+            import tkinter as tk
+            root = tk.Tk()
+            root.title('いそがしい窓')
+            tk.Label(root, text='回数: 0').pack(padx=40, pady=20)
+            root.update()
+            shown.set()
+            finish.wait(10)  # busy: no update() for a while
+            root.destroy()
+        thread = threading.Thread(target=gui, daemon=True)
+        thread.start()
+        shown.wait(5)
+        windows = script_windows.ScriptWindows()
+        try:
+            started = time.monotonic()
+            window = next(w for w in windows.list() if w['title'] == 'いそがしい窓')
+            windows.list()
+            try:
+                windows.capture(window['id'])
+            except ValueError:
+                pass  # not drawn yet is fine; waiting is not
+            self.assertLess(time.monotonic() - started, 2)
+        finally:
+            finish.set()
+            thread.join(5)
+
     def test_cv2_window_gets_clicks(self):
         import cv2
         import numpy as np
