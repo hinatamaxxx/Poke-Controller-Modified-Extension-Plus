@@ -118,5 +118,33 @@ class SleepTest(unittest.TestCase):
         self.assertEqual(len(seen), 1)
 
 
+class SwitchKeyboardTest(unittest.TestCase):
+    def test_why_text_cannot_be_typed(self):
+        from unittest.mock import Mock
+        import core
+        owner = Mock(running=True, demo=False)
+        self.assertIn('実行中', core.Core.keyboard_unavailable(owner))
+        owner.running = False
+        owner.ser.isOpened.return_value = False
+        self.assertIn('シリアルポート', core.Core.keyboard_unavailable(owner))
+        owner.demo = True
+        self.assertEqual(core.Core.keyboard_unavailable(owner), '')
+
+    def test_a_refused_text_is_an_error(self):
+        import threading
+        from unittest.mock import Mock
+        import core
+        owner = Mock(lock=threading.RLock(), keyboard_session=Mock())
+        owner.keyboard_unavailable.return_value = ''
+        owner.keyboard_session.send_text.return_value = False
+        with self.assertRaises(ValueError):
+            core.Core.switch_keyboard(owner, {'text': 'あいう'})
+        core.Core.switch_keyboard(owner, {'key': 'ok'})
+        owner.keyboard_session.ok.assert_called_once_with()
+        owner.keyboard_unavailable.return_value = 'だめ'
+        with self.assertRaisesRegex(ValueError, 'だめ'):
+            core.Core.switch_keyboard(owner, {'text': 'a'})
+
+
 if __name__ == '__main__':
     unittest.main()

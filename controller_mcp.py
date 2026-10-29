@@ -271,6 +271,15 @@ def build_server(endpoint_path=None, autostart=True):
         """Answer a script dialogue: values in field order, skipping 'next' separators; null cancels it."""
         return call(session_id, 'command', {'action': 'answer', 'values': {'dialog': dialog_id, 'values': values}})
 
+    @server.tool(annotations=control)
+    def type_on_switch(session_id: str, text: str = '', enter: bool = False, key: str = '') -> dict:
+        """Type on the Switch's own on-screen keyboard (it must be open on the Switch), the microcontroller acting as a USB
+        keyboard: half-width letters, digits, symbols, hiragana and katakana (the input mode is switched to match).
+        enter: press Enter after the text. key: instead of text, one of backspace / space / enter / ok (ok = the + button).
+        Works only with a Data Format that supports the keyboard (Default / NX) and when no script runs."""
+        values = {'key': key} if key else {'text': text, 'enter': enter}
+        return call(session_id, 'command', {'action': 'switch_keyboard', 'values': values})
+
     @server.tool(annotations=read_only)
     def list_windows(session_id: str) -> list:
         """Windows a script opened itself (tkinter, cv2.imshow, pygame, ...), top first: id, title, width, height.
