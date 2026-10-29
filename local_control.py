@@ -710,6 +710,8 @@ class LocalControl(ApiServer):
             core.save_discord_destination(values.get('name', ''), values.get('url', ''), values.get('original', ''))
         elif action == 'discord_destination_delete':
             core.delete_discord_destination(values.get('name', ''))
+        elif action == 'switch_keyboard':
+            core.switch_keyboard(values)
         elif action == 'run_list_save':
             core.save_run_list(values.get('list') or {}, str(values.get('original') or ''))
         elif action == 'run_list_delete':

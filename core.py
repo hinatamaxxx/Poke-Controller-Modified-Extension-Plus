@@ -22,6 +22,26 @@ def serial_formats():
     return transport_names()
 
 
+class Mock_typer:
+    """Just enough of KeyboardTyper for its unavailable_reason (which only looks at the port and the format)."""
+
+    def __init__(self, ser):
+        self.ser = ser
+
+
+class DemoPort:
+    """The demo's sender as open (like serial_open()): its writes go nowhere."""
+
+    def __init__(self, ser):
+        self._ser = ser
+
+    def isOpened(self):
+        return True
+
+    def __getattr__(self, name):
+        return getattr(self._ser, name)
+
+
 class RunListService:
     """What the fork origin's run lists (services/run_list) need from the app: find a script and create it."""
 
@@ -353,6 +373,7 @@ class Core:
         self.keys_software_controller = KeyPress(self.ser)
         self.cur_command, self.running = None, False
         self.starting = None  # name of a script whose setup (e.g. its own settings window) is still open
+        self.keyboard_session = None
         self.reported_error = ''
         from assist import Assist
         self.assist = Assist(self, profile_dir)
@@ -970,6 +991,36 @@ class Core:
         start, stop = self.schedule.describe()
         return {'start': start if self.schedule.start_at else '', 'stop': stop if (self.schedule.stop_at or self.schedule.stop_after_minutes) else ''}
 
+    # ---- typing on the Switch's keyboard (the fork origin's KeyboardSession; the microcontroller types as a USB keyboard)
+    def keyboard_unavailable(self):
+        """Why text cannot be typed on the Switch now ('' when it can)."""
+        if self.running:
+            return 'スクリプトの実行中は使えません。'
+        if self.demo:
+            return ''
+        from services.keyboard_typer import KeyboardTyper
+        return KeyboardTyper.unavailable_reason(Mock_typer(self.ser))
+
+    def switch_keyboard(self, values):
+        """values: text (+ enter) to type, or key 'backspace' / 'space' / 'enter' / 'ok'."""
+        from services.keyboard_session import KeyboardSession
+        reason = self.keyboard_unavailable()
+        if reason:
+            raise ValueError(reason)
+        with self.lock:
+            if self.keyboard_session is None:
+                self.keyboard_session = KeyboardSession(DemoPort(self.ser) if self.demo else self.ser, on_message=lambda text, error: print('キーボード: ' + text))
+            session = self.keyboard_session
+        key = values.get('key')
+        if key == 'ok':
+            accepted = session.ok()
+        elif key:
+            accepted = session.special(str(key))
+        else:
+            accepted = session.send_text(str(values.get('text', '')), True, bool(values.get('enter')))
+        if not accepted and not key and values.get('text'):
+            raise ValueError('送れませんでした（ログを見てください）。')
+
     def _resumed(self, seconds):
         """The PC was suspended for this many seconds: stop the running script and say why."""
         with self.lock:
@@ -1187,6 +1238,7 @@ class Core:
         keys = self.keys_software_controller
         return {'profile': self.profile, 'label': self.label, 'running': self.running, 'paused': bool(Command.isPause),
                 'starting': self.starting or '', 'windows': self.windows.list(), 'schedule': self.schedule_state(),
+                'keyboard': self.keyboard_unavailable(),
                 'command': Command.cur_command_name if self.running else '', 'demo': self.demo,
                 'camera_live': self.camera_live(), 'camera': {'name': self.settings.camera_name, 'path': self.settings.camera_path,
                                                               'error': self.camera.error},
@@ -1203,6 +1255,8 @@ class Core:
     def close(self):
         """Stop the script, release the port and camera, and save settings."""
         self.sleep_watch.stop()
+        if self.keyboard_session is not None:
+            self.keyboard_session.close()
         self.stop_script()
         if self.recorder.current and self.recorder.current['thread'].is_alive():
             self.recorder.stop()

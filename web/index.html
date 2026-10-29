@@ -446,6 +446,8 @@ table.notify input { margin: 1px 0; }
 .pad-slot:empty { display: none; }
 .pad-slot .pad-wrap { --pad-w: min(calc(100cqw - 12px), calc((100cqh - 30px) * 2), 640px); }
 .manual-options { justify-content: center; align-items: center; font-size: 12px; margin-top: 6px; }
+.switch-keys { width: 100%; max-width: 520px; margin: 6px auto 0; gap: 4px; }
+.switch-keys[hidden] { display: none; }
 .manual-options .pad-colors { font: inherit; font-size: 12px; padding: 0 4px; }
 #side-pad-option[hidden] { display: none; }
 
@@ -742,6 +744,13 @@ table.notify input { margin: 1px 0; }
       <label><input type="checkbox" id="pad-stick-click"> スティックは押し込みだけ</label>
       <select id="pad-colors" class="pad-colors" aria-label="コントローラーの色" title="コントローラーの色"></select>
       <label id="side-pad-option"><input type="checkbox" id="opt-side-pad"> コントローラーを映像の横に並べる</label>
+    </div>
+    <div class="row switch-keys" id="switch-keys" hidden>
+      <input id="sk-text" class="grow" placeholder="Switch のキーボードに入力" aria-label="Switch のキーボードに入力する文字" autocomplete="off">
+      <button class="cmd" id="sk-send">送信</button>
+      <button class="mini" data-sk="backspace" aria-label="1 文字消す" title="1 文字消す">⌫</button>
+      <button class="mini" data-sk="enter" title="改行">Enter</button>
+      <button class="mini" data-sk="ok" title="Switch のキーボードの OK（+）">OK</button>
     </div>
     </div>
   </section>
@@ -1233,6 +1242,19 @@ $('sc-stop').addEventListener('click', () => scheduleCommand({stop: $('sc-stop-k
 $('sc-start-cancel').addEventListener('click', () => scheduleCommand({cancel: 'start'}));
 $('sc-stop-cancel').addEventListener('click', () => scheduleCommand({cancel: 'stop'}));
 
+// Typing on the Switch's own keyboard (the fork origin's Keyboard window), when the Data Format supports it.
+function switchKeys(values) {
+  return call('command', {action: 'switch_keyboard', values}).catch(error => { $('message').textContent = error.message; throw error; });
+}
+$('sk-send').addEventListener('click', () => {
+  const text = $('sk-text').value;
+  switchKeys({text}).then(() => { $('sk-text').value = ''; }).catch(() => {});
+});
+$('sk-text').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); $('sk-send').click(); }
+});
+document.querySelectorAll('[data-sk]').forEach(button => button.addEventListener('click', () => switchKeys({key: button.dataset.sk}).catch(() => {})));
+
 function command(action, values = {}) {
   $('message').textContent = '';
   return call('command', {action, values}).catch(error => { $('message').textContent = error.message; throw error; });
@@ -1588,6 +1610,7 @@ function render() {
   renderDialog();
   renderScriptWindows();
   renderSchedule();
+  $('switch-keys').hidden = !!state.keyboard || !state.serial_open;
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
   fillLog('log1', state.log + (exec === 1 ? local : ''));
