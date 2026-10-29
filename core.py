@@ -60,19 +60,55 @@ class DemoPort:
         return getattr(self._ser, name)
 
 
-class RunListService:
-    """What the fork origin's run lists (services/run_list) need from the app: find a script and create it."""
+KINDS = {'python': 'Python', 'mcu': 'Mcu'}  # this app's script kinds -> the fork origin's command types
 
-    def __init__(self, core):
-        self.core = core
 
-    def find_class(self, command_type, name):
-        kind = 'python' if command_type == 'Python' else 'mcu'
-        entry = self.core.find_entry(name, kind)
-        return None if entry is None else self.core.script_class(entry, kind)
+def _command_service():
+    from services.command_service import CommandService
 
-    def create(self, command_type, command_class):
-        return self.core.create_command(command_class, 'python' if command_type == 'Python' else 'mcu')
+    class Scripts(CommandService):
+        """The fork origin's CommandService (the script lists, importing and creating scripts; run lists use it too),
+        with this app's script folder (ScriptLoader). A script edited since the last reload is read again when it
+        next starts."""
+
+        def __init__(self, get_camera, get_gui):
+            super().__init__(get_camera, get_gui)
+            self.reload_next = set()
+
+        def load(self):
+            import Utility as util
+            import Paths
+            from CommandLoader import CombinedLoader, CommandLoader
+            from Commands import McuCommandBase, PythonCommandBase
+            from services.command_service import MCU, PYTHON
+            from services.run_list import RunListLoader
+            self.run_loader = RunListLoader(self)
+            self.loaders = {
+                PYTHON: CombinedLoader(CommandLoader(util.ospath('Commands/PythonCommands'), PythonCommandBase.PythonCommand),
+                                       ScriptLoader(Paths.SCRIPTS, PythonCommandBase.PythonCommand), self.run_loader),
+                MCU: CommandLoader(util.ospath('Commands/McuCommands'), McuCommandBase.McuCommand)}
+            self.commands = {command_type: loader.load() for command_type, loader in self.loaders.items()}
+            self.reload_next = set()
+
+        def reload(self):
+            super().reload()
+            self.reload_next = {e.module_name for entries in self.commands.values() for e in entries if e.module_name}
+
+        def command_class(self, command_type, entry):
+            """Import the script (again after a reload) and return its class; errors are raised as they are."""
+            module = entry.module_name
+            command_class = self.loaders[command_type].getCommandClass(entry, reload=module in self.reload_next)
+            self.reload_next.discard(module)
+            return command_class
+
+        def find_class(self, command_type, name, reload=False):
+            entry = self.loaders[command_type].findEntry(name)
+            if entry is not None and entry.module_name in self.reload_next:
+                reload = True
+                self.reload_next.discard(entry.module_name)
+            return super().find_class(command_type, name, reload)
+
+    return Scripts
 
 
 class ScriptLoader:
@@ -777,27 +813,27 @@ class Core:
     # ---- scripts ----
     # The fork origin's loaders list scripts from their source (nothing is imported until a script runs).
     def load_scripts(self):
-        import Utility as util
-        from CommandLoader import CommandLoader, CombinedLoader
-        from Commands import PythonCommandBase, McuCommandBase
-        import Paths
-        from services.run_list import RunListLoader
-        self.run_loader = RunListLoader(RunListService(self))
-        self.py_loader = CombinedLoader(CommandLoader(util.ospath('Commands/PythonCommands'), PythonCommandBase.PythonCommand),
-                                        ScriptLoader(Paths.SCRIPTS, PythonCommandBase.PythonCommand), self.run_loader)
-        self.mcu_loader = CommandLoader(util.ospath('Commands/McuCommands'), McuCommandBase.McuCommand)
-        self.py_entries = self.py_loader.load()
-        self.mcu_entries = self.mcu_loader.load()
-        self.reload_next = set()
+        self.scripts = _command_service()(lambda: self.camera, lambda: self.overlay)
+        self.scripts.load()
+        self.run_loader = self.scripts.run_loader
+
+    @property
+    def py_entries(self):
+        return self.scripts.commands['Python']
+
+    @py_entries.setter
+    def py_entries(self, entries):
+        self.scripts.commands['Python'] = entries
+
+    @property
+    def mcu_entries(self):
+        return self.scripts.commands['Mcu']
 
     def reload_scripts(self):
         with self.lock:
             if self.running:
                 raise ValueError('Stop the running script before reloading')
-            self.py_entries = self.py_loader.reload()
-            self.mcu_entries = self.mcu_loader.reload()
-            # Edited files are read again when their script next starts.
-            self.reload_next = {e.module_name for e in self.py_entries + self.mcu_entries}
+            self.scripts.reload()  # edited files are read again when their script next starts
             print('スクリプトを再読み込みしました。')
 
     def find_entry(self, name, kind=None):
@@ -811,11 +847,7 @@ class Core:
 
     def script_class(self, entry, kind):
         """Import the script (again after a reload) and return its class."""
-        loader = self.py_loader if kind == 'python' else self.mcu_loader
-        reload = entry.module_name in self.reload_next
-        cls = loader.getCommandClass(entry, reload=reload)
-        self.reload_next.discard(entry.module_name)
-        return cls
+        return self.scripts.command_class(KINDS[kind], entry)
 
     def write_script(self, path, content, overwrite=False):
         """Save a script, reload, and report the script names it defines or why it could not be loaded."""
@@ -899,20 +931,10 @@ class Core:
         demo = [e.name for e in self.py_entries if e.module_name == DEMO_SCRIPT]
         return run_list is not None and all(item.name in demo for item in run_list.items)
 
-    def create_command(self, cls, kind):
-        """An instance of a script class (an image script gets the camera and the overlay)."""
-        from Commands import PythonCommandBase
-        if kind == 'python' and issubclass(cls, PythonCommandBase.ImageProcPythonCommand):
-            try:
-                return cls(self.camera, self.overlay)
-            except TypeError:
-                return cls(self.camera)
-        return cls()
-
     def _create_and_start(self, entry, kind, name, restart):
         from Commands.CommandBase import Command
         try:
-            command = self.create_command(self.script_class(entry, kind), kind)
+            command = self.scripts.create(KINDS[kind], self.script_class(entry, kind))
         except BaseException as error:
             with self.lock:
                 if self.starting == name:

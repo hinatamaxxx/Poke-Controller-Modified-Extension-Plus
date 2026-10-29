@@ -118,6 +118,25 @@ class SleepTest(unittest.TestCase):
         self.assertEqual(len(seen), 1)
 
 
+class ScriptsTest(unittest.TestCase):
+    def test_an_edited_script_is_read_again_once_also_inside_a_run_list(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import core
+        entry = SimpleNamespace(name='A (x/a)', module_name='x.a')
+        loader = Mock()
+        loader.findEntry.return_value = entry
+        loader.reload.return_value = [entry]
+        scripts = core._command_service()(lambda: None, lambda: None)
+        scripts.loaders, scripts.commands = {'Python': loader, 'Mcu': Mock(reload=Mock(return_value=[]))}, {}
+        scripts.reload()
+        self.assertEqual(scripts.reload_next, {'x.a'})
+        scripts.find_class('Python', 'A (x/a)')  # a run list's step
+        loader.getCommandClass.assert_called_with(entry, reload=True)
+        scripts.command_class('Python', entry)
+        loader.getCommandClass.assert_called_with(entry, reload=False)
+
+
 class MaskTest(unittest.TestCase):
     def owner(self):
         import threading
