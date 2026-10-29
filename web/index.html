@@ -295,7 +295,7 @@ main { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows:
   body .modal .actions { margin: 6px 0; }
 }
 
-button.cmd, select, input[type=search], input[type=text], input[type=password], input[type=url], input[type=number] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; min-width: 0; min-height: 26px; }
+button.cmd, select, input:not([type]), input[type=search], input[type=text], input[type=password], input[type=url], input[type=number], input[type=time] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 10px; min-width: 0; min-height: 26px; }
 button.cmd { cursor: pointer; white-space: nowrap; }
 button.cmd.icon { padding: 0 8px; min-width: 28px; font-size: 15px; line-height: 1; }
 button.cmd.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -390,6 +390,9 @@ table.notify input { margin: 1px 0; }
 .links a { color: var(--accent); margin-right: 10px; white-space: nowrap; }
 .keys button[aria-pressed=true] { border-color: var(--accent); }
 .keys button[aria-pressed=true] kbd { color: var(--accent); }
+.dests { display: flex; flex-direction: column; gap: 4px; }
+.dest { display: grid; grid-template-columns: 8em minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
+.dest input { min-width: 0; }
 .runlists, .schedule { gap: 6px; }
 .rl-head, .rl-item { display: grid; grid-template-columns: minmax(0, 1fr) 64px 92px auto; gap: 6px; align-items: center; }
 .rl-head { font-size: 11px; color: var(--muted); }
@@ -808,6 +811,10 @@ table.notify input { margin: 1px 0; }
         <button type="button" class="cmd primary" id="save-discord">保存</button>
         <a href="#" class="ext" data-link="discord_webhook">Webhook の作り方</a>
       </div>
+      <h3 title="スクリプトから self.discord_text('…', name='名前') のように名前で選んで送れます">スクリプトの送り先</h3>
+      <div class="dests" id="discord-dests"></div>
+      <div class="row"><button type="button" class="cmd" id="dest-add">＋ 送り先を足す</button></div>
+      <div class="error" id="dest-error"></div>
     </section>
     <section class="settings-page" id="set-watch" hidden>
       <h2>見張り</h2>
@@ -2747,8 +2754,52 @@ function showWebhook() {
   if (!editing) field.scrollLeft = 0;
 }
 function loadWebhook() {
-  return call('discord_webhook').then(result => { discordWebhook = result.url || ''; showWebhook(); }).catch(() => {});
+  return call('discord_webhook').then(result => {
+    discordWebhook = result.url || '';
+    showWebhook();
+    renderDestinations(result.destinations || []);
+  }).catch(() => {});
 }
+// Other webhooks that scripts pick by name (the fork origin's multiple Discord destinations).
+function destinationRow(dest) {
+  const row = document.createElement('div');
+  row.className = 'dest';
+  row.innerHTML = '<input class="dest-name" maxlength="40" placeholder="名前" aria-label="送り先の名前">'
+    + '<input class="dest-url" spellcheck="false" autocomplete="off" placeholder="https://discord.com/api/webhooks/…" aria-label="送り先の Webhook URL">'
+    + '<button type="button" class="cmd">保存</button><button type="button" class="mini" aria-label="この送り先を消す" title="消す">✕</button>';
+  const [name, url] = row.querySelectorAll('input');
+  const [save, remove] = row.querySelectorAll('button');
+  name.value = dest ? dest.name : '';
+  const full = dest ? dest.url : '';
+  const show = () => { if (!url.dataset.edited) url.value = document.activeElement === url ? full : maskWebhook(full); if (document.activeElement !== url) url.scrollLeft = 0; };
+  url.addEventListener('focus', show);
+  url.addEventListener('blur', show);
+  url.addEventListener('input', () => { url.dataset.edited = '1'; });
+  show();
+  const done = () => { $('dest-error').textContent = ''; return loadWebhook(); };
+  const fail = error => { $('dest-error').textContent = error.message; };
+  save.addEventListener('click', () => {
+    const value = url.dataset.edited ? url.value.trim() : full;
+    call('command', {action: 'discord_destination', values: {name: name.value.trim(), url: value, original: dest ? dest.name : ''}})
+      .then(done).catch(fail);
+  });
+  remove.addEventListener('click', () => {
+    if (!dest) { row.remove(); fitSettings(); return; }
+    call('command', {action: 'discord_destination_delete', values: {name: dest.name}}).then(done).catch(fail);
+  });
+  [name, url].forEach(field => field.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) save.click(); }));
+  return row;
+}
+function renderDestinations(list) {
+  $('discord-dests').replaceChildren(...list.map(destinationRow));
+  if (!$('settings').hidden) fitSettings();
+}
+$('dest-add').addEventListener('click', () => {
+  const row = destinationRow(null);
+  $('discord-dests').append(row);
+  fitSettings();
+  row.querySelector('.dest-name').focus();
+});
 $('discord-url').addEventListener('focus', showWebhook);
 $('discord-url').addEventListener('blur', showWebhook);
 $('discord-url').addEventListener('input', () => { $('discord-url').dataset.edited = '1'; $('discord-error').textContent = ''; });

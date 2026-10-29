@@ -587,7 +587,7 @@ class LocalControl(ApiServer):
         if method == 'discord_webhook':
             if via_mcp:
                 raise ValueError('Not available')
-            return {'url': self.core.discord_webhook()}
+            return {'url': self.core.discord_webhook(), 'destinations': self.core.discord_destinations()}
         if method == 'summary':
             return self.summary()
         if method == 'web_url':
@@ -706,6 +706,10 @@ class LocalControl(ApiServer):
             core.set_keymap(mapping)
         elif action == 'keymap_reset':
             core.reset_keymap()
+        elif action == 'discord_destination':
+            core.save_discord_destination(values.get('name', ''), values.get('url', ''), values.get('original', ''))
+        elif action == 'discord_destination_delete':
+            core.delete_discord_destination(values.get('name', ''))
         elif action == 'run_list_save':
             core.save_run_list(values.get('list') or {}, str(values.get('original') or ''))
         elif action == 'run_list_delete':

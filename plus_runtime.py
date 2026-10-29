@@ -63,6 +63,10 @@ def _patch_notifiers():
     def __init__(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         self.default_username = 'Pokecon'
+        default_name = self.username_dict.get(DiscordNotify.DEFAULT_WEBHOOK, '')
+        for key, name in list(self.username_dict.items()):
+            if not name and default_name:
+                self.username_dict[key] = default_name
         # A webhook without a URL is no destination (nothing is sent and the Switch does not record for it).
         self.webhook_keys = [key for key in self.webhook_keys if str(self.webhook_url_dict.get(key, '')).strip()]
 

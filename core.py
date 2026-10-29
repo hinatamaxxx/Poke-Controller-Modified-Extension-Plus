@@ -536,6 +536,50 @@ class Core:
             return ''
         return config.get('DISCORD_WEBHOOK', 'webhook_url', fallback='').strip()
 
+    WEBHOOK_URL = r'^https://([\w-]+\.)?discord(app)?\.com/api/webhooks/\d+/[\w-]+$'
+
+    def discord_destinations(self):
+        """The webhooks besides DISCORD_WEBHOOK that scripts can send to by name (name=...), with their URLs: for the
+        settings page only."""
+        import DiscordNotify
+        setting = DiscordNotify.load_setting(DiscordNotify.Discord_Notify.DISCORD_SETTING_PATH)
+        return [{'name': name, 'url': setting.get(name, 'webhook_url', fallback='').strip()}
+                for name in DiscordNotify.webhook_names(setting) if name != DiscordNotify.DEFAULT_WEBHOOK]
+
+    def save_discord_destination(self, name, url, original=''):
+        """Add or change a named webhook (original: its name before this edit). Raises ValueError with the reason."""
+        import re
+        import DiscordNotify
+        name, url, original = str(name).strip(), str(url).strip(), str(original).strip()
+        error = DiscordNotify.check_webhook_name(name)
+        if error is None and name == DiscordNotify.DEFAULT_WEBHOOK:
+            error = f'{name} は上の「Webhook URL」で設定します。'
+        if error is None and not re.match(Core.WEBHOOK_URL, url):
+            error = 'Discord の Webhook URL（https://discord.com/api/webhooks/… ）を入力してください。'
+        path = DiscordNotify.Discord_Notify.DISCORD_SETTING_PATH
+        with self.lock:
+            setting = DiscordNotify.load_setting(path)
+            names = DiscordNotify.webhook_names(setting)
+            if error is None and name != original and name in names:
+                error = f'「{name}」という送り先は、すでにあります。'
+            if error:
+                raise ValueError(error)
+            if original and original != name and original != DiscordNotify.DEFAULT_WEBHOOK:
+                setting.remove_section(original)
+            setting[name] = {'webhook_url': url, 'username': '', 'avatar_url': ''}
+            DiscordNotify.save_setting(path, setting)
+
+    def delete_discord_destination(self, name):
+        import DiscordNotify
+        name = str(name).strip()
+        if name in (DiscordNotify.DEFAULT_WEBHOOK, DiscordNotify.RECEIVE_SECTION):
+            raise ValueError(f'{name} は削除できません。')
+        path = DiscordNotify.Discord_Notify.DISCORD_SETTING_PATH
+        with self.lock:
+            setting = DiscordNotify.load_setting(path)
+            if setting.remove_section(name):
+                DiscordNotify.save_setting(path, setting)
+
     def set_notification(self, values):
         """Write LINE / Discord settings into the profile's token files, keeping other entries."""
         import configparser
