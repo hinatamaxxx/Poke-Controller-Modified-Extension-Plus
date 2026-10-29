@@ -687,8 +687,8 @@ class LocalControl(ApiServer):
         elif action == 'open_script_folder':
             import Paths
             import app_paths
-            cls = next((c for c in core.py_classes if c.NAME == values.get('name')), None)
-            folder = Paths.script_folder(cls.__module__) if cls else ''
+            entry = core.find_entry(values.get('name'), 'python')
+            folder = Paths.script_folder(entry.module_name) if entry else ''
             folder = folder or str(app_paths.FOLDERS['scripts'])
             os.makedirs(folder, exist_ok=True)
             os.startfile(folder)

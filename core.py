@@ -11,20 +11,44 @@ import time
 
 LOG_LINES = 2000
 LOG_CHARS = 200000
-FORMATS = ('Default', 'Qingpi', '3DS Controller(FW:-x.3)', '3DS Controller(FW:x.4-)')
+DEMO_SCRIPT = 'Commands.PythonCommands.Samples.PortableDemo'
+
+from plus_settings import Var  # noqa: E402  (settings fields and this app's own switches)
 
 
-class Var:
-    """The get/set part of a tkinter variable."""
+def serial_formats():
+    """The Data Format names the fork origin's transports offer here (Default, NX Macro, Qingpi, 3DS ...)."""
+    from Commands.transport.registry import transport_names
+    return transport_names()
 
-    def __init__(self, value=None):
-        self._value = value
 
-    def get(self):
-        return self._value
+class ScriptLoader:
+    """Scripts in the workspace's スクリプト folder, named after their folder (BDSP/固定シンボル/エンテイ) rather than
+    the fork origin's file-based name."""
 
-    def set(self, value):
-        self._value = value
+    def __init__(self, path, base_class):
+        from CommandLoader import CommandLoader
+        self.loader = CommandLoader(path, base_class)
+
+    def _named(self, entries):
+        for entry in entries:
+            parts = entry.module_name.split('.')[1:]
+            folder = parts[:-1] if len(parts) > 1 else parts
+            entry.name = f"{entry.name.rsplit(' (', 1)[0]} ({'/'.join(folder)})"
+            entry.tags = [t for t in entry.tags if not str(t).startswith('@')] + ['@' + t for t in folder[:-1]]
+        return entries
+
+    def load(self):
+        return self._named(self.loader.load())
+
+    def reload(self):
+        return self._named(self.loader.reload())
+
+    def findEntry(self, name):
+        return next((e for e in self.loader.entries if e.name == name), None)
+
+    def getCommandClass(self, entry, reload=False):
+        return self.loader.getCommandClass(entry, reload)
 
 
 class LogArea:
@@ -225,6 +249,10 @@ class Dialogs:
             return {f['label']: v for f, v in zip(inputs, converted)}
         return converted
 
+    def handle(self, command, title, message, desc=None, need=list, mode=0, pos=2):
+        """Command.dialogue_handler: the fork origin's scripts ask their dialogues through this."""
+        return self.ask(title, message, desc, mode, need)
+
     def answer(self, dialog_id, values):
         with self._lock:
             entry = self._pending.get(dialog_id)
@@ -260,12 +288,13 @@ class Core:
 
     def __init__(self, profile, profile_dir, demo=False, console_mirror=None, label=''):
         import os
-        import Settings
-        import PokeConDialogue
+        import plus_runtime
+        plus_runtime.install()
+        from plus_settings import HeadlessSettings
+        from services.settings_store import AppSettings
         from Commands.CommandBase import Command
         from Commands.Keys import KeyPress
-        from Commands.Sender import Sender
-        from Camera import Camera
+        from plus_camera import PlusCamera
         from LineNotify import Line_Notify
         from DiscordNotify import Discord_Notify
         from ExternalTools import SocketCommunications, MQTTCommunications
@@ -275,12 +304,12 @@ class Core:
         self.profile, self.demo = profile, demo
         self.label = label or profile  # the Switch's name, shown in notifications
         self.exit_requested = False
-        Settings.GuiSettings.SETTING_PATH = os.path.join(profile_dir, 'settings.ini')
+        AppSettings.SETTING_PATH = HeadlessSettings.SETTING_PATH = os.path.join(profile_dir, 'settings.ini')
         Line_Notify.LINE_TOKEN_PATH = os.path.join(profile_dir, 'line_token.ini')
         Discord_Notify.DISCORD_SETTING_PATH = os.path.join(profile_dir, 'discord_token.ini')
         SocketCommunications.SOCKET_TOKEN_PATH = os.path.join(profile_dir, 'external_token.ini')
         MQTTCommunications.MQTT_TOKEN_PATH = os.path.join(profile_dir, 'external_token.ini')
-        self.settings = Settings.GuiSettings()
+        self.settings = HeadlessSettings()
         self.log1, self.log2 = LogArea(), LogArea()
         self.overlay, self.dialogs = Overlay(), Dialogs()
         import script_windows
@@ -290,10 +319,10 @@ class Core:
         Command.canvas = self.overlay
         Command.app_name = f'{NAME} ver.{VERSION}'
         Command.profilename = profile
-        PokeConDialogue.DIALOGUE_PROVIDER = self.dialogs.ask
+        Command.dialogue_handler = self.dialogs.handle
         self.console_mirror = console_mirror
         self.apply_options()
-        self.camera = Camera(int(self.settings.fps.get() or 45))
+        self.camera = PlusCamera(int(self.settings.fps.get() or 45), self.settings.capture_size.get() or '1280x720')
         # Screenshots go to the chosen capture folder (settings: フォルダー).
         import app_paths
         import Camera as camera_module
@@ -302,7 +331,9 @@ class Core:
             self.camera.capture_dir = str(app_paths.CAPTURES)
         self.camera_missing, self.next_camera_check = False, 0
         self.show_serial = Var(bool(self.settings.is_show_serial.get()))
-        self.ser = Sender(self.show_serial)
+        self.ser = plus_runtime.make_sender(self.show_serial.get())
+        if demo:
+            plus_runtime.install_demo_sender(self.ser)
         KeyPress.serial_data_format_name = self.settings.serial_data_format_name.get() or 'Default'
         self.keys_software_controller = KeyPress(self.ser)
         self.cur_command, self.running = None, False
@@ -334,6 +365,8 @@ class Core:
         Command.isDiscordNotStart = bool(s.is_discord_notification_start.get())
         Command.isDiscordNotEnd = bool(s.is_discord_notification_end.get())
         Command.isDiscordSwitchCapture = bool(s.is_discord_switch_capture.get())
+        from Commands.PythonCommandBase import PythonCommand
+        PythonCommand.isDiscordSwitchCapture = Command.isDiscordSwitchCapture
         if getattr(self, 'watch', None) is not None:
             self.watch.history.set_fps(self.clip_fps())
         Command.stdout_destination = str(s.stdout_destination or '1')
@@ -357,7 +390,7 @@ class Core:
                     raise ValueError(f'Unknown option: {key}')
                 getattr(self.settings, self.OPTIONS[key]).set(value)
             self.show_serial.set(bool(self.settings.is_show_serial.get()))
-            self.ser._show_serial = self.show_serial.get()
+            self.ser.set_show_serial(self.show_serial.get())
             self.apply_options()
             self.save()
 
@@ -404,8 +437,8 @@ class Core:
                 self.settings.command_class_dict[key] = 'None'
                 self.settings.command_name_dict[key].set('(empty)')
             else:
-                classes = self.py_classes if kind == 'python' else self.mcu_classes if kind == 'mcu' else None
-                if classes is None or name not in [c.NAME for c in classes]:
+                entries = self.py_entries if kind == 'python' else self.mcu_entries if kind == 'mcu' else None
+                if entries is None or name not in [e.name for e in entries]:
                     raise ValueError('Script not found')
                 self.settings.command_class_dict[key] = 'Python' if kind == 'python' else 'Mcu'
                 self.settings.command_name_dict[key].set(name)
@@ -634,23 +667,45 @@ class Core:
             self._logger.exception('設定の保存に失敗しました')
 
     # ---- scripts ----
+    # The fork origin's loaders list scripts from their source (nothing is imported until a script runs).
     def load_scripts(self):
         import Utility as util
-        from CommandLoader import CommandLoader
+        from CommandLoader import CommandLoader, CombinedLoader
         from Commands import PythonCommandBase, McuCommandBase
         import Paths
-        self.py_loader = CommandLoader([util.ospath('Commands/PythonCommands'), Paths.SCRIPTS], PythonCommandBase.PythonCommand)
+        self.py_loader = CombinedLoader(CommandLoader(util.ospath('Commands/PythonCommands'), PythonCommandBase.PythonCommand),
+                                        ScriptLoader(Paths.SCRIPTS, PythonCommandBase.PythonCommand))
         self.mcu_loader = CommandLoader(util.ospath('Commands/McuCommands'), McuCommandBase.McuCommand)
-        self.py_classes = self.py_loader.load()
-        self.mcu_classes = self.mcu_loader.load()
+        self.py_entries = self.py_loader.load()
+        self.mcu_entries = self.mcu_loader.load()
+        self.reload_next = set()
 
     def reload_scripts(self):
         with self.lock:
             if self.running:
                 raise ValueError('Stop the running script before reloading')
-            self.py_classes = self.py_loader.reload()
-            self.mcu_classes = self.mcu_loader.reload()
+            self.py_entries = self.py_loader.reload()
+            self.mcu_entries = self.mcu_loader.reload()
+            # Edited files are read again when their script next starts.
+            self.reload_next = {e.module_name for e in self.py_entries + self.mcu_entries}
             print('スクリプトを再読み込みしました。')
+
+    def find_entry(self, name, kind=None):
+        """The listed script with this name ("NAME (folder/file)"), or None."""
+        lists = {'python': self.py_entries, 'mcu': self.mcu_entries}
+        for key in ([kind] if kind else ['python', 'mcu']):
+            entry = next((e for e in lists.get(key, []) if e.name == name), None)
+            if entry is not None:
+                return entry
+        return None
+
+    def script_class(self, entry, kind):
+        """Import the script (again after a reload) and return its class."""
+        loader = self.py_loader if kind == 'python' else self.mcu_loader
+        reload = entry.module_name in self.reload_next
+        cls = loader.getCommandClass(entry, reload=reload)
+        self.reload_next.discard(entry.module_name)
+        return cls
 
     def write_script(self, path, content, overwrite=False):
         """Save a script, reload, and report the script names it defines or why it could not be loaded."""
@@ -667,11 +722,19 @@ class Core:
                 result['error'] = 'スクリプトの実行中なので、再読み込みしていません。止めてから reload してください。'
                 return result
             # Forget the old module so nothing of the previous version stays when the new one fails to load.
-            self.py_loader.modules = [m for m in self.py_loader.modules if m.__name__ != module]
             sys.modules.pop(module, None)
             importlib.invalidate_caches()
             self.reload_scripts()
-            result['names'] = [c.NAME for c in self.py_classes if c.__module__ == module]
+            names = [e.name for e in self.py_entries if e.module_name == module]
+            if names:
+                try:
+                    self.script_class(self.find_entry(names[0], 'python'), 'python')
+                except Exception:
+                    lines = traceback.format_exc().splitlines(True)
+                    first = next((n for n, line in enumerate(lines) if script_files.resolve(path) in line), 0)
+                    result['error'] = ''.join(lines[first:][-12:])
+                    return result
+            result['names'] = names
             if not result['names']:
                 try:
                     importlib.import_module(module)
@@ -686,14 +749,14 @@ class Core:
         import app_paths
         bundled = app_paths.PROGRAM / 'SerialController'
 
-        def is_sample(c):
+        def is_sample(entry):
             # A script that came with the app (its file is in the program's copy), listed after the user's own.
-            module = c.__module__.split('.')
+            module = entry.module_name.split('.')
             return module[:2] == ['Commands', 'PythonCommands'] and bundled.joinpath(*module).with_suffix('.py').is_file()
 
-        def describe(classes):
-            return [{'name': c.NAME, 'tags': list(getattr(c, 'TAGS', []) or []), 'sample': is_sample(c)} for c in classes]
-        return {'python': describe(self.py_classes), 'mcu': describe(self.mcu_classes)}
+        def describe(entries):
+            return [{'name': e.name, 'tags': list(e.tags or []), 'sample': is_sample(e)} for e in entries]
+        return {'python': describe(self.py_entries), 'mcu': describe(self.mcu_entries)}
 
     def start_script(self, kind, name, restart=False):
         from Commands.CommandBase import Command
@@ -703,11 +766,10 @@ class Core:
                 raise ValueError('A script is already running')
             if kind not in ('python', 'mcu'):
                 raise ValueError('Unknown script kind')
-            classes = self.py_classes if kind == 'python' else self.mcu_classes
-            cls = next((c for c in classes if c.NAME == name), None)
-            if cls is None:
+            entry = self.find_entry(name, kind)
+            if entry is None:
                 raise ValueError('Script not found')
-            if self.demo and cls.__module__ != 'Commands.PythonCommands.Samples.PortableDemo':
+            if self.demo and entry.module_name != DEMO_SCRIPT:
                 raise ValueError('Demo mode only runs PortableDemo')
             if not self.serial_open():
                 raise ValueError('COM port is not connected')
@@ -716,13 +778,14 @@ class Core:
             self.starting = name
         # A script may open its own settings window while it is created and wait there. Create it on its own thread,
         # so the app keeps answering (and shows that window) until the user closes it.
-        threading.Thread(target=self._create_and_start, args=(cls, kind, name, restart), daemon=True,
+        threading.Thread(target=self._create_and_start, args=(entry, kind, name, restart), daemon=True,
                          name='script-setup').start()
 
-    def _create_and_start(self, cls, kind, name, restart):
+    def _create_and_start(self, entry, kind, name, restart):
         from Commands.CommandBase import Command
         from Commands import PythonCommandBase
         try:
+            cls = self.script_class(entry, kind)
             if kind == 'python' and issubclass(cls, PythonCommandBase.ImageProcPythonCommand):
                 try:
                     command = cls(self.camera, self.overlay)
@@ -745,9 +808,9 @@ class Core:
                 return
             self.keys_software_controller.neutral()
             Command.isPause = False
-            Command.cur_command_name = command.NAME
+            Command.cur_command_name = name
             self.cur_command, self.running = command, True
-            print('開始 ' + command.NAME)
+            print('開始 ' + name)
             command.start(self.ser, self._finished)
             self.watch.script_started(kind, name, restart)
 
@@ -765,7 +828,7 @@ class Core:
                 self.windows.close_all()
             if self.running and self.cur_command is not None:
                 self.watch.expect_stop()
-                print('停止 ' + self.cur_command.NAME)
+                print('停止 ' + str(Command.cur_command_name or self.cur_command.NAME))
                 Command.isPause = False
                 self.dialogs.cancel_all()
                 self.cur_command.end(self.ser)
@@ -791,17 +854,14 @@ class Core:
     def open_camera(self):
         path = self.settings.camera_path
         if self.demo:
-            # The demo camera only produces a frame when read; the Tk preview used to do that.
-            def pump():
-                while not self.exit_requested:
-                    self.camera.readFrame()
-                    time.sleep(1 / 30)
-            threading.Thread(target=pump, daemon=True).start()
+            from plus_camera import DemoSource, install_demo
+            install_demo()
+            self.camera.openCamera(window=DemoSource.NAME)
             return
         if not path:
             self.camera.destroy()
             return
-        self.camera.openCamera(0, device_path=path)
+        self.camera.openCamera(device_path=path)
 
     def select_camera(self, path):
         with self.lock:
@@ -854,7 +914,7 @@ class Core:
             if self.running:
                 raise ValueError('Stop the running script before changing the connection')
             fmt = fmt or self.settings.serial_data_format_name.get() or 'Default'
-            if fmt not in FORMATS:
+            if fmt not in serial_formats():
                 raise ValueError('Unknown serial format')
             baud = int(baud or (115200 if '3DS Controller' in fmt else 9600))
             port = str(port or '').strip()
@@ -869,7 +929,6 @@ class Core:
             self.settings.baud_rate.set(baud)
             self.settings.serial_data_format_name.set(fmt)
             KeyPress.serial_data_format_name = fmt
-            self.keys_software_controller.init_hat()
             self.save()
             if port and not self.open_serial():
                 raise ValueError(f'{port} に接続できません。ほかのアプリが使っていないか確認してください。')
@@ -929,7 +988,7 @@ class Core:
     def reset_keymap(self):
         """Put the keyboard mapping back to what a new profile starts with."""
         from safe_settings import read_config, write_config
-        from Settings import DEFAULT_KEYMAPS
+        from plus_settings import DEFAULT_KEYMAPS
         with self.lock:
             config = read_config(self.settings.SETTING_PATH)
             for section, values in DEFAULT_KEYMAPS.items():
@@ -966,7 +1025,7 @@ class Core:
                                                               'error': self.camera.error},
                 'serial_open': self.serial_open(),
                 'serial': {'port': self.serial_target(), 'baud': int(self.settings.baud_rate.get() or 9600),
-                           'format': self.settings.serial_data_format_name.get() or 'Default', 'formats': list(FORMATS),
+                           'format': self.settings.serial_data_format_name.get() or 'Default', 'formats': serial_formats(),
                            'error': self.ser.last_error},
                 'held': [getattr(b, 'showName', None) or b.name for b in keys.holdButton],
                 'options': self.options(), 'dialogs': self.dialogs.current(), 'keymap': self.keymap(),

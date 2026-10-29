@@ -317,6 +317,8 @@ class Worker:
             import numpy as np
             frame = cv2.imdecode(np.frombuffer(self.history.frames[-1][1], np.uint8), cv2.IMREAD_COLOR)
         with self.hub.notify_lock:  # the notifiers keep their settings path on the class
+            import plus_runtime
+            plus_runtime.install()  # this app's notifier behaviour (no network check, timeouts, the name Pokecon)
             discord = read_config(folder / 'discord_token.ini')
             if str(discord['DISCORD_WEBHOOK'].get('webhook_url', '') if 'DISCORD_WEBHOOK' in discord else '').strip():
                 try:

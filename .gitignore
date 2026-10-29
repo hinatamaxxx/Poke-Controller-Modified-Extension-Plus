@@ -15,9 +15,20 @@
 !.codex-plugin/*.json
 !.agents/plugins/*.json
 !plugin/*.json
+!SerialController/ControllerProfiles/*.json
+!SerialController/tests/data/*.json
 *.bat
 !ExecutePokeConModified-Extension.bat
+!ExecutePokeConModified-Extension_web.bat
+!ExecutePokeConModified-Extension_with_monitor.bat
+!ExecutePokeConMonitor.bat
 !UpdatePokeConModified-Extension.bat
+!PokeConExtension.bat
+!PokeConExtension_AddLibrary.bat
+!PokeConExtension_Install.bat
+!PokeConExtension_ListLibraries.bat
+!PokeConExtension_RemoveLibrary.bat
+!PokeConExtension_Monitor.bat
 .idea/
 SerialController/Captures/
 SerialController/Backups/
@@ -112,8 +123,7 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
+# .python-version は、uv が使う Python の版の指定なので、対象外にしない
 
 # celery beat schedule file
 celerybeat-schedule
@@ -152,3 +162,5 @@ updates/
 .runtime-updates/
 runtime-choice.txt*
 !packaging/*.spec
+# 利用者が足したライブラリの一覧(uv の環境に入れるもの。利用者ごと)
+requirements-user.txt

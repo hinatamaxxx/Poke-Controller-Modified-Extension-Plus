@@ -6,6 +6,9 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'SerialController')]
+import plus_runtime  # noqa: E402
+
+plus_runtime.install()
 
 
 class PortableTests(unittest.TestCase):
@@ -31,22 +34,18 @@ class PortableTests(unittest.TestCase):
             self.assertAlmostEqual(stick.get_axis(0), 16000 / 32768, places=3)
             self.assertTrue(any(e.type == pygame.JOYBUTTONDOWN and e.button == 0 for e in events))
 
-    def test_right_stick_unchanged_does_not_resend(self):
-        from Commands.ProController import ProController
-        controller = ProController()
-        stick = Mock()
-        stick.get_axis.side_effect = lambda i: [0, 0, .7, -.4][i]
-        controller.joystick_move_detection(stick)
-        self.assertEqual(controller.bits_16 & 1, 1)
-        controller.joystick_move_detection(stick)
-        self.assertEqual(controller.bits_16 & 1, 0)
-
-    def test_original_bridge_restored_unchanged(self):
+    def test_serial_controller_is_the_fork_origin_as_shipped(self):
+        # Only these files differ from futo030/Poke-Controller-Modified-Extension (so its updates merge cleanly).
         import subprocess
-        folder = 'SerialController/Commands/PythonCommands/bridge_functions'
-        for name in ('bridge_functions.py', 'License.txt', 'README.md', 'Sample/bf_sample.py'):
-            expected = subprocess.check_output(['git', 'show', '3274e77:' + folder + '/' + name], cwd=ROOT)
-            self.assertEqual((ROOT / folder / name).read_bytes(), expected)
+        try:
+            subprocess.check_output(['git', 'rev-parse', '--verify', 'upstream/master'], cwd=ROOT, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest('no upstream remote')
+        changed = subprocess.check_output(['git', 'diff', '--name-only', 'upstream/master', '--', 'SerialController'],
+                                          cwd=ROOT, text=True).split()
+        allowed = {'SerialController/Paths.py', 'SerialController/WindowsDevices.py', 'SerialController/UiDispatch.py',
+                   'SerialController/Commands/PythonCommands/Samples/PortableDemo.py'}
+        self.assertEqual([name for name in changed if name not in allowed and '/profiles/' not in name], [])
 
     def test_notification_constructors_never_contact_network(self):
         import tempfile
@@ -63,9 +62,9 @@ class PortableTests(unittest.TestCase):
             request.assert_not_called()
 
     def test_disabled_camera_does_not_open_hardware(self):
-        from Camera import Camera
+        from plus_camera import PlusCamera
         with patch('cv2.VideoCapture') as capture:
-            camera = Camera()
+            camera = PlusCamera()
             camera.openCamera(-1)
             self.assertIsNone(camera.readFrame())
             self.assertFalse(camera.isOpened())

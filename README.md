@@ -1,6 +1,6 @@
 # Poke-Controller Modified Extension Plus
 
-[Poke-Controller Modified Extension](https://github.com/futo030/Poke-Controller-Modified-Extension) 0.1.9 をもとにした Windows 用のフォークです。Tk の画面をなくし、ブラウザで操作する形にしました。Claude などの AI から MCP とブラウザで扱うことを主な用途にしています。有志が公開しているスクリプトは、元と同じ置き方・書き方で使えます。
+[Poke-Controller Modified Extension](https://github.com/futo030/Poke-Controller-Modified-Extension) 0.2.0 をもとにした Windows 用のフォークです。Tk の画面をなくし、ブラウザで操作する形にしました。Claude などの AI から MCP とブラウザで扱うことを主な用途にしています。有志が公開しているスクリプトは、元と同じ置き方・書き方で使えます。
 
 フォーク元との違いの詳細は [docs/fork-history.md](docs/fork-history.md) にまとめています。
 
@@ -160,6 +160,29 @@ python -m venv .venv
 ```
 
 ソースから実行するとき（`.git` があるとき）は、設定やログを従来どおり `SerialController` 以下に置きます。`--demo` は人工の映像を使い、ボタンを送りません。
+
+### フォーク元との関係
+
+- `SerialController/` は、フォーク元（futo030/Poke-Controller-Modified-Extension）が配布しているものと同じ中身です。手を加えていません。例外は、ここで足したファイル（`Paths.py`、`WindowsDevices.py`、`UiDispatch.py`、サンプルの `PortableDemo.py`）だけです。
+- このアプリで足した動きは、外側のファイルにまとめています。
+
+| ファイル | 中身 |
+|---|---|
+| `plus_runtime.py` | スクリプトの画像を探す順、エラーでの停止を知らせる、Switch 本体の録画、Discord の後続の送信、日本語のパスの画像、シリアルの書き込みの時間切れ |
+| `plus_settings.py` | 画面のない設定。このアプリの設定は `[PokeControllerPlus]` に置く |
+| `plus_camera.py` | 機器のパスでカメラを選ぶ、ほかのアプリと取り合わない、デモの映像 |
+| `plus_logger.py` | ログファイル |
+
+- `plus_runtime.py` は、起動したときにフォーク元の関数を包んで差し込みます。
+- フォーク元の起動用の bat、`bootstrap/`、`pyproject.toml` などは、取り込みを楽にするためにリポジトリには残しています。インストールには含めません。
+
+フォーク元の更新を取り込む手順:
+
+```powershell
+git fetch upstream
+git merge upstream/master          # SerialController/ はフォーク元の内容をそのまま採る
+.venv\Scripts\python.exe -m unittest discover -s tests    # test_portable が、SerialController がフォーク元のままかも確かめる
+```
 
 ## ライセンス
 
