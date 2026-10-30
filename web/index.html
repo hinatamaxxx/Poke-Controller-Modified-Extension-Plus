@@ -319,13 +319,12 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .mask-row input[type=color] { width: 32px; height: 22px; padding: 0; border: 1px solid var(--line, #555); background: none; }
 .mask-hint { font-size: 12px; opacity: .8; }
 .audio[hidden] { display: none; }
-.audio-level { flex: 1; min-width: 60px; height: 6px; border-radius: 3px; background: rgba(127, 127, 127, .3); overflow: hidden; }
+.audio-level { flex: 0 1 120px; min-width: 40px; height: 6px; border-radius: 3px; background: rgba(127, 127, 127, .3); overflow: hidden; }
 .audio-level span { display: block; height: 100%; width: 0; background: #3fb950; }
 .audio-db { min-width: 5em; font-size: 12px; opacity: .8; }
-#audio-volume { width: 120px; }
 .audio-head { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
 .audio-head h3 { margin: 0; }
-.audio-check[hidden] { display: none; }
+.audio-check[hidden], .audio-level[hidden] { display: none; }
 .audio-check { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .audio .inline { flex-wrap: nowrap; }
 .audio .inline select { flex: 1 1 auto; min-width: 0; width: 0; }
@@ -664,7 +663,7 @@ table.notify input { margin: 1px 0; }
         <div class="error full" id="serial-error"></div>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
-      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label></div>
+      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label><span class="audio-level" id="audio-level" aria-hidden="true"><span></span></span><span class="audio-db" id="audio-db"></span></div>
       <div class="audio" id="audio">
         <div class="form">
           <label for="audio-input">入力</label>
@@ -674,8 +673,6 @@ table.notify input { margin: 1px 0; }
           </div>
           <label for="audio-output">再生先</label>
           <div class="inline"><select id="audio-output" aria-label="音声の再生先"></select></div>
-          <label for="audio-volume">音量</label>
-          <div class="inline"><input type="range" id="audio-volume" min="0" max="100" step="1" aria-label="音量"><span class="audio-level" id="audio-level"><span></span></span><span class="audio-db" id="audio-db"></span></div>
         </div>
       </div>
       <div class="error full" id="audio-error"></div>
@@ -1306,16 +1303,15 @@ function renderAudio() {
   fillSelect($('audio-input'), inputs, audio.input || inputs[0][0]);  // unset: the first one is taken when capture starts
   fillSelect($('audio-output'), audio.outputs.map(name => [name, name === 'Default' ? '既定の再生デバイス' : name]), audio.output);
   $('audio-on').checked = audio.use && audio.playback;
-  if (document.activeElement !== $('audio-volume')) $('audio-volume').value = audio.volume;
   const meter = audio.meter;
+  $('audio-level').hidden = !audio.use;
   $('audio-level').firstElementChild.style.width = (meter ? meter.percent : 0) + '%';
   $('audio-db').textContent = !audio.use ? '' : meter ? (meter.text === 'No signal' ? '音が来ていません' : meter.text) : '';
 }
-// One switch: on takes the board's sound in and plays it; off stops both.
-$('audio-on').addEventListener('change', () => saveAudio($('audio-on').checked ? {use: true, playback: true} : {use: false}));
+// One switch: on takes the board's sound in and plays it at full volume (Windows sets how loud); off stops both.
+$('audio-on').addEventListener('change', () => saveAudio($('audio-on').checked ? {use: true, playback: true, volume: 100} : {use: false}));
 $('audio-input').addEventListener('change', () => saveAudio({input: $('audio-input').value}));
 $('audio-output').addEventListener('change', () => saveAudio({output: $('audio-output').value}));
-$('audio-volume').addEventListener('change', () => saveAudio({volume: Number($('audio-volume').value)}));
 $('audio-rescan').addEventListener('click', () => saveAudio({refresh: true}));
 
 // Masks (the fork origin's Mask tab): shapes in camera pixels, drawn by the app on the picture this page shows.
