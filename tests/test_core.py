@@ -216,6 +216,10 @@ class AudioTest(unittest.TestCase):
         audio.apply.assert_not_called()
         audio.apply_playback.assert_called_once_with()
         settings.save.assert_called()
+        audio.is_running = False  # the input did not open (apply() turned it off)
+        audio.apply.side_effect = lambda *args: settings.is_use_audio.set(False)
+        with self.assertRaisesRegex(ValueError, '開けませんでした'):
+            core.Core.set_audio(owner, {'input': 'c'})
 
 
 class SwitchKeyboardTest(unittest.TestCase):
