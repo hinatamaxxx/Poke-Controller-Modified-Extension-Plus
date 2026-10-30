@@ -180,7 +180,7 @@ python -m venv .venv
 | `plus_settings.py` | 画面のない設定。このアプリの設定は `[PokeControllerPlus]` に置く |
 | `plus_camera.py` | 機器のパスでカメラを選ぶ、ほかのアプリと取り合わない、デモの映像 |
 | `plus_logger.py` | ログファイル |
-| `plus_audio.py` | 音声の入力が Windows の標準の方式で開けないときに、同じ機器を別の方式（WDM-KS など）で開く。開くのが固まっても待ち続けない |
+| `plus_audio.py` | 音声の入力が Windows の標準の方式で開けないときに、同じ機器を別の方式（WDM-KS など）で開く。開くのが固まっても待ち続けない。「既定の再生デバイス」は Windows の今の既定を使い、変わったら知らせを受けて鳴らし直す |
 
 - `plus_runtime.py` は、起動したときにフォーク元の関数を包んで差し込みます。
 - 本体の `core.py` は、フォーク元の `services/app_core.py`（AppCore）の部品を少しずつ使う形に寄せています。今使っているもの: スクリプトの一覧と作成（`CommandService`）、形式で決まるボーレート（`serial_service`）、実行リスト、予約、スリープの検知、キーボード入力、目隠し（`Mask`）、音声（`AudioService`）、Discord の送り先。カメラ・シリアル・画面の状態は、まだこのアプリのものです。

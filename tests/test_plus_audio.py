@@ -3,7 +3,8 @@ import sys
 import threading
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT), str(ROOT / 'SerialController')]
 
 import plus_audio  # noqa: E402
 
@@ -36,6 +37,44 @@ class PlusAudioTest(unittest.TestCase):
         self.assertFalse(plus_audio.opens(sd, 0, device, 'Windows WASAPI', seconds=.2))  # not tried again
         self.assertFalse(plus_audio.opens(sd, 1, device, 'MME'))
         self.assertTrue(plus_audio.opens(sd, 2, device, 'Windows WDM-KS'))
+
+
+class DefaultOutputTest(unittest.TestCase):
+    def test_playback_on_the_default_follows_windows(self):
+        from unittest.mock import Mock, patch
+        capture = Mock(output_device_name='', is_playing=True, opened_default='TV')
+        with patch.object(plus_audio, 'windows_default_output', return_value='TV'):
+            self.assertFalse(plus_audio.follow_default(capture))
+        with patch.object(plus_audio, 'windows_default_output', return_value='Steam'):
+            self.assertTrue(plus_audio.follow_default(capture))
+        capture.set_playback.assert_any_call(False)
+        capture.set_playback.assert_called_with(True)
+        capture.reset_mock()
+        capture.output_device_name = 'TV'  # a chosen device stays
+        with patch.object(plus_audio, 'windows_default_output', return_value='Steam'):
+            self.assertFalse(plus_audio.follow_default(capture))
+        capture.set_playback.assert_not_called()
+
+    def test_windows_notification_reopens_playback(self):
+        import platform
+        from unittest.mock import Mock, patch
+        if platform.system() != 'Windows':
+            self.skipTest('Windows only')
+        capture, done = Mock(), threading.Event()
+        with patch.object(plus_audio, '_watcher', None), \
+                patch.object(plus_audio, 'follow_default', side_effect=lambda c: done.set()) as follow:
+            plus_audio.watch_default(lambda: capture, threading.RLock())
+            on_default_changed = plus_audio._watcher[0][6]
+            on_default_changed(None, 1, 1, 'mic')  # a recording device: ignored
+            on_default_changed(None, 0, 1, 'speakers')
+            self.assertTrue(done.wait(2))
+            follow.assert_called_once_with(capture)
+
+    def test_windows_default_output_is_read(self):
+        import platform
+        if platform.system() != 'Windows':
+            self.skipTest('Windows only')
+        self.assertIsInstance(plus_audio.windows_default_output(), str)
 
 
 if __name__ == '__main__':
