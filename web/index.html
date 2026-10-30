@@ -674,7 +674,7 @@ table.notify input { margin: 1px 0; }
         <div class="error full" id="serial-error"></div>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
-      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label><span class="audio-meter" id="audio-meter"><button type="button" class="audio-speaker" id="audio-speaker" aria-label="ミュート" title="ミュート"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor"/><path class="wave" d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.3 6.3 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><span class="audio-level" id="audio-level" aria-hidden="true"><span></span></span><span class="audio-db" id="audio-db"></span></span></div>
+      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label><span class="audio-meter" id="audio-meter"><button type="button" class="audio-speaker" id="audio-speaker" aria-label="ミュート"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor"/><path class="wave" d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.3 6.3 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path class="slash" d="M2 2l12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><span class="audio-level" id="audio-level" aria-hidden="true"><span></span></span><span class="audio-db" id="audio-db"></span></span></div>
       <div class="audio" id="audio">
         <div class="form">
           <label for="audio-input">入力</label>
@@ -1327,8 +1327,8 @@ let audioWanted = null;
 function showAudioOn(on) {
   $('audio-on').checked = on;
   $('audio-meter').classList.toggle('muted', !on);
-  $('audio-speaker').title = on ? 'ミュート' : 'ミュートを解除';
-  $('audio-speaker').setAttribute('aria-label', $('audio-speaker').title);
+  // No hover description: the icon says it, and a description changing under the pointer pops up on every click.
+  $('audio-speaker').setAttribute('aria-label', on ? 'ミュート' : 'ミュートを解除');
 }
 function setAudioOn(on) {
   audioWanted = on;
