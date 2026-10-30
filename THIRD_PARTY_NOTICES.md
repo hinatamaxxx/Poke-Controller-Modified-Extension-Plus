@@ -10,7 +10,7 @@ The controller base is Poke-Controller Modified Extension 0.1.9, derived from Po
 
 ## Installed at setup, not distributed
 
-Python and the libraries in `requirements-lock.txt` (OpenCV with its FFmpeg plugin, NumPy, SciPy, pandas, pygame, pynput, Pillow, pyserial, sounddevice (with PortAudio), the MCP SDK and their dependencies) are downloaded by the installer from python.org and PyPI into the user's environment. Each keeps its own license, available in its installed package.
+Python and the libraries in `requirements-lock.txt` (OpenCV with its FFmpeg plugin, NumPy, SciPy, pandas, pygame, pynput, Pillow, pyserial, sounddevice (with PortAudio), the MCP SDK and their dependencies) are downloaded by the installer into the app's own folder: uv (Astral, MIT / Apache-2.0) from its GitHub releases, a CPython build from python-build-standalone through uv, and the libraries from PyPI. Each keeps its own license, available in its installed package.
 
 ## Changes from Modified Extension 0.1.9
 

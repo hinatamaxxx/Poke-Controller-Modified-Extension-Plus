@@ -1,5 +1,6 @@
-﻿<#
-Poke-Controller をコマンド1行で入れる: irm https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/releases/latest/download/get.ps1 | iex
+<#
+Poke-Controller をコマンド1行で入れる: irm https://raw.githubusercontent.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/master/get.ps1 | iex
+（irm | iex は先頭の BOM で失敗するので、このファイルは BOM なしの UTF-8 で保存する）
 最新のリリースを取得し、SHA-256 を照合してから install.ps1 を実行する（ユーザーごと、管理者権限は不要）。
 #>
 $ErrorActionPreference = 'Stop'

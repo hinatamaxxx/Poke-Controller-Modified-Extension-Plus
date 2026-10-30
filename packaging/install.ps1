@@ -1,8 +1,8 @@
 ﻿<#
 Poke-Controller のインストール・更新（ユーザーごと、管理者権限は不要）。
 
-  -Python Auto      おすすめ。python.org 版の Python 3.12 があれば専用の仮想環境を作り、
-                    なければ公式の Python 3.12 を専用フォルダーに展開する。既存の環境には触らない。
+  -Python Auto      おすすめ。フォーク元と同じく uv（Python とライブラリを用意する道具）で、専用の Python 3.12 と
+                    ライブラリを用意する。Python が入っていなくてよく、既存の環境には触らない。
   -Python Existing  -PythonPath（省略時は見つかった Python）にライブラリを入れて使う。
   -Python Manual    -PythonPath の Python をそのまま使う。ライブラリは入れない。
 #>
@@ -21,7 +21,10 @@ $App = 'PokeController'
 $Target = Join-Path $env:LOCALAPPDATA "Programs\$App"
 $Local = Join-Path $env:LOCALAPPDATA $App
 $Config = Join-Path $env:APPDATA $App
-$PythonVersion = '3.12.10'
+# uv: the fork origin requires 0.12.22 or later. A uv already installed the official way is used; otherwise this pinned
+# release is fetched from GitHub and checked against its SHA-256.
+$UvVersion = '0.12.24'
+$UvSha256 = '7c38608c8a18ee137d748a1773053b07ec8f3a30fab49aebaa6f4e4efeceb019'
 $script:Step = 0
 $script:FilesTouched = $false
 
@@ -32,7 +35,12 @@ function Step([string]$Text) {
 }
 
 function Invoke-Checked([string]$File, [string[]]$Arguments) {
-    & $File @Arguments
+    # uv (and pip) write their progress to stderr. With 'Stop', PowerShell 5.1 turns those lines into a terminating
+    # error when the output is redirected (an update in the background), so only the exit code decides.
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $File @Arguments 2>&1 | ForEach-Object { Write-Host "$_" } }
+    finally { $ErrorActionPreference = $saved }
     if ($LASTEXITCODE -ne 0) { throw "$File $($Arguments -join ' ') が失敗しました（終了コード $LASTEXITCODE）" }
 }
 
@@ -57,7 +65,7 @@ function Test-Python312([string]$Path) {
 # A dedicated environment is reused only when it still works (an interrupted install or an uninstalled base Python breaks it).
 function Test-Runtime([string]$Path) {
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $false }
-    $null = Invoke-Probe $Path @('-s', '-c', 'import encodings, tkinter, pip')
+    $null = Invoke-Probe $Path @('-s', '-c', 'import encodings, tkinter')
     return $LASTEXITCODE -eq 0
 }
 
@@ -80,38 +88,58 @@ function Find-Python312 {
     return $null
 }
 
-function Install-PrivatePython([string]$Folder) {
-    # Official python.org MSIs unpacked with an administrative install: no registry entries, no admin rights.
-    $download = Join-Path $env:TEMP "$App-python-$PythonVersion"
-    New-Item -ItemType Directory -Force $download | Out-Null
-    # Unpacked into a temporary folder first, so a failed part never leaves a half-built environment behind.
-    $staging = "$Folder.new-$([DateTime]::Now.Ticks)"
-    try {
-        foreach ($part in 'core', 'exe', 'lib', 'tcltk') {
-            $msi = Join-Path $download "$part.msi"
-            for ($attempt = 1; ; $attempt++) {
-                if (-not (Test-Path -LiteralPath $msi)) {
-                    $partial = "$msi.part"
-                    Invoke-WebRequest "https://www.python.org/ftp/python/$PythonVersion/amd64/$part.msi" -OutFile $partial -UseBasicParsing
-                    Move-Item -LiteralPath $partial -Destination $msi -Force
-                }
-                $signature = Get-AuthenticodeSignature -LiteralPath $msi
-                if ($signature.Status -eq 'Valid' -and $signature.SignerCertificate.Subject -like '*Python Software Foundation*') { break }
-                # A truncated or damaged download is removed so the next attempt fetches it again.
-                Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
-                if ($attempt -ge 2) { throw "$part.msi の署名を確認できません。ダウンロードをやり直してください。" }
-            }
-            $process = Start-Process msiexec.exe -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$staging`"" -Wait -PassThru
-            if ($process.ExitCode -ne 0) { throw "$part.msi を展開できません（$($process.ExitCode)）" }
-        }
-        Get-ChildItem -LiteralPath $staging -Filter *.msi | Remove-Item -Force
-        Rename-Item -LiteralPath $staging -NewName (Split-Path $Folder -Leaf)
-    } finally {
-        if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
+# uv installed the official way (its install script), the same places the fork origin's bootstrap looks.
+# A uv that pip put inside some Python environment is not used.
+function Find-Uv {
+    $folders = @()
+    $receipt = Join-Path $env:LOCALAPPDATA 'uv\uv-receipt.json'
+    if (Test-Path -LiteralPath $receipt) {
+        try { $folders += (Get-Content -LiteralPath $receipt -Raw -Encoding UTF8 | ConvertFrom-Json).install_prefix } catch {}
     }
-    Remove-Item -LiteralPath $download -Recurse -Force -ErrorAction SilentlyContinue
-    # -s: never read or change the user's own site-packages (%APPDATA%\Python\Python312).
-    Invoke-Checked (Join-Path $Folder 'python.exe') @('-s', '-m', 'ensurepip', '--default-pip')
+    $folders += Join-Path $env:USERPROFILE '.local\bin'
+    foreach ($folder in $folders | Where-Object { $_ }) {
+        $path = Join-Path $folder 'uv.exe'
+        if (Test-Path -LiteralPath $path -PathType Leaf) { return $path }
+    }
+    return $null
+}
+
+# The pinned uv, kept in this app's folder (removed with the app).
+function Get-Uv {
+    $found = Find-Uv
+    if ($found) {
+        $text = Invoke-Probe $found @('--version')
+        if ($LASTEXITCODE -eq 0 -and $text -match 'uv (\d+)\.(\d+)\.(\d+)' -and
+                ([version]"$($Matches[1]).$($Matches[2]).$($Matches[3])" -ge [version]'0.12.22')) { return $found }
+    }
+    $folder = Join-Path $Local 'uv'
+    $exe = Join-Path $folder 'uv.exe'
+    if ((Test-Path -LiteralPath $exe) -and ((Invoke-Probe $exe @('--version')) -match [regex]::Escape($UvVersion))) { return $exe }
+    Step "uv $UvVersion を取得しています"
+    $zip = Join-Path $env:TEMP "$App-uv-$UvVersion.zip"
+    Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$UvVersion/uv-x86_64-pc-windows-msvc.zip" -OutFile $zip -UseBasicParsing
+    try {
+        if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower() -ne $UvSha256) { throw 'uv のファイルの SHA-256 が一致しません。' }
+        $unpacked = "$folder.new-$([DateTime]::Now.Ticks)"
+        Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
+        if (Test-Path -LiteralPath $folder) { Remove-Item -LiteralPath $folder -Recurse -Force }
+        Rename-Item -LiteralPath $unpacked -NewName (Split-Path $folder -Leaf)
+    } finally {
+        Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+    }
+    return $exe
+}
+
+# uv keeps its Python and download cache inside this app's folder and writes no registry entries.
+function Set-UvEnvironment {
+    $env:UV_PYTHON_INSTALL_DIR = Join-Path $Local 'uv-python'
+    $env:UV_CACHE_DIR = Join-Path $Local 'uv-cache'
+    $env:UV_PYTHON_INSTALL_REGISTRY = '0'
+    $env:UV_NO_CONFIG = '1'          # the user's own uv.toml does not apply
+    $env:UV_SYSTEM_CERTS = '1'       # Windows' certificates (antivirus software that inspects HTTPS)
+    $env:UV_NATIVE_TLS = '1'         # the same for older uv
+    $env:UV_PYTHON_PREFERENCE = 'only-managed'
+    $env:UV_NO_PROGRESS = '1'
 }
 
 # Removes a dedicated environment that no longer works, so it is built again.
@@ -122,6 +150,10 @@ function Remove-BrokenRuntime([string]$Folder) {
     }
     Step '壊れた Python の環境を作り直します'
     Remove-Item -LiteralPath $Folder -Recurse -Force
+}
+
+function Install-LibrariesWithUv([string]$Uv, [string]$Interpreter, [string]$Requirements) {
+    Invoke-Checked $Uv @('pip', 'install', '--python', $Interpreter, '-r', $Requirements)
 }
 
 function Install-Libraries([string]$Interpreter, [string]$Requirements, [switch]$Isolated) {
@@ -200,7 +232,8 @@ try {
     $dedicated = Join-Path $Local 'python'
     $needsLibraries = -not $Update -or -not $current -or -not (Test-Path -LiteralPath $current) -or
         ((Test-Path -LiteralPath $hashFile) -and (Get-Content -LiteralPath $hashFile -Raw).Trim() -ne $hash) -or
-        ($current.StartsWith($dedicated, [StringComparison]::OrdinalIgnoreCase) -and -not (Test-Runtime $current))
+        ($current.StartsWith($dedicated, [StringComparison]::OrdinalIgnoreCase) -and -not (Test-Runtime $current)) -or
+        ($Python -eq 'Auto' -and (Test-Path -LiteralPath (Join-Path $dedicated 'python.exe')))  # an earlier python.org runtime moves to uv
     if ($Update -and $current -and -not $current.StartsWith($dedicated, [StringComparison]::OrdinalIgnoreCase)) {
         $needsLibraries = $false  # the user's own Python is theirs to manage
     }
@@ -218,25 +251,34 @@ try {
                 Install-Libraries $interpreter $requirements
             }
             'Auto' {
+                # Like the fork origin: uv prepares Python 3.12 and the libraries (no Python needs to be installed).
                 Remove-BrokenRuntime $dedicated
+                $uv = Get-Uv
+                Set-UvEnvironment
+                # Versions before 0.3.0-alpha.61 unpacked python.org's Python here; it is replaced by uv's (kept until that works).
+                $earlier = $null
                 if (Test-Path -LiteralPath (Join-Path $dedicated 'python.exe')) {
-                    $interpreter = Join-Path $dedicated 'python.exe'
-                } elseif (Test-Path -LiteralPath (Join-Path $dedicated 'Scripts\python.exe')) {
-                    $interpreter = Join-Path $dedicated 'Scripts\python.exe'
-                } else {
-                    $base = Find-Python312
-                    if ($base) {
-                        Step "Python $((& $base -c 'import sys; print(sys.version.split()[0])')) から専用の環境を作っています"
-                        Invoke-Checked $base @('-m', 'venv', $dedicated)
-                        $interpreter = Join-Path $dedicated 'Scripts\python.exe'
-                    } else {
-                        Step "公式の Python $PythonVersion を専用フォルダーに入れています"
-                        Install-PrivatePython $dedicated
-                        $interpreter = Join-Path $dedicated 'python.exe'
-                    }
+                    $earlier = "$dedicated.old-$([DateTime]::Now.Ticks)"
+                    Rename-Item -LiteralPath $dedicated -NewName (Split-Path $earlier -Leaf)
                 }
-                Step 'ライブラリを入れています（数分かかります）'
-                Install-Libraries $interpreter $requirements -Isolated
+                try {
+                    if (-not (Test-Path -LiteralPath (Join-Path $dedicated 'Scripts\python.exe'))) {
+                        Step 'uv で Python 3.12 を用意しています'
+                        Invoke-Checked $uv @('venv', '--seed', '--python', '3.12', $dedicated)
+                    }
+                    $interpreter = Join-Path $dedicated 'Scripts\python.exe'
+                    Step 'ライブラリを入れています（初回は数分かかります）'
+                    Install-LibrariesWithUv $uv $interpreter $requirements
+                } catch {
+                    if ($earlier) {
+                        Remove-Item -LiteralPath $dedicated -Recurse -Force -ErrorAction SilentlyContinue
+                        Rename-Item -LiteralPath $earlier -NewName (Split-Path $dedicated -Leaf)
+                    }
+                    throw
+                }
+                if ($earlier) { Remove-Item -LiteralPath $earlier -Recurse -Force -ErrorAction SilentlyContinue }
+                # The download cache is only needed while installing.
+                Remove-Item -LiteralPath $env:UV_CACHE_DIR -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
         Set-Content -LiteralPath $record -Value $interpreter -Encoding UTF8

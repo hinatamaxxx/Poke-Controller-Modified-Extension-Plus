@@ -1,5 +1,11 @@
 Poke-Controller Modified Extension Plus 更新履歴
 
+■ 0.3.0-alpha.61
+  ・リポジトリを、フォーク元（futo030/Poke-Controller-Modified-Extension）の GitHub 上のフォークとして公開した。
+  ・インストーラーが、フォーク元と同じく uv で Python 3.12 とライブラリを用意するようにした（python.org の Python は使わない）。uv・Python・ライブラリはアプリのフォルダーに置き、Windows には登録しない。以前の版の Python は、次の更新で uv のものに置き換わる。
+  ・コマンド1行の入口（get.ps1）をリポジトリの直下に移した: irm https://raw.githubusercontent.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/master/get.ps1 | iex
+  ・AI に「このリポジトリを導入して」と頼めるよう、AGENTS.md に導入の手順（アプリ、プラグイン、機器の接続）を書いた。CLAUDE.md の内容も AGENTS.md に移した。
+
 ■ 0.3.0-alpha.60
   ・スピーカーのアイコンにマウスを乗せたまま押すと、マウスの下に小さな説明が出ていたのをなくした。
 
