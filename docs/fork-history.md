@@ -60,10 +60,10 @@ Python ファイルだけで見ると、フォーク元の 64 ファイル・13,
 |---|---|
 | 画面のない本体 | `core.py`（770 行） `app.py` `app_paths.py` `bootstrap.py` `product.py` `safe_settings.py` `plus_preferences.py` `demo_camera.py` |
 | 操作画面と API | `web/index.html`（1,225 行） `local_control.py`（498 行） `host_channel.py` |
-| MCP | `controller_mcp.py` `controller_api.py` `plugin/` `MCP.md` `CLAUDE.md` |
+| MCP | `controller_mcp.py` `controller_api.py` `plugin/` `MCP.md` `AGENTS.md` |
 | 更新 | `update_service.py` |
 | Windows の機器 | `SerialController/WindowsDevices.py`（COM でカメラを列挙） `SerialController/UiDispatch.py` `SerialController/Paths.py` |
-| 配布 | `packaging/`（トレイアプリ C# 11 ファイル、`install.ps1` `get.ps1` `uninstall.ps1` `build.py` `Launcher.cs`、WebView2 SDK の DLL） |
+| 配布 | `packaging/`（トレイアプリ C# 11 ファイル、`install.ps1` `uninstall.ps1`（コマンド1行の入口 `get.ps1` はリポジトリの直下） `build.py` `Launcher.cs`、WebView2 SDK の DLL） |
 | テスト | `tests/`（unittest 9 ファイル、`integration.py`、`virtual_gamepad.py`） |
 | 文書 | `README.upstream.md` `changelog.upstream.txt` `THIRD_PARTY_NOTICES.md` `.gitattributes` `requirements-lock.txt` |
 

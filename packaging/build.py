@@ -16,6 +16,8 @@ EXCLUDED_PARTS = {'profiles', 'log', 'runtime', 'Captures', 'Controller_Log', '_
 # but are not part of this app's install.
 UPSTREAM_ONLY = ('bootstrap/', 'docs/', 'DirectShowLib/', 'SerialController/tests/', 'pyproject.toml', 'uv.lock', 'ruff.toml',
                  'requirements-web.txt', '.python-version', 'CONTRIBUTING.md')
+# Only for setting up from the repository; the release carries its own copy of get.ps1.
+REPOSITORY_ONLY = ('get.ps1', 'AGENTS.md')
 
 
 def version():
@@ -63,7 +65,7 @@ def build(out):
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     for name in tracked:
         if not name or name.startswith(('.git', '.claude-plugin/', '.codex-plugin/', '.agents/', 'plugin/', 'packaging/', 'tests/', 'Images/')) or set(Path(name).parts) & EXCLUDED_PARTS \
-                or name.startswith(UPSTREAM_ONLY) or (name.endswith('.bat') and '/' not in name):
+                or name.startswith(UPSTREAM_ONLY) or name in REPOSITORY_ONLY or (name.endswith('.bat') and '/' not in name):
             continue
         source = ROOT / name
         if source.is_file():
@@ -88,7 +90,7 @@ def archive(out):
     with target.open('rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     target.with_name(target.name + '.sha256').write_text(f'{digest}  {target.name}\n', encoding='ascii')
-    shutil.copy2(PACKAGING / 'get.ps1', release / 'get.ps1')
+    shutil.copy2(ROOT / 'get.ps1', release / 'get.ps1')
     print(target, f'{target.stat().st_size / 1024 / 1024:.1f} MB')
 
 

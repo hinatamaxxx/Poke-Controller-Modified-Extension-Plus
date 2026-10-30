@@ -19,25 +19,43 @@
 
 ## インストール
 
-PowerShell で次の1行を実行します。管理者権限は要りません。
+### AI に頼む
 
-```powershell
-irm https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/releases/latest/download/get.ps1 | iex
+Claude Code や Codex に、次のように頼みます。アプリ本体とプラグインを入れ、動くところまで確かめます（手順は [AGENTS.md](AGENTS.md)）。
+
+```
+https://github.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus を導入して。
 ```
 
-Python の扱いはインストール時に選べます（`get.ps1` と `install.ps1` の引数）。
+### 自分で入れる
+
+PowerShell で次の1行を実行します。管理者権限は要らず、Python も入っていなくてかまいません。
+
+```powershell
+irm https://raw.githubusercontent.com/hinatamaxxx/Poke-Controller-Modified-Extension-Plus/master/get.ps1 | iex
+```
+
+- 最新のリリースを取得して照合（SHA-256）し、`%LOCALAPPDATA%\Programs\PokeController` に入れます。
+- フォーク元と同じく [uv](https://docs.astral.sh/uv/) で、アプリ専用の Python 3.12 とライブラリ（`requirements-lock.txt`）を用意します。uv・Python・ライブラリはアプリのフォルダーの中に置き、Windows には登録しません。既存の Python 環境には触りません。
+- スタートメニューに「Poke-Controller」が入り、「設定 → アプリ → インストールされているアプリ」からアンインストールできます。
+- 署名していないため、SmartScreen の警告が出たら「詳細情報」→「実行」で進めます。
+
+Claude Code・Codex から使うときは、あわせてプラグインを入れます（[Claude Code・Codex のプラグイン](#claude-codecodex-のプラグイン)）。
+
+<details>
+<summary>Python を自分で用意するとき・ソースから入れるとき</summary>
+
+`install.ps1` の引数で、Python の扱いを変えられます。
 
 | 指定 | 内容 |
 |---|---|
-| なし（おすすめ） | python.org 版の Python 3.12 があれば、それをもとに専用の仮想環境を作る。なければ公式の Python 3.12 を専用フォルダーに展開する（システムには登録しない）。どちらも既存の Python 環境には触らない |
-| `-Python Existing [-PythonPath <python.exe>]` | 指定した Python にライブラリを入れて使う |
+| なし（おすすめ） | uv で、アプリ専用の Python 3.12 とライブラリを用意する |
+| `-Python Existing [-PythonPath <python.exe>]` | 指定した Python 3.12 にライブラリを入れて使う |
 | `-Python Manual -PythonPath <python.exe>` | 指定した Python をそのまま使う。ライブラリは自分で用意する |
 
-ライブラリは元のポケコンと同じ組み合わせ（`requirements-lock.txt`）を PyPI から入れます。Microsoft Store 版の Python はカメラの許可が別に必要になるため、おすすめの方法では使いません。
+`-DesktopShortcut` でデスクトップにも置きます。ソースから入れるときは `python packaging\build.py` の後、`dist\PokeController\install.ps1` を実行します。Microsoft Store 版の Python はカメラの許可が別に必要になるため、使いません。
 
-ほかの引数: `-DesktopShortcut`（デスクトップにも置く）。Claude Code・Codex から使うときは、あわせてプラグインを入れます（[Claude Code・Codex のプラグイン](#claude-codecodex-のプラグイン)）。ソースから入れる場合は `python packaging\build.py` の後、`dist\PokeController\install.ps1` を実行します。
-
-署名していないため、SmartScreen の警告が出たら「詳細情報」→「実行」で進めます。
+</details>
 
 ## 使い方
 
@@ -116,7 +134,7 @@ Claude も同じ一覧（`list_sessions`）で台を選び、`add_switch` など
 | プログラム | `%LOCALAPPDATA%\Programs\PokeController` |
 | スクリプト・テンプレート画像・キャプチャ（作業フォルダー） | `ドキュメント\PokeController`（中は元の `SerialController` と同じ構成） |
 | 設定（プロファイル、通知トークン、自動更新） | `%APPDATA%\PokeController` |
-| 専用の Python、ログ、接続ファイル | `%LOCALAPPDATA%\PokeController`（Switch ごとのログは `log\worker-<設定名>.log`） |
+| 専用の Python（uv が用意したもの）、ログ、接続ファイル | `%LOCALAPPDATA%\PokeController`（Switch ごとのログは `log\worker-<設定名>.log`） |
 | Switch の一覧 | 最初の Switch の設定フォルダーの `switches.json`。2 台目からの設定は `default-2` のような名前のフォルダー |
 
 同梱のサンプルは初回起動時に作業フォルダーの `Commands\PythonCommands` と `Template` へコピーし、利用者が変更したファイルは上書きしません。
@@ -155,13 +173,13 @@ Claude も同じ一覧（`list_sessions`）で台を選び、`add_switch` など
 
 ## 大きさ
 
-配布物は約 5MB（アプリのコード、サンプル画像、WebView2 の部品）です。Python とライブラリは同梱せず、インストール時に用意します。ライブラリ（OpenCV、SciPy、pandas など、元のポケコンと同じもの）は約 500MB で、専用の環境に入ります。
+配布物は約 5MB（アプリのコード、サンプル画像、WebView2 の部品）です。Python とライブラリは同梱せず、インストール時に uv で用意します。Python（約 100MB）とライブラリ（OpenCV、SciPy、pandas など、元のポケコンと同じもの。約 500MB）は、専用の環境に入ります。ダウンロードの一時ファイルは、インストールの最後に消します。
 
 ## 開発
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+uv venv --python 3.12 .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements-lock.txt
 .venv\Scripts\python.exe -m unittest discover -s tests
 .venv\Scripts\python.exe tests\integration.py
 .venv\Scripts\python.exe app.py --demo
