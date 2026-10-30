@@ -172,6 +172,9 @@ python -m venv .venv
 ### フォーク元との関係
 
 - `SerialController/` は、フォーク元（futo030/Poke-Controller-Modified-Extension）が配布しているものと同じ中身です。手を加えていません。例外は、ここで足したファイル（`Paths.py`、`WindowsDevices.py`、`UiDispatch.py`、サンプルの `PortableDemo.py`）だけです。
+- `SerialController/Window.py`、`Menubar.py`、`GuiAssets.py`、`ui/` などは、フォーク元の tkinter の画面です。このアプリでは起動せず、画面はブラウザーの画面（`web/index.html`）が受け持ちます。それでも消さずに残しています。
+  - フォーク元の更新を、衝突なくそのまま取り込めるようにするため。
+  - 中身の部品が一部を読み込んでいるため（スクリプトの土台が `GuiAssets.py` を、確認ダイアログが代わりのないときに `ui/dialogue` を使う）。消すと、読み込みの時点で止まるおそれがあります。
 - このアプリで足した動きは、外側のファイルにまとめています。
 
 | ファイル | 中身 |
