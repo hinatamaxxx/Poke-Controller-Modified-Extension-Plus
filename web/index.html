@@ -323,6 +323,9 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .audio-level span { display: block; height: 100%; width: 0; background: #3fb950; }
 .audio-db { min-width: 5em; font-size: 12px; opacity: .8; }
 #audio-volume { width: 120px; }
+.audio-check { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.audio .inline { flex-wrap: nowrap; }
+.audio .inline select { flex: 1 1 auto; min-width: 0; width: 0; }
 .mask-hint[hidden] { display: none; }
 .video .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #aaa; }
 .video .empty[hidden] { display: none; }
@@ -665,15 +668,15 @@ table.notify input { margin: 1px 0; }
           <div class="inline">
             <select id="audio-input" aria-label="音声の入力"></select>
             <button class="cmd" id="audio-rescan">再検索</button>
+            <label class="audio-check"><input type="checkbox" id="audio-use"> 取り込む</label>
           </div>
           <label for="audio-output">再生先</label>
-          <div class="inline"><select id="audio-output" aria-label="音声の再生先"></select></div>
+          <div class="inline">
+            <select id="audio-output" aria-label="音声の再生先"></select>
+            <label class="audio-check"><input type="checkbox" id="audio-playback"> PC で鳴らす</label>
+          </div>
           <label for="audio-volume">音量</label>
           <div class="inline"><input type="range" id="audio-volume" min="0" max="100" step="1" aria-label="音量"><span class="audio-level" id="audio-level"><span></span></span><span class="audio-db" id="audio-db"></span></div>
-        </div>
-        <div class="checks">
-          <label><input type="checkbox" id="audio-use"> 音声を取り込む</label>
-          <label><input type="checkbox" id="audio-playback"> PC で鳴らす</label>
         </div>
       </div>
       <div class="error full" id="audio-error"></div>
@@ -1301,7 +1304,7 @@ function renderAudio() {
   if (!audio.available) return;
   const inputs = audio.inputs.map(name => [name, name]);
   if (!inputs.length) inputs.push(['', '見つかりません']);
-  fillSelect($('audio-input'), inputs, audio.input);
+  fillSelect($('audio-input'), inputs, audio.input || inputs[0][0]);  // unset: the first one is taken when capture starts
   fillSelect($('audio-output'), audio.outputs.map(name => [name, name === 'Default' ? '既定の再生デバイス' : name]), audio.output);
   $('audio-use').checked = audio.use;
   $('audio-playback').checked = audio.playback;

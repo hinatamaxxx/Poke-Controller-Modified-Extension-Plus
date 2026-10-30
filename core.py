@@ -1097,8 +1097,12 @@ class Core:
                 settings.audio_device, restart = str(values['input']), True
             if 'use' in values and bool(values['use']) != bool(settings.is_use_audio):
                 settings.is_use_audio, restart = bool(values['use']), True
+            wanted = bool(settings.is_use_audio)  # apply() turns it off when the input does not open
             if restart:
                 audio.apply(self._audio_cameras(), 0)
+            if restart and wanted and not audio.is_running:
+                self.settings.save()
+                raise ValueError(f'{settings.audio_device or "音声の入力"} を開けませんでした。ほかの入力を選んでください。')
             if 'output' in values:
                 settings.audio_output_device = str(values['output'])
                 audio.apply_output_device()
