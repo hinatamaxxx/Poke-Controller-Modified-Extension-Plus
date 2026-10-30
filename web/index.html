@@ -324,7 +324,11 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .audio-db { min-width: 5em; font-size: 12px; opacity: .8; }
 .audio-head { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
 .audio-head h3 { margin: 0; }
-.audio-check[hidden], .audio-level[hidden] { display: none; }
+.audio-check[hidden] { display: none; }
+.audio-meter { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+/* Muted: the level still moves (the sound is taken in), greyed, with the muted speaker in front. */
+.audio-meter.muted .audio-level span { background: var(--muted, #8b949e); }
+.audio-meter.muted .audio-db { color: #f0883e; font-weight: 600; opacity: 1; }
 .audio-check { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .audio .inline { flex-wrap: nowrap; }
 .audio .inline select { flex: 1 1 auto; min-width: 0; width: 0; }
@@ -663,7 +667,7 @@ table.notify input { margin: 1px 0; }
         <div class="error full" id="serial-error"></div>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
-      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label><span class="audio-level" id="audio-level" aria-hidden="true"><span></span></span><span class="audio-db" id="audio-db"></span></div>
+      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label><span class="audio-meter" id="audio-meter"><span class="audio-level" id="audio-level" aria-hidden="true"><span></span></span><span class="audio-db" id="audio-db"></span></span></div>
       <div class="audio" id="audio">
         <div class="form">
           <label for="audio-input">入力</label>
@@ -1304,12 +1308,14 @@ function renderAudio() {
   fillSelect($('audio-output'), audio.outputs.map(name => [name, name === 'Default' ? '既定の再生デバイス' : name]), audio.output);
   $('audio-on').checked = audio.use && audio.playback;
   const meter = audio.meter;
-  $('audio-level').hidden = !audio.use;
+  const muted = !(audio.use && audio.playback);
+  $('audio-meter').classList.toggle('muted', muted);
   $('audio-level').firstElementChild.style.width = (meter ? meter.percent : 0) + '%';
-  $('audio-db').textContent = !audio.use ? '' : meter ? (meter.text === 'No signal' ? '音が来ていません' : meter.text) : '';
+  $('audio-db').textContent = muted ? 'ミュート' : meter ? (meter.text === 'No signal' ? '音が来ていません' : meter.text) : '';
 }
-// One switch: on takes the board's sound in and plays it at full volume (Windows sets how loud); off stops both.
-$('audio-on').addEventListener('change', () => saveAudio($('audio-on').checked ? {use: true, playback: true, volume: 100} : {use: false}));
+// One switch: on plays the board's sound at full volume (Windows sets how loud); off mutes it but keeps taking it in,
+// so the meter shows whether sound is coming.
+$('audio-on').addEventListener('change', () => saveAudio($('audio-on').checked ? {use: true, playback: true, volume: 100} : {playback: false}));
 $('audio-input').addEventListener('change', () => saveAudio({input: $('audio-input').value}));
 $('audio-output').addEventListener('change', () => saveAudio({output: $('audio-output').value}));
 $('audio-rescan').addEventListener('click', () => saveAudio({refresh: true}));
