@@ -431,7 +431,9 @@ class Core:
         self.ser = plus_runtime.make_sender(self.show_serial.get())
         if demo:
             plus_runtime.install_demo_sender(self.ser)
-        KeyPress.serial_data_format_name = self.settings.serial_data_format_name.get() or 'Default'
+        from services.serial_service import SerialService
+        self.serial = SerialService(self.ser)  # the fork origin's port list order, connecting and the Data Format
+        self.serial.set_data_format(self.settings.serial_data_format_name.get() or 'Default')
         self.keys_software_controller = KeyPress(self.ser)
         self.cur_command, self.running = None, False
         self.starting = None  # name of a script whose setup (e.g. its own settings window) is still open
@@ -1275,8 +1277,16 @@ class Core:
 
     # ---- serial ----
     def ports(self):
+        """The ports in the fork origin's order (by their COM number; ports without one after them)."""
         from serial.tools import list_ports
-        return [{'port': p.device, 'description': p.description} for p in sorted(list_ports.comports(), key=lambda p: p.device)]
+        from services.serial_service import port_number
+
+        def order(port):
+            try:
+                return 0, port_number(port.device)
+            except (AttributeError, ValueError):
+                return 1, 0
+        return [{'port': p.device, 'description': p.description} for p in sorted(list_ports.comports(), key=order)]
 
     def serial_open(self):
         return self.demo or self.ser.isOpened()
@@ -1291,13 +1301,9 @@ class Core:
         number = int(self.settings.com_port.get() or 0)
         if not name and number <= 0:
             return False
-        if self.ser.openSerial(number, name, int(self.settings.baud_rate.get() or 9600)):
-            print(f'{self.serial_target()} に接続しました。')
-            return True
-        return False
+        return self.serial.connect(number, name, int(self.settings.baud_rate.get() or 9600))
 
     def connect_serial(self, port, baud=None, fmt=None):
-        from Commands.Keys import KeyPress
         with self.lock:
             if self.running:
                 raise ValueError('Stop the running script before changing the connection')
@@ -1308,8 +1314,7 @@ class Core:
             forced = forced_baud_rate(fmt)  # the fork origin: the format decides the baud rate (None: an FTDI board has none)
             baud = forced if forced is not None else int(baud or 9600)
             port = str(port or '').strip()
-            if self.ser.isOpened():
-                self.ser.closeSerial()
+            self.serial.disconnect()
             if port.upper().startswith('COM') and port[3:].isdigit():
                 self.settings.com_port.set(int(port[3:]))
                 self.settings.com_port_name.set('')
@@ -1318,7 +1323,7 @@ class Core:
                 self.settings.com_port_name.set(port)
             self.settings.baud_rate.set(baud)
             self.settings.serial_data_format_name.set(fmt)
-            KeyPress.serial_data_format_name = fmt
+            self.serial.set_data_format(fmt)
             self.save()
             if port and not self.open_serial():
                 raise ValueError(f'{port} に接続できません。ほかのアプリが使っていないか確認してください。')
@@ -1331,7 +1336,7 @@ class Core:
                 try:
                     self.keys_software_controller.end()
                 finally:
-                    self.ser.closeSerial()
+                    self.serial.disconnect()
                 print('シリアル接続を切断しました。')
 
     # ---- periodic work on the main thread ----
@@ -1446,6 +1451,6 @@ class Core:
             except Exception:
                 self._logger.exception('入力の解放に失敗しました')
             finally:
-                self.ser.closeSerial()
+                self.serial.disconnect()
             self.camera.destroy()
             self.save()
