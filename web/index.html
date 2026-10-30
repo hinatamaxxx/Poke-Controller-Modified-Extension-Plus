@@ -323,6 +323,9 @@ button.mini.danger { color: var(--danger); border-color: var(--danger); }
 .audio-level span { display: block; height: 100%; width: 0; background: #3fb950; }
 .audio-db { min-width: 5em; font-size: 12px; opacity: .8; }
 #audio-volume { width: 120px; }
+.audio-head { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+.audio-head h3 { margin: 0; }
+.audio-check[hidden] { display: none; }
 .audio-check { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .audio .inline { flex-wrap: nowrap; }
 .audio .inline select { flex: 1 1 auto; min-width: 0; width: 0; }
@@ -661,20 +664,16 @@ table.notify input { margin: 1px 0; }
         <div class="error full" id="serial-error"></div>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="show_serial"> 通信内容を表示</label></div>
-      <h3>音声</h3>
+      <div class="audio-head"><h3>音声</h3><label class="audio-check" id="audio-on-label"><input type="checkbox" id="audio-on"> 音声を鳴らす</label></div>
       <div class="audio" id="audio">
         <div class="form">
           <label for="audio-input">入力</label>
           <div class="inline">
             <select id="audio-input" aria-label="音声の入力"></select>
             <button class="cmd" id="audio-rescan">再検索</button>
-            <label class="audio-check"><input type="checkbox" id="audio-use"> 取り込む</label>
           </div>
           <label for="audio-output">再生先</label>
-          <div class="inline">
-            <select id="audio-output" aria-label="音声の再生先"></select>
-            <label class="audio-check"><input type="checkbox" id="audio-playback"> PC で鳴らす</label>
-          </div>
+          <div class="inline"><select id="audio-output" aria-label="音声の再生先"></select></div>
           <label for="audio-volume">音量</label>
           <div class="inline"><input type="range" id="audio-volume" min="0" max="100" step="1" aria-label="音量"><span class="audio-level" id="audio-level"><span></span></span><span class="audio-db" id="audio-db"></span></div>
         </div>
@@ -1299,22 +1298,21 @@ function saveAudio(values) {
 }
 function renderAudio() {
   const audio = state.audio || {};
-  $('audio').hidden = !audio.available;
+  $('audio').hidden = $('audio-on-label').hidden = !audio.available;
   if (audio.available === false) $('audio-error').textContent = '音声を扱うライブラリ（sounddevice）が使えません。';
   if (!audio.available) return;
   const inputs = audio.inputs.map(name => [name, name]);
   if (!inputs.length) inputs.push(['', '見つかりません']);
   fillSelect($('audio-input'), inputs, audio.input || inputs[0][0]);  // unset: the first one is taken when capture starts
   fillSelect($('audio-output'), audio.outputs.map(name => [name, name === 'Default' ? '既定の再生デバイス' : name]), audio.output);
-  $('audio-use').checked = audio.use;
-  $('audio-playback').checked = audio.playback;
+  $('audio-on').checked = audio.use && audio.playback;
   if (document.activeElement !== $('audio-volume')) $('audio-volume').value = audio.volume;
   const meter = audio.meter;
   $('audio-level').firstElementChild.style.width = (meter ? meter.percent : 0) + '%';
   $('audio-db').textContent = !audio.use ? '' : meter ? (meter.text === 'No signal' ? '音が来ていません' : meter.text) : '';
 }
-$('audio-use').addEventListener('change', () => saveAudio({use: $('audio-use').checked}));
-$('audio-playback').addEventListener('change', () => saveAudio({playback: $('audio-playback').checked}));
+// One switch: on takes the board's sound in and plays it; off stops both.
+$('audio-on').addEventListener('change', () => saveAudio($('audio-on').checked ? {use: true, playback: true} : {use: false}));
 $('audio-input').addEventListener('change', () => saveAudio({input: $('audio-input').value}));
 $('audio-output').addEventListener('change', () => saveAudio({output: $('audio-output').value}));
 $('audio-volume').addEventListener('change', () => saveAudio({volume: Number($('audio-volume').value)}));
@@ -1677,6 +1675,11 @@ function renderSettings() {
   $('log1-title').textContent = exec === 1 ? 'ログ1（実行ログ）' : 'ログ1';
   $('log2-title').textContent = exec === 2 ? 'ログ2（実行ログ）' : 'ログ2';
   const app = state.app || {};
+  // After the app was updated, a page left open still shows the old screen: load the new one.
+  if (app.version) {
+    pageVersion = pageVersion || app.version;
+    if (app.version !== pageVersion) { location.reload(); return; }
+  }
   if (document.activeElement !== $('auto-update')) $('auto-update').checked = !!app.auto_update;
   if (document.activeElement !== $('pad-colors')) $('pad-colors').value = app.pad_colors || 'Default';
   $('pad-stick-click').checked = !!app.pad_stick_click;
@@ -1751,6 +1754,7 @@ $('key-reset').addEventListener('click', () => { assigning = null; renderKeymap(
 
 function manualAllowed() { return !!state && !state.running && state.serial_open; }
 
+let pageVersion = '';  // the app's version this page was loaded with
 function render() {
   $('act-capture').disabled = $('act-discord').disabled = !state.camera_live;
   $('profile').hidden = !state.demo;
