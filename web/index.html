@@ -459,7 +459,8 @@ table.notify input { margin: 1px 0; }
 .stick.on .knob { background: var(--btn-on); }
 .pad-slot { flex: 1; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
 .pad-slot:empty { display: none; }
-.pad-slot .pad-wrap { --pad-w: min(calc(100cqw - 12px), calc((100cqh - 30px) * 2), 640px); }
+/* The pad takes the height the rows under it (options, the Switch keyboard) leave: --pad-below is their measured height. */
+.pad-slot .pad-wrap { --pad-w: min(calc(100cqw - 12px), calc((100cqh - var(--pad-below, 32px)) * 2), 640px); }
 .manual-options { justify-content: center; align-items: center; font-size: 12px; margin-top: 6px; }
 .switch-keys { width: 100%; max-width: 520px; margin: 6px auto 0; gap: 4px; }
 .switch-keys[hidden] { display: none; }
@@ -601,7 +602,7 @@ table.notify input { margin: 1px 0; }
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-camera" aria-controls="panel-camera" aria-selected="false">カメラ</button>
       <button role="tab" id="tab-device" aria-controls="panel-device" aria-selected="false">機器接続</button>
-      <button role="tab" id="tab-pad" aria-controls="panel-pad" aria-selected="false">手動操作</button>
+      <button role="tab" id="tab-pad" aria-controls="panel-pad" aria-selected="false">コントローラー</button>
       <button role="tab" id="tab-script" aria-controls="panel-script" aria-selected="true">スクリプト</button>
       <button role="tab" id="tab-claude" aria-controls="panel-claude" aria-selected="false">Claude</button>
       <button role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false">ログ</button>
@@ -1468,6 +1469,15 @@ function renderBaud() {
 }
 $('format').addEventListener('change', renderBaud);
 
+// How tall the rows under the pad are (they wrap on narrow screens, and the keyboard row comes and goes).
+function measurePadBelow() {
+  const wrap = $('pad-wrap');
+  const below = [...wrap.children].filter(child => child !== $('pad'))
+    .reduce((sum, child) => sum + (child.hidden ? 0 : child.offsetHeight + parseFloat(getComputedStyle(child).marginTop)), 0);
+  wrap.style.setProperty('--pad-below', Math.ceil(below) + 'px');
+}
+new ResizeObserver(measurePadBelow).observe($('pad-wrap'));
+
 // Scripts
 function scriptItems() { return (state && state.tags && state.tags[$('kind').value]) || []; }
 // Script names look like "名前 (Folder/Sub/module)"; show the name and the folder separately.
@@ -1788,7 +1798,8 @@ function render() {
   renderSchedule();
   renderMasks();
   renderAudio();
-  $('switch-keys').hidden = !!state.keyboard || !state.serial_open;
+  const keysHidden = !!state.keyboard || !state.serial_open;
+  if ($('switch-keys').hidden !== keysHidden) { $('switch-keys').hidden = keysHidden; measurePadBelow(); }
   const exec = (state.choices || {}).stdout_destination === '2' ? 2 : 1;
   const local = localLog.length ? localLog.join('\n') + '\n' : '';
   fillLog('log1', state.log + (exec === 1 ? local : ''));
