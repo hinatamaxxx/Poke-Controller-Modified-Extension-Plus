@@ -1,5 +1,8 @@
 Poke-Controller Modified Extension Plus 更新履歴
 
+■ 0.3.0-alpha.62
+  ・Python を uv のものに置き換えたとき、使用中で消せなかった古い Python のフォルダーを、次のインストールで消すようにした。
+
 ■ 0.3.0-alpha.61
   ・リポジトリを、フォーク元（futo030/Poke-Controller-Modified-Extension）の GitHub 上のフォークとして公開した。
   ・インストーラーが、フォーク元と同じく uv で Python 3.12 とライブラリを用意するようにした（python.org の Python は使わない）。uv・Python・ライブラリはアプリのフォルダーに置き、Windows には登録しない。以前の版の Python は、次の更新で uv のものに置き換わる。

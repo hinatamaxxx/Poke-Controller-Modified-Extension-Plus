@@ -252,6 +252,9 @@ try {
             }
             'Auto' {
                 # Like the fork origin: uv prepares Python 3.12 and the libraries (no Python needs to be installed).
+                # A replaced runtime still in use (e.g. by an MCP server of an open Claude session) is removed the next time.
+                Get-ChildItem -LiteralPath $Local -Directory -Filter 'python.old-*' -ErrorAction SilentlyContinue |
+                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
                 Remove-BrokenRuntime $dedicated
                 $uv = Get-Uv
                 Set-UvEnvironment
