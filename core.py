@@ -1050,6 +1050,7 @@ class Core:
             from services.audio_service import AudioService
             plus_audio.install()
             self.audio = AudioService(AudioSettings(self.settings))
+            plus_audio.watch_default(lambda: self.audio.capture, self.lock)
             if self.audio.available:
                 self.audio.refresh(self._audio_cameras())
         return self.audio
